@@ -24,20 +24,138 @@ const Logo = ({ size = 32 }) => (
   </svg>
 );
 
+// ─── Typewriter ───────────────────────────────────────────────────────────────
+function TypewriterText({ dark }) {
+  const [displayed, setDisplayed] = useState("");
+  const [done, setDone]           = useState(false);
+
+  const line1 = "Committed to You.";
+  const line2 = "Accountable Always.";
+  const full  = line1 + " " + line2;
+
+  useEffect(() => {
+    setDisplayed("");
+    setDone(false);
+    let i = 0;
+    const start = setTimeout(() => {
+      const tick = setInterval(() => {
+        i++;
+        setDisplayed(full.slice(0, i));
+        if (i >= full.length) { clearInterval(tick); setDone(true); }
+      }, 48);
+      return () => clearInterval(tick);
+    }, 300);
+    return () => clearTimeout(start);
+  }, []);
+
+  const shownLine1 = displayed.slice(0, Math.min(displayed.length, line1.length));
+  const shownLine2 = displayed.length > line1.length + 1 ? displayed.slice(line1.length + 1) : "";
+  const cursorOnLine1 = !done && shownLine2 === "";
+  const cursorOnLine2 = !done && shownLine2 !== "";
+
+  return (
+    <div className="mb-5">
+      {/* Shield icon + text row */}
+      <div className="flex items-center gap-4 mb-4">
+
+        {/* Shield — light blue rounded square, gradient icon, white checkmark */}
+        <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center relative overflow-hidden"
+          style={{
+            background: dark ? "rgba(96,165,250,0.15)" : "#dbeafe",
+            boxShadow: dark ? "none" : "0 2px 8px rgba(59,130,246,0.1)",
+          }}>
+          {/* Pulsing background glow */}
+          <div className="shield-bg-glow absolute inset-0 rounded-2xl pointer-events-none"
+            style={{ background: "radial-gradient(circle at 50% 50%, rgba(59,130,246,0.5), transparent 70%)" }} />
+          <svg viewBox="0 0 24 24" fill="none" className="shield-animate w-11 h-11 relative z-10">
+            <defs>
+              <linearGradient id="sg" x1="0" y1="0" x2="1" y2="1">
+                <stop offset="0%" stopColor="#60a5fa" />
+                <stop offset="100%" stopColor="#2563eb" />
+              </linearGradient>
+            </defs>
+            <path d="M12 2L4 5v6c0 5.25 3.5 10.15 8 11.35C16.5 21.15 20 16.25 20 11V5L12 2z"
+              fill="url(#sg)" />
+            <polyline points="8.5 12 11 14.5 15.5 9.5"
+              className="check-draw"
+              stroke="white" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+
+        {/* Text */}
+        <div>
+          <p className="font-extrabold leading-tight"
+            style={{ fontSize: "1.45rem", color: dark ? "#ffffff" : "#1e3a8a" }}>
+            {shownLine1}
+            {cursorOnLine1 && <span className="tw-cursor" style={{ color: "#3b82f6", fontWeight: 200 }}>|</span>}
+          </p>
+          <p className="font-bold mt-0.5"
+            style={{ fontSize: "1.1rem", color: dark ? "#93c5fd" : "#047857" }}>
+            {shownLine2}
+            {cursorOnLine2 && <span className="tw-cursor" style={{ color: dark ? "#93c5fd" : "#047857", fontWeight: 400 }}>|</span>}
+          </p>
+        </div>
+      </div>
+
+      {/* Divider — gradient underline (old style) */}
+      {done && (
+        <div className="mb-1 h-0.5 rounded-full"
+          style={{
+            width: "100%",
+            background: dark
+              ? "linear-gradient(90deg,#e2e8f0,#93c5fd,transparent)"
+              : "linear-gradient(90deg,#1e3a8a,#047857,transparent)",
+            opacity: 0.35,
+            animation: "fadeSlideIn 0.5s ease forwards",
+          }} />
+      )}
+    </div>
+  );
+}
+
 const injectStyles = () => {
   if (typeof document !== "undefined" && !document.getElementById("login-styles")) {
     const s = document.createElement("style");
     s.id = "login-styles";
     s.innerHTML = `
-      @keyframes floatUp   { 0%,100%{transform:translateY(0)}   50%{transform:translateY(-16px)} }
+      @keyframes shieldPulse { 
+        0%,100% { transform: scale(1);    filter: drop-shadow(0 0 4px rgba(59,130,246,0.4)); } 
+        50%      { transform: scale(1.08); filter: drop-shadow(0 0 12px rgba(59,130,246,0.8)); } 
+      }
+      @keyframes shieldGlow {
+        0%,100% { opacity: 0.15; }
+        50%      { opacity: 0.45; }
+      }
+      @keyframes checkDraw {
+        from { stroke-dashoffset: 20; opacity: 0; }
+        to   { stroke-dashoffset: 0;  opacity: 1; }
+      }
+      .shield-animate { animation: shieldPulse 4s ease-in-out infinite; }
+      .shield-bg-glow { animation: shieldGlow  6s ease-in-out infinite; }
+      .check-draw     { stroke-dasharray: 20; animation: checkDraw 1.4s 0.6s ease forwards; opacity: 0; }
       @keyframes floatDown { 0%,100%{transform:translateY(0)}   50%{transform:translateY(12px)}  }
       @keyframes fadeSlideIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+      @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+      @keyframes overlayIn { from{opacity:0} to{opacity:1} }
+      @keyframes textPop { from{opacity:0;transform:translateY(12px) scale(0.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+      @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
       .bar-float  { animation: floatUp   5s ease-in-out infinite; }
       .coin-float { animation: floatDown 4s ease-in-out infinite; }
       .fade-in    { animation: fadeSlideIn 0.6s ease forwards; }
       .fade-in-1  { animation: fadeSlideIn 0.6s 0.1s ease both; }
       .fade-in-2  { animation: fadeSlideIn 0.6s 0.2s ease both; }
       .fade-in-3  { animation: fadeSlideIn 0.6s 0.3s ease both; }
+      .tw-cursor  { animation: blink 0.75s step-end infinite; }
+      .overlay-in { animation: overlayIn 0.35s ease forwards; }
+      .text-pop   { animation: textPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
+      .shimmer-text {
+        background: linear-gradient(90deg, #93c5fd 0%, #ffffff 40%, #6ee7b7 60%, #93c5fd 100%);
+        background-size: 200% auto;
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        animation: shimmer 2.5s linear infinite;
+      }
       /* Light neumorphic */
       .neu-outer { box-shadow: 20px 20px 40px #c8cdd6, -20px -20px 40px #ffffff; }
       .neu-inner { box-shadow: inset 5px 5px 10px #d1d5db, inset -5px -5px 10px #ffffff; }
@@ -67,6 +185,7 @@ export default function Login() {
   const [showPw, setShowPw]         = useState(false);
   const [error, setError]           = useState("");
   const [loading, setLoading]       = useState(false);
+  const [loginText, setLoginText]   = useState("");
 
   const dark = theme === "dark";
 
@@ -74,9 +193,20 @@ export default function Login() {
     e.preventDefault();
     setError("");
     setLoading(true);
+    setLoginText("");
+
+    // Start typewriter immediately on click
+    const msg = "Your Trust, Our Priority.";
+    let i = 0;
+    const tick = setInterval(() => {
+      i++;
+      setLoginText(msg.slice(0, i));
+      if (i >= msg.length) clearInterval(tick);
+    }, 60);
+
     const result = await login(credential.trim(), password);
     setLoading(false);
-    if (!result.success) { setError(result.error); return; }
+    if (!result.success) { setError(result.error); setLoginText(""); return; }
     navigate(result.role === "admin" ? "/admin" : "/dashboard", { replace: true });
   };
 
@@ -95,7 +225,7 @@ export default function Login() {
   const features = [
     { Icon: BarChartIcon, label: "Portfolio Analytics",  accent: "#60a5fa", bg: "rgba(96,165,250,0.15)"  },
     { Icon: ShieldIcon,   label: "Secure & Encrypted",   accent: "#34d399", bg: "rgba(52,211,153,0.15)"  },
-    { Icon: UsersIcon,    label: "Family Management",    accent: "#c084fc", bg: "rgba(192,132,252,0.15)" },
+    // { Icon: UsersIcon,    label: "Family Management",    accent: "#c084fc", bg: "rgba(192,132,252,0.15)" },
   ];
 
   return (
@@ -112,22 +242,25 @@ export default function Login() {
       {/* ── Header ── */}
       <header className="relative z-20 flex items-center justify-end gap-3 px-8 py-5">
         <Link to="/support"
-          className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all ${pillShadow}`}
-          style={{ background: cardBg, color: subC }}>
-          Support <ChatIcon />
+          className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${pillShadow}`}
+          style={{ background: cardBg, color: subC }}
+          title="Support">
+          <ChatIcon />
         </Link>
         <button
           onClick={() => setTheme(dark ? "light" : "dark")}
-          className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all ${pillShadow}`}
-          style={{ background: cardBg, color: subC }}>
+          className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${pillShadow}`}
+          style={{ background: cardBg, color: subC }}
+          title={dark ? "Switch to Light" : "Switch to Dark"}>
           {dark ? <SunIcon /> : <MoonIcon />}
-          Theme Comparison
         </button>
       </header>
 
       {/* ── Main ── */}
       <main className="flex-1 flex items-center justify-center px-4 pb-6">
-        <div className="flex flex-col lg:flex-row gap-5 items-stretch">
+        <div className="w-full max-w-6xl mx-auto">
+          
+          <div className="flex flex-col lg:flex-row gap-5 items-stretch justify-center">
 
           {/* ══ LEFT PANEL ══ */}
           <div className={`relative overflow-hidden rounded-[2.5rem] flex flex-col w-full lg:w-[420px] flex-shrink-0 ${outerShadow} fade-in`}
@@ -237,19 +370,35 @@ export default function Login() {
           </div>
 
           {/* ══ RIGHT: Login Card ══ */}
-          <div className={`w-full lg:w-[400px] flex-shrink-0 rounded-[2.5rem] flex flex-col justify-center p-8 ${outerShadow} fade-in-1`}
-            style={{ background: cardBg }}>
+          <div className={`w-full lg:w-[400px] flex-shrink-0 rounded-[2.5rem] flex flex-col justify-start pt-8 px-8 pb-8 ${outerShadow} fade-in-1`}
+            style={{
+              background: cardBg,
+              border: dark ? '1px solid rgba(255,255,255,0.07)' : '1px solid rgba(30,58,138,0.08)',
+            }}>
+
+            {/* Typewriter tagline */}
+            <TypewriterText dark={dark} />
+
+            {/* Secure Login bordered card */}
+            <div className="rounded-2xl p-5"
+              style={{
+                border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(30,58,138,0.1)',
+                background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(255,255,255,0.7)',
+                boxShadow: dark
+                  ? '0 4px 24px rgba(0,0,0,0.25), inset 0 1px 0 rgba(255,255,255,0.06)'
+                  : '0 4px 20px rgba(30,58,138,0.07), 0 1px 4px rgba(30,58,138,0.05), inset 0 1px 0 rgba(255,255,255,0.9)',
+              }}>
 
             {/* Card header */}
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0"
-                style={{ background: "linear-gradient(135deg,#3b82f6,#1d4ed8)", boxShadow: "0 6px 20px rgba(29,78,216,0.45)" }}>
-                <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: "linear-gradient(135deg,#3b82f6,#2563eb)", boxShadow: "0 4px 12px rgba(37,99,235,0.3)" }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
                   <rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
                 </svg>
               </div>
               <div>
-                <h2 className="text-xl font-extrabold leading-none" style={{ color: headingC }}>Secure Login</h2>
+                <h2 className="text-base font-extrabold leading-none" style={{ color: dark ? "#ffffff" : "#1e3a8a" }}>Secure Login</h2>
                 <p className="text-xs font-medium mt-1" style={{ color: subC }}>Sign in to your account</p>
               </div>
             </div>
@@ -259,7 +408,7 @@ export default function Login() {
               {/* Email */}
               <div>
                 <label className="block text-xs font-bold mb-2 uppercase tracking-wider" style={{ color: subC }}>
-                  Email / LR ID
+                  Email
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: iconC }}>
@@ -341,15 +490,17 @@ export default function Login() {
               <Link to="/register" className="font-bold" style={{ color: "#3b82f6" }}>Sign Up</Link>
             </p>
 
+            </div>{/* end secure login card */}
+
             {/* Divider */}
-            <div className="flex items-center gap-3 my-4">
+            {/* <div className="flex items-center gap-3 my-4">
               <div className="flex-1 h-px" style={{ background: dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)" }} />
               <span className="text-xs font-semibold" style={{ color: iconC }}>or try a demo</span>
               <div className="flex-1 h-px" style={{ background: dark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.07)" }} />
-            </div>
+            </div> */}
 
             {/* Demo buttons */}
-            <div className="flex gap-3">
+            {/* <div className="flex gap-3">
               {[
                 { id: "LR-1001", pw: "pass123",  label: "Demo User"  },
                 { id: "ADMIN",   pw: "admin123",  label: "Demo Admin" },
@@ -362,11 +513,117 @@ export default function Login() {
                   {d.label}
                 </button>
               ))}
-            </div>
+            </div> */}
 
+          </div>
           </div>
         </div>
       </main>
+
+      {/* ── Login Loading Overlay ── */}
+      {loading && (
+        <div className="overlay-in fixed inset-0 z-50 flex flex-col items-center justify-center"
+          style={{
+            background: dark
+              ? 'rgba(10,14,30,0.75)'
+              : 'rgba(238,240,245,0.72)',
+            backdropFilter: 'blur(28px) saturate(1.8)',
+            WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+          }}>
+
+          {/* Soft radial glow behind the card */}
+          <div className="absolute pointer-events-none"
+            style={{
+              width: 480, height: 480,
+              borderRadius: '50%',
+              background: dark
+                ? 'radial-gradient(circle,rgba(59,130,246,0.18) 0%,transparent 70%)'
+                : 'radial-gradient(circle,rgba(30,58,138,0.1) 0%,transparent 70%)',
+              filter: 'blur(50px)',
+            }} />
+
+          {/* Glass card */}
+          <div className="text-pop relative z-10 flex flex-col items-center gap-6 px-12 py-10 rounded-3xl"
+            style={{
+              background: dark
+                ? 'rgba(255,255,255,0.04)'
+                : 'rgba(255,255,255,0.65)',
+              border: dark
+                ? '1px solid rgba(255,255,255,0.1)'
+                : '1px solid rgba(30,58,138,0.12)',
+              boxShadow: dark
+                ? '0 8px 48px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)'
+                : '0 8px 48px rgba(30,58,138,0.12), 0 2px 0 rgba(255,255,255,0.9), inset 0 1px 0 rgba(255,255,255,0.8)',
+            }}>
+
+            {/* Spinner */}
+            <div className="relative w-16 h-16">
+              {/* Track */}
+              <div className="absolute inset-0 rounded-full"
+                style={{ border: `2px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(30,58,138,0.1)'}` }} />
+              {/* Spin arc */}
+              <div className="absolute inset-0 rounded-full animate-spin"
+                style={{ border: '2.5px solid transparent', borderTopColor: '#3b82f6', borderRightColor: '#10b981', animationDuration: '0.85s' }} />
+              {/* Outer glow */}
+              <div className="absolute -inset-1.5 rounded-full pointer-events-none"
+                style={{ boxShadow: '0 0 20px rgba(59,130,246,0.25)' }} />
+              {/* Center dot */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: 'linear-gradient(135deg,#3b82f6,#10b981)', boxShadow: '0 0 10px rgba(59,130,246,0.6)' }} />
+              </div>
+            </div>
+
+            {/* Typewriter text */}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p style={{
+                fontSize: '1.6rem',
+                fontWeight: 900,
+                fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: '0.02em',
+                lineHeight: 1.2,
+                minHeight: '2.2rem',
+                color: dark ? '#e2e8f0' : '#1e3a8a',
+              }}>
+                {loginText}
+                <span className="tw-cursor" style={{ color: '#3b82f6', fontWeight: 200 }}>|</span>
+              </p>
+
+              {/* Animated underline */}
+              <div style={{
+                height: 2,
+                width: `${(loginText.length / 25) * 100}%`,
+                minWidth: 4,
+                maxWidth: '100%',
+                borderRadius: 99,
+                background: 'linear-gradient(90deg,#3b82f6,#10b981)',
+                boxShadow: '0 0 8px rgba(59,130,246,0.5)',
+                transition: 'width 0.06s linear',
+              }} />
+
+              <p className="text-xs font-semibold tracking-[0.18em] uppercase mt-1"
+                style={{ color: dark ? 'rgba(148,163,184,0.6)' : 'rgba(30,58,138,0.45)' }}>
+                Signing you in
+              </p>
+            </div>
+
+            {/* Staggered dots */}
+            <div className="flex items-center gap-2">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="rounded-full"
+                  style={{
+                    width: i === 1 ? 7 : 5,
+                    height: i === 1 ? 7 : 5,
+                    background: i === 1 ? '#3b82f6' : (dark ? 'rgba(59,130,246,0.4)' : 'rgba(30,58,138,0.3)'),
+                    boxShadow: i === 1 ? '0 0 10px rgba(59,130,246,0.7)' : 'none',
+                    animation: `blink 1.1s ${i * 0.22}s ease-in-out infinite`,
+                  }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

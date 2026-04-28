@@ -32,12 +32,19 @@ const injectStyles = () => {
       @keyframes floatUp   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }
       @keyframes floatDown { 0%,100%{transform:translateY(0)} 50%{transform:translateY(12px)} }
       @keyframes fadeSlideIn { from{opacity:0;transform:translateY(20px)} to{opacity:1;transform:translateY(0)} }
+      @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0} }
+      @keyframes overlayIn { from{opacity:0} to{opacity:1} }
+      @keyframes textPop { from{opacity:0;transform:translateY(12px) scale(0.96)} to{opacity:1;transform:translateY(0) scale(1)} }
+      @keyframes shimmer { 0%{background-position:200% center} 100%{background-position:-200% center} }
       .bar-float  { animation: floatUp   5s ease-in-out infinite; }
       .coin-float { animation: floatDown 4s ease-in-out infinite; }
       .fade-in    { animation: fadeSlideIn 0.6s ease forwards; }
       .fade-in-1  { animation: fadeSlideIn 0.6s 0.1s ease both; }
       .fade-in-2  { animation: fadeSlideIn 0.6s 0.2s ease both; }
       .fade-in-3  { animation: fadeSlideIn 0.6s 0.3s ease both; }
+      .tw-cursor  { animation: blink 0.75s step-end infinite; }
+      .overlay-in { animation: overlayIn 0.35s ease forwards; }
+      .text-pop   { animation: textPop 0.4s cubic-bezier(0.34,1.56,0.64,1) forwards; }
       .neu-outer { box-shadow: 20px 20px 40px #c8cdd6, -20px -20px 40px #ffffff; }
       .neu-inner { box-shadow: inset 5px 5px 10px #d1d5db, inset -5px -5px 10px #ffffff; }
       .neu-pill  { box-shadow: 5px 5px 12px #d1d5db, -5px -5px 12px #ffffff; }
@@ -230,6 +237,7 @@ export default function Register() {
   const [otpLoading, setOtpLoading] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
   const [apiError,   setApiError]   = useState('');
+  const [regText,    setRegText]    = useState('');
 
   const [form, setForm] = useState({
     firstName: '', lastName: '', email: '', mobile: '',
@@ -314,7 +322,17 @@ export default function Register() {
     const errs = validateFull();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    setRegLoading(true); setApiError('');
+    setRegLoading(true); setApiError(''); setRegText('');
+
+    // Typewriter starts immediately
+    const msg = 'Your Trust, Our Priority.';
+    let i = 0;
+    const tick = setInterval(() => {
+      i++;
+      setRegText(msg.slice(0, i));
+      if (i >= msg.length) clearInterval(tick);
+    }, 60);
+
     try {
       await signUp({
         firstName:   form.firstName.trim(),
@@ -330,6 +348,7 @@ export default function Register() {
       setStep(2);
     } catch (err) {
       setApiError(err.data?.message ?? err.message ?? 'Registration failed. Please try again.');
+      setRegText('');
     } finally {
       setRegLoading(false);
     }
@@ -582,6 +601,92 @@ export default function Register() {
           </div>
         </div>
       </main>
+
+      {/* ── Register Loading Overlay ── */}
+      {regLoading && (
+        <div className="overlay-in fixed inset-0 z-50 flex flex-col items-center justify-center"
+          style={{
+            background: dark ? 'rgba(10,14,30,0.75)' : 'rgba(238,240,245,0.72)',
+            backdropFilter: 'blur(28px) saturate(1.8)',
+            WebkitBackdropFilter: 'blur(28px) saturate(1.8)',
+          }}>
+
+          {/* Soft radial glow */}
+          <div className="absolute pointer-events-none"
+            style={{ width: 480, height: 480, borderRadius: '50%',
+              background: dark ? 'radial-gradient(circle,rgba(59,130,246,0.18) 0%,transparent 70%)' : 'radial-gradient(circle,rgba(30,58,138,0.1) 0%,transparent 70%)',
+              filter: 'blur(50px)' }} />
+
+          {/* Glass card */}
+          <div className="text-pop relative z-10 flex flex-col items-center gap-6 px-12 py-10 rounded-3xl"
+            style={{
+              background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.65)',
+              border: dark ? '1px solid rgba(255,255,255,0.1)' : '1px solid rgba(30,58,138,0.12)',
+              boxShadow: dark
+                ? '0 8px 48px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.08)'
+                : '0 8px 48px rgba(30,58,138,0.12), 0 2px 0 rgba(255,255,255,0.9), inset 0 1px 0 rgba(255,255,255,0.8)',
+            }}>
+
+            {/* Spinner */}
+            <div className="relative w-16 h-16">
+              <div className="absolute inset-0 rounded-full"
+                style={{ border: `2px solid ${dark ? 'rgba(255,255,255,0.08)' : 'rgba(30,58,138,0.1)'}` }} />
+              <div className="absolute inset-0 rounded-full animate-spin"
+                style={{ border: '2.5px solid transparent', borderTopColor: '#3b82f6', borderRightColor: '#10b981', animationDuration: '0.85s' }} />
+              <div className="absolute -inset-1.5 rounded-full pointer-events-none"
+                style={{ boxShadow: '0 0 20px rgba(59,130,246,0.25)' }} />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-2.5 h-2.5 rounded-full"
+                  style={{ background: 'linear-gradient(135deg,#3b82f6,#10b981)', boxShadow: '0 0 10px rgba(59,130,246,0.6)' }} />
+              </div>
+            </div>
+
+            {/* Typewriter text */}
+            <div className="flex flex-col items-center gap-2 text-center">
+              <p style={{
+                fontSize: '1.6rem', fontWeight: 900,
+                fontFamily: "'JetBrains Mono', monospace",
+                letterSpacing: '0.02em', lineHeight: 1.2,
+                minHeight: '2.2rem',
+                color: dark ? '#e2e8f0' : '#1e3a8a',
+              }}>
+                {regText}
+                <span className="tw-cursor" style={{ color: '#3b82f6', fontWeight: 200 }}>|</span>
+              </p>
+
+              {/* Animated underline grows with text */}
+              <div style={{
+                height: 2,
+                width: `${(regText.length / 25) * 100}%`,
+                minWidth: 4, maxWidth: '100%',
+                borderRadius: 99,
+                background: 'linear-gradient(90deg,#3b82f6,#10b981)',
+                boxShadow: '0 0 8px rgba(59,130,246,0.5)',
+                transition: 'width 0.06s linear',
+              }} />
+
+              <p className="text-xs font-semibold tracking-[0.18em] uppercase mt-1"
+                style={{ color: dark ? 'rgba(148,163,184,0.6)' : 'rgba(30,58,138,0.45)' }}>
+                Creating your account
+              </p>
+            </div>
+
+            {/* Staggered dots */}
+            <div className="flex items-center gap-2">
+              {[0, 1, 2].map(i => (
+                <div key={i} className="rounded-full"
+                  style={{
+                    width: i === 1 ? 7 : 5, height: i === 1 ? 7 : 5,
+                    background: i === 1 ? '#3b82f6' : (dark ? 'rgba(59,130,246,0.4)' : 'rgba(30,58,138,0.3)'),
+                    boxShadow: i === 1 ? '0 0 10px rgba(59,130,246,0.7)' : 'none',
+                    animation: `blink 1.1s ${i * 0.22}s ease-in-out infinite`,
+                  }} />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
