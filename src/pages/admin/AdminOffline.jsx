@@ -7,10 +7,11 @@ const ActivityIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 
 function fmtINR(n) {
   if (!n && n !== 0) return '—';
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-  if (n >= 100000)   return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000)     return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${n}`;
+  const abs = Math.abs(n);
+  const trim = (val) => val.replace(/\.?0+$/, '');
+  if (abs >= 10000000) return `₹${trim((n / 10000000).toFixed(2))}Cr`;
+  if (abs >= 100000)   return `₹${trim((n / 100000).toFixed(2))}L`;
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
 }
 
 const PAYOUT_LABELS = {
@@ -65,7 +66,7 @@ export default function AdminOffline() {
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>SD Lot Deals</h1>
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Offline Deals</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>All active and closed participation deals</p>
         </div>
         <button onClick={load}

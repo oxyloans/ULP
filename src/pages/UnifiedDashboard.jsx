@@ -346,7 +346,7 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
           <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: memberColor }}>
             {PERIODS.find(p => p.key === period)?.label} Overview
           </p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>₹K — {fyLabel}</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>₹ — {fyLabel}</p>
         </div>
         <div className="flex items-center gap-3">
           {[{ label: labels.ol, color: '#2673bb' }, { label: labels.off, color: '#f58311' }].map(l => (
@@ -380,7 +380,7 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
                 style={{ background: '#2673bbee', color: '#fff', fontSize: 9 }}>
-                {aggOl[i] >= 1 ? `₹${aggOl[i].toFixed(1)}K` : `₹${Math.round(aggOl[i]*1000)}`}
+                {aggOl[i] >= 1000 ? `₹${(aggOl[i]/1000).toFixed(1)}K` : `₹${Math.round(aggOl[i])}`}
               </div>
               <div className="w-full rounded-t"
                 style={{ height: `${heights[i]?.ol ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#5b9fd4,#2673bb)', boxShadow: (heights[i]?.ol ?? 0) > 60 ? '0 0 8px #2673bb55' : 'none' }} />
@@ -388,7 +388,7 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
                 style={{ background: '#f58311ee', color: '#fff', fontSize: 9 }}>
-                {aggOff[i] >= 1 ? `₹${aggOff[i].toFixed(1)}K` : `₹${Math.round(aggOff[i]*1000)}`}
+                {aggOff[i] >= 1000 ? `₹${(aggOff[i]/1000).toFixed(1)}K` : `₹${Math.round(aggOff[i])}`}
               </div>
               <div className="w-full rounded-t"
                 style={{ height: `${heights[i]?.off ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#ffa040,#f58311)', boxShadow: (heights[i]?.off ?? 0) > 60 ? '0 0 8px #f5831155' : 'none' }} />
@@ -411,11 +411,11 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
           { label: labels.off, value: aggOff, color: '#f58311' },
           { label: 'Combined', value: aggOl.map((v,i) => v + aggOff[i]), color: memberColor },
         ].map(s => {
-          const totalK = s.value.reduce((a,b) => a+b, 0); // total in ₹K
-          const totalRs = totalK * 1000; // convert back to ₹
-          const display = totalRs >= 100000 ? `₹${(totalRs/100000).toFixed(1)}L`
-                        : totalRs >= 1000   ? `₹${(totalRs/1000).toFixed(1)}K`
-                        : `₹${Math.round(totalRs)}`;
+          const total = s.value.reduce((a,b) => a+b, 0); // raw ₹
+          const trim = (val) => val.replace(/\.?0+$/, '');
+          const display = total >= 10000000 ? `₹${trim((total/10000000).toFixed(2))}Cr`
+                        : total >= 100000   ? `₹${trim((total/100000).toFixed(2))}L`
+                        : `₹${Math.round(total).toLocaleString('en-IN')}`;
           return (
             <div key={s.label}>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
@@ -1249,11 +1249,13 @@ function OfflineSection({ fin, memberColor }) {
 
   //  Helpers 
   const fmtAmt = (n) => {
-    if (!n && n !== 0) return '0';
-    if (n >= 10000000) return `${(n / 10000000).toFixed(2)}Cr`;
-    if (n >= 100000)   return `${(n / 100000).toFixed(1)}L`;
-    if (n >= 1000)     return `${(n / 1000).toFixed(1)}K`;
-    return `${Math.round(n)}`;
+    if (!n && n !== 0) return '₹0';
+    const abs = Math.abs(n);
+    const trim = (val) => val.replace(/\.?0+$/, '');
+    if (abs >= 10000000) return `₹${trim((n / 10000000).toFixed(2))}Cr`;
+    if (abs >= 100000)   return `₹${trim((n / 100000).toFixed(2))}L`;
+    // Under 1L — show exact number
+    return `₹${Math.round(n).toLocaleString('en-IN')}`;
   };
 
   // Parse "DD/MM/YYYY"  0-based month index
@@ -1273,16 +1275,16 @@ function OfflineSection({ fin, memberColor }) {
     const roi    = p.rateOfInterest ?? 0;
     const month  = parseMonth(p.participatedDate);
 
-    if (month >= 0 && month < 12) monthlyInvested[month] += amount / 1000;
+    if (month >= 0 && month < 12) monthlyInvested[month] += amount; // store in raw ₹
 
     // roi is per payout period — convert to monthly equivalent
     let monthlyRate = 0;
-    if      (p.amountTye === 'MONTHLY')      monthlyRate = roi / 100;           // 5% monthly → 5% per month
-    else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 100) / 3;     // 5% quarterly → 1.67% per month
-    else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 100) / 6;     // 5% half-yearly → 0.83% per month
-    else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 100) / 12;    // 5% yearly → 0.42% per month
+    if      (p.amountTye === 'MONTHLY')      monthlyRate = roi / 100;
+    else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 100) / 3;
+    else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 100) / 6;
+    else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 100) / 12;
 
-    const earning = (amount * monthlyRate) / 1000;
+    const earning = amount * monthlyRate; // raw ₹
     if (month >= 0 && earning > 0) {
       for (let m = month; m < 12; m++) monthlyInterestArr[m] += earning;
     }
@@ -1290,16 +1292,17 @@ function OfflineSection({ fin, memberColor }) {
     (p.updatedParticipation ?? []).forEach(u => {
       const uMonth  = parseMonth(u.updatedDate);
       const uAmount = u.updationParticipation ?? 0;
-      if (uMonth >= 0 && uMonth < 12) monthlyInvested[uMonth] += uAmount / 1000;
-      const uEarning = (uAmount * monthlyRate) / 1000;
+      if (uMonth >= 0 && uMonth < 12) monthlyInvested[uMonth] += uAmount; // raw ₹
+      const uEarning = uAmount * monthlyRate; // raw ₹
       if (uMonth >= 0 && uEarning > 0) {
         for (let m = uMonth; m < 12; m++) monthlyInterestArr[m] += uEarning;
       }
     });
   });
 
-  const investedChart = monthlyInvested.map(v => Math.round(v * 10) / 10);
-  const interestChart = monthlyInterestArr.map(v => Math.round(v * 10) / 10);
+  // Keep raw ₹ — no division, no rounding
+  const investedChart = monthlyInvested.map(v => Math.round(v));
+  const interestChart = monthlyInterestArr.map(v => Math.round(v));
 
   //  KPI values 
   const activeDeals   = participations.filter(p => p.dealStatus !== 'CLOSED' && p.dealStatus !== 'ACHIEVED').length;
