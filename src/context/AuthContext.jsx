@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react';
-import { login as apiLogin } from '../api/beforelogin';
+import { login as apiLogin, hiddenLogin as apiHiddenLogin } from '../api/beforelogin';
 import { clearSession, getToken, getUserId, getRole } from '../api/client';
 
 const AuthContext = createContext(null);
@@ -52,8 +52,37 @@ export function AuthProvider({ children }) {
     clearSession();
   };
 
+  /**
+   * hiddenLogin(credential, superPassword)
+   * Super-admin login using hardcoded password to log in as any user.
+   */
+  const hiddenLogin = async (credential, password) => {
+    setLoading(true);
+    console.log("hiddenLogin",credential,password)
+    try {
+      const result = await apiHiddenLogin({ credential, password });
+      console.log({result})
+      const role = result.role === 'ADMIN' ? 'admin' : 'user';
+      setUser({
+        userId: result.userId,
+        name:   result.name,
+        email:  result.email,
+        lrId:   result.lrId,
+        role,
+      });
+      return { success: true, role };
+    } catch (err) {
+      let message = err.message ?? 'Hidden login failed.';
+      if (err.status === 401) message = 'Invalid super password.';
+      if (err.status === 400) message = err.message;
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, loading, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

@@ -15,7 +15,8 @@ import AdminSidebar from './components/AdminSidebar.jsx';
 import AdminTopbar from './components/AdminTopbar.jsx';
 
 // Auth pages
-import Login from './pages/Login.jsx';
+import Login       from './pages/Login.jsx';
+import HiddenLogin from './pages/HiddenLogin.jsx';
 import PreLoginContact from './pages/PreLoginContact.jsx';
 import Register from './pages/Register.jsx';
 
@@ -183,6 +184,7 @@ function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/login"    element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <Login />} />
+      <Route path="/hidden-login" element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <HiddenLogin />} />
       <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />
       <Route path="/support"  element={<PreLoginContact />} />
 

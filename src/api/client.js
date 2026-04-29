@@ -19,18 +19,18 @@ export const USERID       = 'userId';
 export const ROLES        = 'roles';
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
-export const getToken   = ()      => localStorage.getItem(ACCESS_TOKEN) ?? '';
-export const getUserId  = ()      => localStorage.getItem(USERID) ?? '';
-export const getRole    = ()      => localStorage.getItem(ROLES) ?? '';
+export const getToken   = ()      => sessionStorage.getItem(ACCESS_TOKEN) ?? '';
+export const getUserId  = ()      => sessionStorage.getItem(USERID) ?? '';
+export const getRole    = ()      => sessionStorage.getItem(ROLES) ?? '';
 export const setSession = ({ accessToken, userId, role }) => {
-  localStorage.setItem(ACCESS_TOKEN, accessToken);
-  localStorage.setItem(USERID,       userId);
-  localStorage.setItem(ROLES,        role);
+  sessionStorage.setItem(ACCESS_TOKEN, accessToken);
+  sessionStorage.setItem(USERID,       userId);
+  sessionStorage.setItem(ROLES,        role);
 };
 export const clearSession = () => {
-  localStorage.removeItem(ACCESS_TOKEN);
-  localStorage.removeItem(USERID);
-  localStorage.removeItem(ROLES);
+  sessionStorage.removeItem(ACCESS_TOKEN);
+  sessionStorage.removeItem(USERID);
+  sessionStorage.removeItem(ROLES);
 };
 
 // ─── Axios instance ───────────────────────────────────────────────────────────

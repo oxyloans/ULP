@@ -236,7 +236,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   );
 
   if (submitted) return (
-    <div className="max-w-xl mx-auto py-12 flex flex-col items-center gap-6 text-center">
+    <div className="max-w-3xl mx-auto py-12 flex flex-col items-center gap-6 text-center">
       <div className="w-20 h-20 rounded-3xl flex items-center justify-center"
         style={{ background: "linear-gradient(135deg,rgba(16,185,129,0.15),rgba(16,185,129,0.05))", border: "1px solid rgba(16,185,129,0.3)", color: "#10b981" }}>
         <CheckCircle />
@@ -256,21 +256,60 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           <TrendUp />
           <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#6366f1" }}>Deal Summary</span>
         </div>
-        <div className="p-5 grid grid-cols-2 gap-3">
+        {/* Left — Deal stats single horizontal row */}
+        <div className="flex items-stretch gap-0 divide-x" style={{ borderBottom: '1px solid var(--border)', '--tw-divide-opacity': 1 }}>
           {[
-            { label: "Deal Amount",    value: fmtINR(numVal(form.dealAmount)),          color: "#6366f1" },
-            { label: "Monthly ROI",    value: form.monthlyInterest + "%",               color: "#10b981" },
-            { label: "Duration",       value: form.duration + " months",                color: "#818cf8" },
-            { label: "Type",           value: form.dealType + " / " + form.globalDealType, color: "#ec4899" },
-            { label: "Min / Max",      value: fmtINR(numVal(form.minimumParticipation)) + " – " + fmtINR(numVal(form.maxParticipation)), color: "#f59e0b" },
-            { label: "Loan Active",    value: form.loanActiveDate,                      color: "#06b6d4" },
+            { label: "Deal Amount",  value: fmtINR(numVal(form.dealAmount)),                                                          color: "#6366f1" },
+            { label: "Monthly ROI", value: form.monthlyInterest ? form.monthlyInterest + "%" : "—",                                  color: "#10b981" },
+            { label: "Duration",    value: form.duration ? form.duration + " months" : "—",                                          color: "#818cf8" },
+            { label: "Min / Max",   value: fmtINR(numVal(form.minimumParticipation)) + " – " + fmtINR(numVal(form.maxParticipation)), color: "#f59e0b" },
           ].map(s => (
-            <div key={s.label} className="rounded-xl px-4 py-3"
-              style={{ background: s.color + "0a", border: "1px solid " + s.color + "18" }}>
-              <p className="text-xs font-semibold mb-0.5" style={{ color: "var(--text-muted)" }}>{s.label}</p>
-              <p className="text-sm font-extrabold" style={{ color: s.color }}>{s.value}</p>
+            <div key={s.label} className="flex-1 px-4 py-4 text-center"
+              style={{ borderRight: '1px solid var(--border)' }}>
+              <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+              <p className="text-base font-extrabold" style={{ color: s.color }}>{s.value}</p>
             </div>
           ))}
+        </div>
+
+        {/* Right — Bank details table */}
+        {(form.transferTo || form.transferFunds || selectedBank) && (
+          <div>
+            <div className="px-5 py-2.5 flex items-center gap-2"
+              style={{ borderBottom: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.04)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#f59e0b' }}>
+                <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/>
+              </svg>
+              <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#f59e0b' }}>Bank Details</span>
+            </div>
+            <table className="w-full text-sm">
+              <tbody>
+                {[
+                  { label: 'Company Name',   value: selectedBank?.companyName   || form.transferTo    || '—' },
+                  { label: 'Bank Name',      value: selectedBank?.bankName      || form.transferFunds || '—' },
+                  { label: 'Account Number', value: selectedBank?.accountNumber || '—', mono: true },
+                  { label: 'IFSC Code',      value: selectedBank?.ifscCode      || '—', mono: true },
+                  { label: 'Branch',         value: selectedBank?.branchName    || selectedBank?.branch || '—' },
+                  { label: 'Account Type',   value: selectedBank?.accountType   || '—' },
+                ].map((r, i) => (
+                  <tr key={r.label} style={{ borderBottom: i < 5 ? '1px solid var(--border)' : 'none' }}>
+                    <td className="px-5 py-2.5 text-xs font-semibold w-40" style={{ color: 'var(--text-muted)', background: 'var(--input-bg)' }}>{r.label}</td>
+                    <td className="px-5 py-2.5 text-sm font-bold" style={{ color: 'var(--text-primary)', fontFamily: r.mono ? "'JetBrains Mono', monospace" : 'inherit' }}>{r.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        {/* Created date footer */}
+        <div className="px-5 py-3 flex items-center justify-between"
+          style={{ borderTop: "1px solid var(--border)", background: "rgba(99,102,241,0.02)" }}>
+          <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>
+            {isEdit ? "Updated on" : "Created on"}
+          </span>
+          <span className="text-xs font-bold" style={{ color: "var(--text-primary)" }}>
+            {new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}
+          </span>
         </div>
       </div>
       <div className="flex gap-3 w-full">

@@ -112,6 +112,12 @@ function SDLotCard({ lot }) {
               <span style={{ color: 'rgba(165,180,252,0.6)', fontSize: 9 }}>{fmtINR(lot.remaining)} left</span>
             </div>
           </div>
+           <p className="text-xs uppercase tracking-widest mb-1 relative z-10"
+            style={{ color: 'rgba(165,180,252,0.7)' }}>Remaining...</p>
+           <p className="text-2xl font-black leading-none relative z-10 text-center"
+            style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: '0 0 20px rgba(129,140,248,0.5)' }}>
+            {fmtINR(lot.remaining)}
+          </p>
         </div>
 
         {/* ── Right: rest of content ── */}
@@ -536,7 +542,7 @@ export default function SDLots() {
       {/* Page header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
-          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>SD Lots</h1>
+          <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Running Deals</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>Browse and participate in active Deals</p>
         </div>
       </div>
@@ -558,12 +564,12 @@ export default function SDLots() {
           <FilterGroup label="Status"  options={['All','Open','Closed']}  value={statusFilter} onChange={setStatusFilter} />
           <FilterGroup label="ROI"     options={roiOptions}               value={roiFilter}    onChange={setRoiFilter}    />
           <FilterGroup label="Payout"  options={payoutOptions}            value={payoutFilter} onChange={setPayoutFilter} />
-          <FilterGroup label="Fee"     options={feeOptions}               value={feeFilter}    onChange={setFeeFilter}    />
+          {/* <FilterGroup label="Fee"     options={feeOptions}               value={feeFilter}    onChange={setFeeFilter}    /> */}
         </div>
       </div>
 
       {/* Stats strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
           { label: 'Total Lots',      value: lots.length,                                                                                                    color: '#6366f1' },
           { label: 'Open',            value: lots.filter(l => l.auctionType === 'Open').length,                                                              color: '#10b981' },
@@ -576,7 +582,7 @@ export default function SDLots() {
             <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
           </div>
         ))}
-      </div>
+      </div> */}
 
       {/* Cards list — one per row */}
       <div className="grid gap-4">

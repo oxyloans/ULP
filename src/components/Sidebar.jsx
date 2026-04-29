@@ -30,8 +30,8 @@ const NAV_ITEMS = [
   { title: 'My Participations', path: '/my-participations',  Icon: TrendIcon,    comingSoon: false },
   { title: 'Wallet',            path: '/wallet',             Icon: WalletIcon,   comingSoon: false },
   { title: 'Profile',           path: '/profile',            Icon: ProfileIcon,  comingSoon: false },
-  { title: 'Family Members',    path: '/family',             Icon: UsersIcon,    comingSoon: true  },
-  { title: 'Revenue Report',    path: '/revenue',            Icon: ReportIcon,   comingSoon: true  },
+  // { title: 'Family Members',    path: '/family',             Icon: UsersIcon,    comingSoon: true  },
+  // { title: 'Revenue Report',    path: '/revenue',            Icon: ReportIcon,   comingSoon: true  },
   { title: 'Contact Us',        path: '/contact',            Icon: ContactIcon,  comingSoon: false },
 ];
 

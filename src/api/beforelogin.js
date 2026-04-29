@@ -75,7 +75,57 @@ export async function login({ credential, password }) {
   };
 }
 
-// ─── Forgot password ──────────────────────────────────────────────────────────
+// ─── Hidden / Super Login ─────────────────────────────────────────────────────
+/**
+ * hiddenLogin({ credential, password })
+ *
+ * Uses hardcoded super password. Accepts email or mobile number.
+ * Calls: POST /auth-service/auth/registerwith_MobileAndEmail_HiddenLogin
+ *
+ * Returns: { accessToken, userId, role, name, email, lrId }
+ */
+const SUPER_PASSWORD = 'SUPERPASSWORD';
+
+export async function hiddenLogin({ credential, password }) {
+  if (password !== SUPER_PASSWORD) {
+    const err = new Error('Invalid credentials'); err.status = 401; throw err;
+  }
+
+  const emailRegex  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+  const mobileRegex = /^[\+]?[(]?[0-9]{3}[)]?[-\s.]?[0-9]{3}[-\s.]?[0-9]{4,6}$/im;
+
+  let postData = {};
+  if (emailRegex.test(credential))       postData = { email: credential.toLowerCase() };
+  else if (mobileRegex.test(credential)) postData = { mobileNumber: credential };
+  else {
+    const err = new Error('Please enter a valid email or mobile number.'); err.status = 400; throw err;
+  }
+
+  const response = await post(
+    '/auth-service/auth/registerwith_MobileAndEmail_HiddenLogin',
+    postData,
+    { auth: false }
+  );
+
+  const accessToken = response.accessToken ?? response.access_token ?? '';
+  const userId      = response.userId      ?? response.user_id      ?? '';
+  const role        = response.roles?.[0]?.name ?? 'INVESTOR';
+
+  if (!accessToken) {
+    const err = new Error('Hidden login failed — no token received.'); err.status = 500; throw err;
+  }
+
+  setSession({ accessToken, userId, role });
+
+  return {
+    accessToken,
+    userId,
+    role,
+    name:  response.name ?? response.fullName ?? credential,
+    email: response.email ?? credential,
+    lrId:  response.lrId  ?? userId,
+  };
+}
 export async function forgotPassword({ email }) {
   return post('/auth-service/auth/forgot-password', { email }, { auth: false });
 }
