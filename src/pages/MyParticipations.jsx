@@ -25,18 +25,23 @@ const PAYOUT = {
   ENDOFTHEDEAL: { label: "End of Deal", months: 0  },
 };
 
+// roi = rate per payout period (e.g. 5% monthly = 5% each month, not annual)
+// monthlyEquiv = interest earned per month (normalized from payout period)
 function monthlyEquiv(amount, roi, type) {
   if (!amount || !roi) return 0;
   const m = PAYOUT[type]?.months ?? 1;
-  if (m === 0) return 0; // end of deal  no monthly
-  return Math.round(amount * (roi / 100) / (12 / m) / (12 / m));
+  if (m === 0) return 0; // ENDOFTHEDEAL — no monthly payout
+  // roi is per payout period; divide by months in that period to get monthly
+  return Math.round(amount * (roi / 100) / m);
 }
 
+// payoutInterest = interest earned per payout cycle
 function payoutInterest(amount, roi, type) {
   if (!amount || !roi) return 0;
   const m = PAYOUT[type]?.months ?? 1;
-  if (m === 0) return Math.round(amount * roi / 100); // full deal interest
-  return Math.round(amount * (roi / 100) * (m / 12));
+  if (m === 0) return Math.round(amount * roi / 100); // ENDOFTHEDEAL: single lump sum
+  // roi is already the rate for this payout period
+  return Math.round(amount * (roi / 100));
 }
 
 //  Deal Row 

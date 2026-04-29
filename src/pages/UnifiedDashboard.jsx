@@ -379,13 +379,17 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
           <div key={i} className="flex-1 flex items-end gap-0.5 group cursor-pointer">
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
-                style={{ background: '#2673bbee', color: '#fff', fontSize: 9 }}>₹{aggOl[i].toFixed(1)}K</div>
+                style={{ background: '#2673bbee', color: '#fff', fontSize: 9 }}>
+                {aggOl[i] >= 1 ? `₹${aggOl[i].toFixed(1)}K` : `₹${Math.round(aggOl[i]*1000)}`}
+              </div>
               <div className="w-full rounded-t"
                 style={{ height: `${heights[i]?.ol ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#5b9fd4,#2673bb)', boxShadow: (heights[i]?.ol ?? 0) > 60 ? '0 0 8px #2673bb55' : 'none' }} />
             </div>
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
-                style={{ background: '#f58311ee', color: '#fff', fontSize: 9 }}>₹{aggOff[i].toFixed(1)}K</div>
+                style={{ background: '#f58311ee', color: '#fff', fontSize: 9 }}>
+                {aggOff[i] >= 1 ? `₹${aggOff[i].toFixed(1)}K` : `₹${Math.round(aggOff[i]*1000)}`}
+              </div>
               <div className="w-full rounded-t"
                 style={{ height: `${heights[i]?.off ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#ffa040,#f58311)', boxShadow: (heights[i]?.off ?? 0) > 60 ? '0 0 8px #f5831155' : 'none' }} />
             </div>
@@ -403,15 +407,22 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
       {/* Footer totals */}
       <div className="flex items-center gap-5 mt-3 pt-3 flex-wrap" style={{ borderTop: '1px solid var(--border)' }}>
         {[
-          { label: labels.ol,  value: `₹${(aggOl.reduce((a,b)=>a+b,0)/10).toFixed(1)}L`,  color: '#2673bb' },
-          { label: labels.off, value: `₹${(aggOff.reduce((a,b)=>a+b,0)/10).toFixed(1)}L`, color: '#f58311' },
-          { label: 'Combined', value: `₹${((aggOl.reduce((a,b)=>a+b,0)+aggOff.reduce((a,b)=>a+b,0))/10).toFixed(1)}L`, color: memberColor },
-        ].map(s => (
-          <div key={s.label}>
-            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
-            <p className="text-sm font-bold" style={{ color: s.color }}>{s.value}</p>
-          </div>
-        ))}
+          { label: labels.ol,  value: aggOl,  color: '#2673bb' },
+          { label: labels.off, value: aggOff, color: '#f58311' },
+          { label: 'Combined', value: aggOl.map((v,i) => v + aggOff[i]), color: memberColor },
+        ].map(s => {
+          const totalK = s.value.reduce((a,b) => a+b, 0); // total in ₹K
+          const totalRs = totalK * 1000; // convert back to ₹
+          const display = totalRs >= 100000 ? `₹${(totalRs/100000).toFixed(1)}L`
+                        : totalRs >= 1000   ? `₹${(totalRs/1000).toFixed(1)}K`
+                        : `₹${Math.round(totalRs)}`;
+          return (
+            <div key={s.label}>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+              <p className="text-sm font-bold" style={{ color: s.color }}>{display}</p>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -1264,11 +1275,12 @@ function OfflineSection({ fin, memberColor }) {
 
     if (month >= 0 && month < 12) monthlyInvested[month] += amount / 1000;
 
+    // roi is per payout period — convert to monthly equivalent
     let monthlyRate = 0;
-    if      (p.amountTye === 'MONTHLY')      monthlyRate = roi / 100;
-    else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 3) / 100;
-    else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 6) / 100;
-    else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 12) / 100;
+    if      (p.amountTye === 'MONTHLY')      monthlyRate = roi / 100;           // 5% monthly → 5% per month
+    else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 100) / 3;     // 5% quarterly → 1.67% per month
+    else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 100) / 6;     // 5% half-yearly → 0.83% per month
+    else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 100) / 12;    // 5% yearly → 0.42% per month
 
     const earning = (amount * monthlyRate) / 1000;
     if (month >= 0 && earning > 0) {
@@ -1292,9 +1304,30 @@ function OfflineSection({ fin, memberColor }) {
   //  KPI values 
   const activeDeals   = participations.filter(p => p.dealStatus !== 'CLOSED' && p.dealStatus !== 'ACHIEVED').length;
   const closedDeals   = participations.filter(p => p.dealStatus === 'CLOSED' || p.dealStatus === 'ACHIEVED').length;
-  const totalInvested = participations.reduce((s, p) => s + (p.participatedAmount ?? 0), 0);
+  const totalInvested = participations.reduce((s, p) => {
+    const updates = (p.updatedParticipation ?? []).reduce((ss, u) => ss + (u.updationParticipation ?? 0), 0);
+    return s + (p.participatedAmount ?? 0) + updates;
+  }, 0);
   const currentMonth  = new Date().getMonth();
   const thisMonthInterest = interestChart[currentMonth] * 1000;
+
+  // Also compute total monthly interest the same way as MyParticipations (sum all entries)
+  const totalMonthlyInterest = participations.reduce((sum, p) => {
+    const roi = p.rateOfInterest ?? 0;
+    const entries = [
+      { amount: p.participatedAmount ?? 0, payout: p.amountTye },
+      ...(p.updatedParticipation ?? []).map(u => ({ amount: u.updationParticipation ?? 0, payout: u.amountTye ?? p.amountTye })),
+    ];
+    return sum + entries.reduce((s, e) => {
+      if (!e.amount) return s;
+      let mr = 0;
+      if      (e.payout === 'MONTHLY')      mr = roi / 100;
+      else if (e.payout === 'QUARTELY')     mr = (roi / 100) / 3;
+      else if (e.payout === 'HALFLY')       mr = (roi / 100) / 6;
+      else if (e.payout === 'YEARLY')       mr = (roi / 100) / 12;
+      return s + Math.round(e.amount * mr);
+    }, 0);
+  }, 0);
 
   //  Payout type donut 
   const payoutCount = {};
@@ -1310,7 +1343,7 @@ function OfflineSection({ fin, memberColor }) {
   const maxStatusCount = Math.max(...Object.values(statusGroups).map(g => g.count), 1);
 
   const kpis = [
-    { label: 'Monthly Interest', Icon: I.Percent,     value: fmtAmt(thisMonthInterest),  sub: `${MONTHS[currentMonth]} earnings`,       trend: null, trendUp: true, color: '#f58311', badge: 'This month'                    },
+    { label: 'Monthly Interest', Icon: I.Percent,     value: fmtAmt(totalMonthlyInterest), sub: `${MONTHS[currentMonth]} earnings`,       trend: null, trendUp: true, color: '#f58311', badge: 'This month'                    },
     { label: 'Active Deals',     Icon: I.Activity,    value: String(activeDeals),         sub: `${fmtAmt(totalInvested)} total invested`, trend: null, trendUp: true, color: '#35a13e', badge: activeDeals > 0 ? 'Live' : null },
     { label: 'Closed Deals',     Icon: I.CheckCircle, value: String(closedDeals),         sub: 'Completed deals',                        trend: null, trendUp: true, color: '#2673bb', badge: null                            },
     { label: 'Total Invested',   Icon: I.Wallet,      value: fmtAmt(totalInvested),       sub: `${participations.length} participations`, trend: null, trendUp: true, color: '#6366f1', badge: null                            },
@@ -1419,12 +1452,16 @@ function OfflineSection({ fin, memberColor }) {
                 ) : filteredDeals.map((p, idx) => {
                   const roi    = p.rateOfInterest ?? 0;
                   const amount = p.participatedAmount ?? 0;
+                  // Total invested = initial + all top-ups
+                  const updatesTotal2 = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
+                  const totalAmt = amount + updatesTotal2;
+                  // roi is per payout period — convert to monthly equivalent for display
                   let monthlyRate = 0;
                   if      (p.amountTye === 'MONTHLY')      monthlyRate = roi / 100;
-                  else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 3) / 100;
-                  else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 6) / 100;
-                  else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 12) / 100;
-                  const monthlyEarning = Math.round(amount * monthlyRate);
+                  else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 100) / 3;
+                  else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 100) / 6;
+                  else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 100) / 12;
+                  const monthlyEarning = Math.round(totalAmt * monthlyRate);
                   const pc = PAYOUT_COLORS[p.amountTye] ?? '#888';
                   const updatesTotal = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
                   const totalInvested = amount + updatesTotal;
