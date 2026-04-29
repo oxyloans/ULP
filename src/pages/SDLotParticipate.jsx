@@ -519,7 +519,7 @@ export default function SDLotParticipate() {
                 <circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
               </svg>
               <div>
-                <p className="text-base font-black" style={{ color: 'var(--text-primary)' }}>Deal Fully Subscribed</p>
+                <p className="text-base font-black" style={{ color: 'var(--text-primary)' }}>Deal Fully Achieved </p>
                 <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>This deal has reached its funding target. No more participation is allowed.</p>
               </div>
             </div>

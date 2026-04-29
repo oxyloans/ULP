@@ -19,18 +19,19 @@ const STATUS_MAP = { UPLOADED: 'REVIEW', APPROVED: 'APPROVE', REJECTED: 'REJECT'
 
 function mapTxn(raw, idx) {
   return {
-    id:          raw.documentId ?? `TXN-${idx}`,
-    userId:      raw.userId ?? '',
-    userName:    ((raw.userName ?? '').trim()) || (raw.userId ?? '—'),
-    description: raw.utrNumber ? `Deposit · UTR ${raw.utrNumber}` : 'Deposit Slip',
-    date:        raw.transactionDate ?? '—',
-    amount:      raw.transactionAmount ?? 0,
-    status:      STATUS_MAP[raw.walletStatus] ?? 'REVIEW',
-    rawStatus:   raw.walletStatus,
-    utrNumber:   raw.utrNumber ?? null,
-    documentId:  raw.documentId ?? null,
-    slipUrl:     raw.transactionSlipUrl ?? null,
-    hasSlip:     !!raw.transactionSlipUrl,
+    id:                  raw.documentId ?? `TXN-${idx}`,
+    userId:              raw.userId ?? '',
+    userName:            ((raw.userName ?? '').trim()) || (raw.userId ?? '—'),
+    description:         raw.utrNumber ? `Deposit · UTR ${raw.utrNumber}` : 'Deposit Slip',
+    date:                raw.transactionDate ?? '—',
+    amount:              raw.transactionAmount ?? 0,
+    status:              STATUS_MAP[raw.walletStatus] ?? 'REVIEW',
+    rawStatus:           raw.walletStatus,
+    utrNumber:           raw.utrNumber ?? null,
+    documentId:          raw.documentId ?? null,
+    slipUrl:             raw.transactionSlipUrl ?? null,
+    hasSlip:             !!raw.transactionSlipUrl,
+    fundTransferCompany: raw.fundTransferompany ?? raw.fundTransferCompany ?? null,
   };
 }
 
@@ -86,6 +87,7 @@ function ConfirmModal({ txn, action, onConfirm, onCancel, loading }) {
   const isApprove = action === 'approve';
   const [approvedBy, setApprovedBy] = useState(ADMIN_NAMES[0]);
   const [comments, setComments]     = useState(isApprove ? 'Approved by admin' : 'Rejected by admin');
+  const [utrRef, setUtrRef]         = useState(txn.utrNumber ?? '');
 
   const accentColor = isApprove ? '#059669' : '#dc2626';
   const accentBg    = isApprove ? '#ecfdf5' : '#fef2f2';
@@ -125,6 +127,35 @@ function ConfirmModal({ txn, action, onConfirm, onCancel, loading }) {
 
         {/* Body */}
         <div className="px-6 py-5 grid gap-4">
+
+          {/* UTR / Ref Number */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-1.5"
+              style={{ color: 'var(--text-muted)' }}>
+              UTR / Ref Number
+              {txn.utrNumber && (
+                <span className="ml-2 normal-case font-semibold px-1.5 py-0.5 rounded-md"
+                  style={{ background: 'rgba(99,102,241,0.1)', color: '#6366f1', border: '1px solid rgba(99,102,241,0.2)', fontSize: 10 }}>
+                  pre-filled
+                </span>
+              )}
+            </label>
+            <input
+              type="text"
+              value={utrRef}
+              onChange={e => setUtrRef(e.target.value)}
+              placeholder="Enter UTR or reference number"
+              className="w-full rounded-xl text-sm font-mono outline-none"
+              style={{
+                padding: '10px 14px',
+                background: 'var(--input-bg)',
+                border: `1.5px solid ${utrRef ? 'rgba(99,102,241,0.4)' : 'var(--border)'}`,
+                color: 'var(--text-primary)',
+                letterSpacing: '0.04em',
+              }}
+            />
+          </div>
+
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider mb-1.5"
               style={{ color: 'var(--text-muted)' }}>Approved By</label>
@@ -151,7 +182,7 @@ function ConfirmModal({ txn, action, onConfirm, onCancel, loading }) {
             style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
             Cancel
           </button>
-          <button onClick={() => onConfirm({ approvedBy, comments })}
+          <button onClick={() => onConfirm({ approvedBy, comments, utrNumber: utrRef.trim() })}
             disabled={loading}
             className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] disabled:opacity-60 flex items-center justify-center gap-2"
             style={{ background: isApprove ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#ef4444,#dc2626)', color: '#fff', boxShadow: `0 4px 14px ${accentColor}40` }}>
@@ -186,13 +217,13 @@ export default function AdminWalletApprovals() {
 
   useEffect(() => { fetchSlips(); }, []);
 
-  const handleConfirm = async ({ approvedBy, comments }) => {
+  const handleConfirm = async ({ approvedBy, comments, utrNumber }) => {
     if (!confirmModal) return;
     const { txn, action } = confirmModal;
     setActionLoading(true);
     try {
       const payload = {
-        utrNumber: txn.utrNumber,
+        utrNumber: utrNumber || txn.utrNumber,   // use modal value (editable), fallback to txn
         transactionAmount: txn.amount,
         transactionDate: txn.date.includes('/') ? txn.date.split('/').reverse().join('-') : txn.date,
         approvedBy, comments,
@@ -216,6 +247,11 @@ export default function AdminWalletApprovals() {
     { key: 'ALL',     label: 'All',      color: '#6366f1' },
   ];
   const filtered = tab === 'ALL' ? txns : txns.filter(t => t.status === tab);
+
+  // Detect duplicate UTR numbers across ALL transactions
+  const utrCounts = {};
+  txns.forEach(t => { if (t.utrNumber) utrCounts[t.utrNumber] = (utrCounts[t.utrNumber] || 0) + 1; });
+  const isDuplicateUtr = (utr) => utr && utrCounts[utr] > 1;
   const counts = {
     REVIEW:  txns.filter(t => t.status === 'REVIEW').length,
     APPROVE: txns.filter(t => t.status === 'APPROVE').length,
@@ -304,7 +340,7 @@ export default function AdminWalletApprovals() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                    {['User', 'Description', 'UTR / Ref', 'Amount', 'Date', 'Status', 'Slip', 'Actions'].map(h => (
+                    {['User', 'Description', 'Amount', 'Date', 'Fund Transfer To', 'Status', 'Slip', 'Actions'].map(h => (
                       <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
                     ))}
                   </tr>
@@ -312,10 +348,18 @@ export default function AdminWalletApprovals() {
                 <tbody>
                   {filtered.length === 0 ? (
                     <tr><td colSpan={8} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No transactions in this category</td></tr>
-                  ) : filtered.map(txn => (
-                    <tr key={txn.id} style={{ borderBottom: '1px solid var(--border)' }}
-                      onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  ) : filtered.map(txn => {
+                    const isDup = isDuplicateUtr(txn.utrNumber);
+                    return (
+                    <tr key={txn.id}
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        outline: isDup ? '2px solid rgba(239,68,68,0.5)' : 'none',
+                        outlineOffset: '-1px',
+                        background: isDup ? 'rgba(239,68,68,0.03)' : 'transparent',
+                      }}
+                      onMouseEnter={e => e.currentTarget.style.background = isDup ? 'rgba(239,68,68,0.06)' : 'var(--row-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = isDup ? 'rgba(239,68,68,0.03)' : 'transparent'}>
                       <td className="py-3.5 px-4">
                         <div className="flex items-center gap-2">
                           <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
@@ -330,18 +374,28 @@ export default function AdminWalletApprovals() {
                       </td>
                       <td className="py-3.5 px-4">
                         <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{txn.description}</p>
-                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{txn.rawStatus}</p>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="px-2.5 py-1 rounded-lg text-xs font-semibold"
-                          style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)', fontFamily: "'JetBrains Mono', monospace" }}>
-                          {txn.utrNumber ?? '—'}
-                        </span>
+                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{txn.rawStatus}</p>
+                          {isDup && (
+                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-md"
+                              style={{ background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)' }}>
+                              ⚠ Duplicate UTR
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="py-3.5 px-4">
                         <span className="text-sm font-extrabold" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>+{fmtINR(txn.amount)}</span>
                       </td>
                       <td className="py-3.5 px-4 text-xs" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{txn.date}</td>
+                      <td className="py-3.5 px-4">
+                        {txn.fundTransferCompany
+                          ? <span className="text-xs font-semibold px-2.5 py-1 rounded-lg whitespace-nowrap"
+                              style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.25)' }}>
+                              {txn.fundTransferCompany}
+                            </span>
+                          : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
+                      </td>
                       <td className="py-3.5 px-4"><StatusChip status={txn.status} /></td>
                       <td className="py-3.5 px-4">
                         {txn.hasSlip
@@ -373,7 +427,8 @@ export default function AdminWalletApprovals() {
                         )}
                       </td>
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

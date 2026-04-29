@@ -30,6 +30,17 @@ function toLocale(s) {
 // Convert YYYY-MM-DD → DD/MM/YYYY for display, keep YYYY-MM-DD for API
 function toApiDate(d) { return d; } // already YYYY-MM-DD from <input type="date">
 
+// Convert API date (DD/MM/YYYY or YYYY-MM-DD) → YYYY-MM-DD for <input type="date">
+function fromApiDate(d) {
+  if (!d) return "";
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(d)) return d;
+  // DD/MM/YYYY → YYYY-MM-DD
+  const parts = d.split("/");
+  if (parts.length === 3) return `${parts[2]}-${parts[1].padStart(2,"0")}-${parts[0].padStart(2,"0")}`;
+  return d;
+}
+
 const inp = (err) => ({
   background: "var(--input-bg)",
   border: "1.5px solid " + (err ? "#ef4444" : "var(--border)"),
@@ -127,10 +138,10 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
       quartelyInterest:          editDeal.quartelyInterest          ? String(editDeal.quartelyInterest)          : "",
       halfInterest:              editDeal.halfInterest              ? String(editDeal.halfInterest)              : "",
       yearlyInterest:            editDeal.yearlyInterest            ? String(editDeal.yearlyInterest)            : "",
-      fundsAcceptanceStartDate:  editDeal.fundsAcceptanceStartDate  ?? "",
-      fundsAcceptanceEndDate:    editDeal.fundsAcceptanceEndDate    ?? "",
-      loanActiveDate:            editDeal.loanActiveDate            ?? "",
-      emiEndDate:                editDeal.emiEndDate                ?? "",
+      fundsAcceptanceStartDate:  fromApiDate(editDeal.fundsAcceptanceStartDate  ?? ""),
+      fundsAcceptanceEndDate:    fromApiDate(editDeal.fundsAcceptanceEndDate    ?? ""),
+      loanActiveDate:            fromApiDate(editDeal.loanActiveDate            ?? ""),
+      emiEndDate:                fromApiDate(editDeal.emiEndDate                ?? ""),
       transferFundsId:           editDeal.transferFundsId           ?? "",
       transferFunds:             editDeal.transferFunds             ?? "",
       transferTo:                editDeal.transferTo                ?? "",

@@ -64,7 +64,7 @@ function BankCard({ bank }) {
 function SDLotCard({ lot }) {
   const navigate = useNavigate();
   const raisedPct = lot.totalSize > 0 ? Math.min(Math.round((lot.raised / lot.totalSize) * 100), 100) : 0;
-  const isClosed  = lot.status === 'Closed';
+  const isClosed  = lot.status === 'Closed' || lot.remaining === 0;
   const accentColor = isClosed ? '#64748b' : '#6366f1';
 
   return (
@@ -244,7 +244,7 @@ function SDLotCard({ lot }) {
               onMouseEnter={e => { if (!isClosed) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.transform = ''; }}
             >
-              {isClosed ? 'Fully Subscribed' : 'Participate Now'}
+              {isClosed ? 'Achevied' : 'Participate Now'}
               {!isClosed && <ArrowRight />}
             </button>
           </div>

@@ -85,7 +85,7 @@ function VirtualCard({ data, profile }) {
 
 // ─── Deposit Slip Upload Form ─────────────────────────────────────────────────
 function DepositSlipForm({ adminBanks }) {
-  const [form, setForm] = useState({ amount: '', refId: '', date: '', bank: '', remarks: '', companyName: '' });
+  const [form, setForm] = useState({ amount: '', refId: '', date: '', bank: '', remarks: '', companyName: 'PINK SCOPE PROPERTIES' });
   const [file, setFile] = useState(null);
   const [preview, setPreview] = useState(null);
   const [submitted, setSubmitted] = useState(false);
@@ -184,7 +184,7 @@ function DepositSlipForm({ adminBanks }) {
         <p className="text-base font-black" style={{ color: 'var(--text-primary)' }}>Slip Submitted!</p>
         <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>Your deposit slip is under review. Balance will be credited after admin approval.</p>
       </div>
-      <button onClick={() => { setSubmitted(false); setForm({ amount: '', refId: '', date: '', bank: '', remarks: '', companyName: '' }); setFile(null); setPreview(null); setAnalysis(null); }}
+      <button onClick={() => { setSubmitted(false); setForm({ amount: '', refId: '', date: '', bank: '', remarks: '', companyName: 'PINK SCOPE PROPERTIES' }); setFile(null); setPreview(null); setAnalysis(null); }}
         className="px-5 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
         style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
         Submit Another

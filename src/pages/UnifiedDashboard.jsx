@@ -175,7 +175,7 @@ function AnimatedBarChart({ data, accent = '#2673bb', label = 'Monthly Interest'
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: accent }}>{label}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{unit} — FY 2025</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{unit} — {(() => { const n = new Date(); const s = n.getMonth() < 3 ? n.getFullYear()-1 : n.getFullYear(); return `FY ${s}-${String(s+1).slice(2)}`; })()}</p>
         </div>
         <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full"
           style={{ background: `${accent}12`, color: accent, border: `1px solid ${accent}25` }}>
@@ -291,25 +291,62 @@ function StatusBars({ deals }) {
 
 // ─── Dual-series animated bar chart ─────────────────────────────────────────
 function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans', off: 'Offline' } }) {
-  const [heights, setHeights] = useState(olData.map(() => ({ ol: 0, off: 0 })));
-  const max = Math.max(...olData, ...offData) || 1;
+  const [period, setPeriod] = useState('monthly');
+
+  // Dynamic FY: Indian FY starts April, so if current month < April use previous year
+  const now = new Date();
+  const fyStart = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
+  const fyLabel = `FY ${fyStart}-${String(fyStart + 1).slice(2)}`;
+
+  // Aggregate data based on selected period
+  const aggregate = (data, p) => {
+    if (p === 'monthly')    return data; // 12 bars
+    if (p === 'quarterly')  return [0,1,2,3].map(q => data.slice(q*3, q*3+3).reduce((a,b)=>a+b,0));
+    if (p === 'halfyearly') return [data.slice(0,6).reduce((a,b)=>a+b,0), data.slice(6).reduce((a,b)=>a+b,0)];
+    if (p === 'yearly')     return [data.reduce((a,b)=>a+b,0)];
+    return data;
+  };
+
+  const periodLabels = {
+    monthly:    MONTHS.map(m => m.slice(0,3)),
+    quarterly:  ['Q1 (Apr-Jun)', 'Q2 (Jul-Sep)', 'Q3 (Oct-Dec)', 'Q4 (Jan-Mar)'],
+    halfyearly: ['H1 (Apr-Sep)', 'H2 (Oct-Mar)'],
+    yearly:     [fyLabel],
+  };
+
+  const aggOl  = aggregate(olData,  period);
+  const aggOff = aggregate(offData, period);
+  const barLabels = periodLabels[period];
+  const max = Math.max(...aggOl, ...aggOff) || 1;
+
+  const [heights, setHeights] = useState(aggOl.map(() => ({ ol: 0, off: 0 })));
 
   useEffect(() => {
-    setHeights(olData.map(() => ({ ol: 0, off: 0 })));
-    const timers = olData.map((_, i) =>
+    setHeights(aggOl.map(() => ({ ol: 0, off: 0 })));
+    const timers = aggOl.map((_, i) =>
       setTimeout(() => setHeights(prev => {
-        const n = [...prev]; n[i] = { ol: (olData[i] / max) * 100, off: (offData[i] / max) * 100 }; return n;
-      }), i * 55)
+        const n = [...prev]; n[i] = { ol: (aggOl[i] / max) * 100, off: (aggOff[i] / max) * 100 }; return n;
+      }), i * 80)
     );
     return () => timers.forEach(clearTimeout);
-  }, [olData.join(','), offData.join(',')]);
+  }, [aggOl.join(','), aggOff.join(','), period]);
+
+  const PERIODS = [
+    { key: 'monthly',    label: 'Monthly'    },
+    { key: 'quarterly',  label: 'Quarterly'  },
+    { key: 'halfyearly', label: 'Half-Yearly'},
+    { key: 'yearly',     label: 'Yearly'     },
+  ];
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <div>
-          <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: memberColor }}>Monthly Overview</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>₹K — FY 2025</p>
+          <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: memberColor }}>
+            {PERIODS.find(p => p.key === period)?.label} Overview
+          </p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>₹K — {fyLabel}</p>
         </div>
         <div className="flex items-center gap-3">
           {[{ label: labels.ol, color: '#2673bb' }, { label: labels.off, color: '#f58311' }].map(l => (
@@ -320,32 +357,55 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
           ))}
         </div>
       </div>
-      <div className="flex items-end gap-1.5" style={{ height: 90 }}>
-        {olData.map((_, i) => (
+
+      {/* Period selector pills */}
+      {/* <div className="flex gap-1 mb-3 p-0.5 rounded-xl w-fit" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+        {PERIODS.map(p => (
+          <button key={p.key} onClick={() => setPeriod(p.key)}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold transition-all"
+            style={{
+              background: period === p.key ? memberColor : 'transparent',
+              color: period === p.key ? '#fff' : 'var(--text-muted)',
+              boxShadow: period === p.key ? `0 2px 8px ${memberColor}40` : 'none',
+            }}>
+            {p.label}
+          </button>
+        ))}
+      </div> */}
+
+      {/* Bars */}
+      <div className="flex items-end gap-2" style={{ height: 90 }}>
+        {aggOl.map((_, i) => (
           <div key={i} className="flex-1 flex items-end gap-0.5 group cursor-pointer">
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
-                style={{ background: '#2673bbee', color: '#fff', fontSize: 9 }}>₹{olData[i]}K</div>
+                style={{ background: '#2673bbee', color: '#fff', fontSize: 9 }}>₹{aggOl[i].toFixed(1)}K</div>
               <div className="w-full rounded-t"
-                style={{ height: `${heights[i].ol}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#5b9fd4,#2673bb)', boxShadow: heights[i].ol > 60 ? '0 0 8px #2673bb55' : 'none' }} />
+                style={{ height: `${heights[i]?.ol ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#5b9fd4,#2673bb)', boxShadow: (heights[i]?.ol ?? 0) > 60 ? '0 0 8px #2673bb55' : 'none' }} />
             </div>
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
-                style={{ background: '#f58311ee', color: '#fff', fontSize: 9 }}>₹{offData[i]}K</div>
+                style={{ background: '#f58311ee', color: '#fff', fontSize: 9 }}>₹{aggOff[i].toFixed(1)}K</div>
               <div className="w-full rounded-t"
-                style={{ height: `${heights[i].off}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#ffa040,#f58311)', boxShadow: heights[i].off > 60 ? '0 0 8px #f5831155' : 'none' }} />
+                style={{ height: `${heights[i]?.off ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#ffa040,#f58311)', boxShadow: (heights[i]?.off ?? 0) > 60 ? '0 0 8px #f5831155' : 'none' }} />
             </div>
           </div>
         ))}
       </div>
-      <div className="flex gap-1.5 mt-1">
-        {MONTHS.map(m => <div key={m} className="flex-1 text-center" style={{ fontSize: 7, color: 'var(--text-muted)' }}>{m.slice(0,1)}</div>)}
+
+      {/* X-axis labels */}
+      <div className="flex gap-2 mt-1">
+        {barLabels.map((lbl, i) => (
+          <div key={i} className="flex-1 text-center truncate" style={{ fontSize: 7, color: 'var(--text-muted)' }}>{lbl}</div>
+        ))}
       </div>
+
+      {/* Footer totals */}
       <div className="flex items-center gap-5 mt-3 pt-3 flex-wrap" style={{ borderTop: '1px solid var(--border)' }}>
         {[
-          { label: labels.ol,  value: `₹${(olData.reduce((a,b)=>a+b,0)/10).toFixed(1)}L`,  color: '#2673bb' },
-          { label: labels.off, value: `₹${(offData.reduce((a,b)=>a+b,0)/10).toFixed(1)}L`, color: '#f58311' },
-          { label: 'Combined', value: `₹${((olData.reduce((a,b)=>a+b,0)+offData.reduce((a,b)=>a+b,0))/10).toFixed(1)}L`, color: memberColor },
+          { label: labels.ol,  value: `₹${(aggOl.reduce((a,b)=>a+b,0)/10).toFixed(1)}L`,  color: '#2673bb' },
+          { label: labels.off, value: `₹${(aggOff.reduce((a,b)=>a+b,0)/10).toFixed(1)}L`, color: '#f58311' },
+          { label: 'Combined', value: `₹${((aggOl.reduce((a,b)=>a+b,0)+aggOff.reduce((a,b)=>a+b,0))/10).toFixed(1)}L`, color: memberColor },
         ].map(s => (
           <div key={s.label}>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
@@ -864,7 +924,7 @@ function RunningDealsSection() {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-header-bg)' }}>
-                    {['#', 'Deal Name', 'Payout Type', 'Invested', 'ROI %', 'Min/Max', 'Participated Date', 'Updates', 'Status'].map(h => (
+                    {['#', 'Deal Name', 'Payout Type', 'Total Invested', 'ROI %', 'Min/Max', 'Participated Date', 'Status'].map(h => (
                       <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
                     ))}
                   </tr>
@@ -877,10 +937,8 @@ function RunningDealsSection() {
                       <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Try changing the filters</p>
                     </td></tr>
                   ) : typeFiltered.map((p, i) => {
-                    const latestUpdate = p.updatedParticipation?.[p.updatedParticipation.length - 1];
-                    const currentAmount = latestUpdate?.updationParticipation ?? p.participatedAmount;
-                    const growth = currentAmount - p.participatedAmount;
-                    const growthPct = p.participatedAmount > 0 ? ((growth / p.participatedAmount) * 100).toFixed(1) : 0;
+                    const updatesTotal = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
+                    const totalInvested = (p.participatedAmount ?? 0) + updatesTotal;
                     const isOpen = expanded === i;
 
                     return (
@@ -911,14 +969,12 @@ function RunningDealsSection() {
                           </td>
                           
                           <td className="py-3.5 px-4">
-                            <div>
-                              <p className="font-bold text-sm" style={{ color: '#2673bb', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(p.participatedAmount)}</p>
-                              {growth !== 0 && (
-                                <p className="text-xs font-semibold mt-0.5" style={{ color: growth > 0 ? '#35a13e' : '#e95330' }}>
-                                  {growth > 0 ? '+' : ''}{growthPct}% growth
-                                </p>
-                              )}
-                            </div>
+                            <p className="font-bold text-sm" style={{ color: '#2673bb', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalInvested)}</p>
+                            {updatesTotal > 0 && (
+                              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                                {fmtINR(p.participatedAmount)} + {fmtINR(updatesTotal)}
+                              </p>
+                            )}
                           </td>
                           
                           <td className="py-3.5 px-4">
@@ -933,13 +989,6 @@ function RunningDealsSection() {
                           
                           <td className="py-3.5 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                             {p.participatedDate}
-                          </td>
-                          
-                          <td className="py-3.5 px-4 text-center">
-                            <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-                              style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
-                              {p.updatedParticipation?.length ?? 0}
-                            </span>
                           </td>
                           
                           <td className="py-3.5 px-4">
@@ -960,7 +1009,7 @@ function RunningDealsSection() {
                         {/* Expanded row: update history */}
                         {isOpen && p.updatedParticipation?.length > 0 && (
                           <tr>
-                            <td colSpan={9} style={{ padding: 0, borderBottom: '1px solid var(--border)' }}>
+                            <td colSpan={8} style={{ padding: 0, borderBottom: '1px solid var(--border)' }}>
                               <div style={{ background: 'var(--input-bg)', padding: '1.25rem' }}>
                                 <div className="flex items-center gap-2 mb-3 px-2"
                                   style={{ borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' }}>
@@ -1278,7 +1327,7 @@ function OfflineSection({ fin, memberColor }) {
     <>
       {interestPayment && <InterestModal payment={interestPayment} onClose={() => setInterestPayment(null)} />}
       <div className="grid gap-5">
-        <SectionHeader icon={I.Package} accent="#f58311" platform="SD Lot Participations" title="My Investment Portfolio" live />
+        <SectionHeader icon={I.Package} accent="#f58311" platform="Offline " title="My Investment Portfolio" live />
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map(k => <KpiCard key={k.label} {...k} />)}
@@ -1295,7 +1344,7 @@ function OfflineSection({ fin, memberColor }) {
           </GlassPanel>
           <GlassPanel accent="#f58311" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
             {payoutSegments.length > 0
-              ? <><MultiDonut segments={payoutSegments} size={120} /><p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#f58311' }}>Payout Split</p></>
+              ? <><MultiDonut segments={payoutSegments} size={120} /><p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#f58311' }}>participated</p></>
               : <p className="text-xs text-center" style={{ color: 'var(--text-muted)' }}>No participations yet</p>
             }
           </GlassPanel>
@@ -1359,7 +1408,7 @@ function OfflineSection({ fin, memberColor }) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-header-bg)' }}>
-                  {['#', 'Deal Name', 'Payout Type', 'Invested', 'ROI %', 'Monthly Interest', 'Participated Date', 'Updates', 'Status'].map(h => (
+                  {['#', 'Deal Name', 'Payout Type', 'Total Invested', 'ROI %', 'Monthly Interest', 'Participated Date', 'Status'].map(h => (
                     <th key={h} className="text-left py-3 px-3 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
                 </tr>
@@ -1377,10 +1426,8 @@ function OfflineSection({ fin, memberColor }) {
                   else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 12) / 100;
                   const monthlyEarning = Math.round(amount * monthlyRate);
                   const pc = PAYOUT_COLORS[p.amountTye] ?? '#888';
-                  const latestUpdate = p.updatedParticipation?.[p.updatedParticipation.length - 1];
-                  const currentAmt = latestUpdate?.updationParticipation ?? amount;
-                  const growth = currentAmt - amount;
-                  const growthPct = amount > 0 ? ((growth / amount) * 100).toFixed(1) : 0;
+                  const updatesTotal = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
+                  const totalInvested = amount + updatesTotal;
                   return (
                     <tr key={p.dealId ?? idx} className="transition-colors" style={{ borderBottom: '1px solid var(--table-row-border)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
@@ -1402,10 +1449,10 @@ function OfflineSection({ fin, memberColor }) {
                         </span>
                       </td>
                       <td className="py-3 px-3">
-                        <p className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{fmtAmt(amount)}</p>
-                        {growth !== 0 && (
-                          <p className="text-xs font-semibold mt-0.5" style={{ color: growth > 0 ? '#35a13e' : '#e95330' }}>
-                            {growth > 0 ? '+' : ''}{growthPct}%
+                        <p className="font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{fmtAmt(totalInvested)}</p>
+                        {updatesTotal > 0 && (
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                            {fmtAmt(amount)} + {fmtAmt(updatesTotal)}
                           </p>
                         )}
                       </td>
@@ -1414,12 +1461,6 @@ function OfflineSection({ fin, memberColor }) {
                         {monthlyEarning > 0 ? fmtAmt(monthlyEarning) : ''}
                       </td>
                       <td className="py-3 px-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{p.participatedDate}</td>
-                      <td className="py-3 px-3 text-center">
-                        <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-                          style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
-                          {p.updatedParticipation?.length ?? 0}
-                        </span>
-                      </td>
                       <td className="py-3 px-3">
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold"
                           style={{ background: 'rgba(53,161,62,0.12)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.25)' }}>
