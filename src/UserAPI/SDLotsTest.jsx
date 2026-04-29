@@ -479,7 +479,7 @@ function MyParticipations() {
   );
 }
 
-export default function SDLots() {
+export default function SDLotsTest() {
   const [lots, setLots]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
@@ -488,7 +488,7 @@ export default function SDLots() {
   const [feeFilter,    setFeeFilter]    = useState('All');
 
   useEffect(() => {
-    getSdLots("NORMAL")
+    getSdLots("TEST")
       .then(data => { if (Array.isArray(data)) setLots(data.map(mapDeal)); })
       .catch(() => {})
       .finally(() => setLoading(false));

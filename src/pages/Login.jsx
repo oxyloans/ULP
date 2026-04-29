@@ -54,15 +54,15 @@ function TypewriterText({ dark }) {
   const cursorOnLine2 = !done && shownLine2 !== "";
 
   return (
-    <div className="mb-5">
+    <div className="mb-1">
       {/* Shield icon + text row */}
       <div className="flex items-center gap-4 mb-4">
 
         {/* Shield — light blue rounded square, gradient icon, white checkmark */}
         <div className="flex-shrink-0 w-16 h-16 rounded-2xl flex items-center justify-center relative overflow-hidden"
           style={{
-            background: dark ? "rgba(96,165,250,0.15)" : "#dbeafe",
-            boxShadow: dark ? "none" : "0 2px 8px rgba(59,130,246,0.1)",
+            // background: dark ? "rgba(96,165,250,0.15)" : "#dbeafe",
+            // boxShadow: dark ? "none" : "0 2px 8px rgba(59,130,246,0.1)",
           }}>
           {/* Pulsing background glow */}
           <div className="shield-bg-glow absolute inset-0 rounded-2xl pointer-events-none"
@@ -86,29 +86,29 @@ function TypewriterText({ dark }) {
         <div>
           <p className="font-extrabold leading-tight"
             style={{ fontSize: "1.45rem", color: dark ? "#ffffff" : "#1e3a8a" }}>
-            {shownLine1}
-            {cursorOnLine1 && <span className="tw-cursor" style={{ color: "#3b82f6", fontWeight: 200 }}>|</span>}
+            {line1}
+            {/* {cursorOnLine1 && <span className="tw-cursor" style={{ color: "#3b82f6", fontWeight: 200 }}>|</span>} */}
           </p>
           <p className="font-bold mt-0.5"
-            style={{ fontSize: "1.1rem", color: dark ? "#93c5fd" : "#047857" }}>
-            {shownLine2}
-            {cursorOnLine2 && <span className="tw-cursor" style={{ color: dark ? "#93c5fd" : "#047857", fontWeight: 400 }}>|</span>}
+            style={{ fontSize: "1.1rem", color: dark ? "#93c5fd" : "#489cfbff" }}>
+            {line2}
+            {/* {cursorOnLine2 && <span className="tw-cursor" style={{ color: dark ? "#93c5fd" : "#047857", fontWeight: 400 }}>|</span>} */}
           </p>
         </div>
       </div>
 
       {/* Divider — gradient underline (old style) */}
-      {done && (
-        <div className="mb-1 h-0.5 rounded-full"
+      {/* {done && ( */}
+        {/* <div className="mb-1 h-0.5 rounded-full"
           style={{
             width: "100%",
             background: dark
               ? "linear-gradient(90deg,#e2e8f0,#93c5fd,transparent)"
-              : "linear-gradient(90deg,#1e3a8a,#047857,transparent)",
-            opacity: 0.35,
-            animation: "fadeSlideIn 0.5s ease forwards",
-          }} />
-      )}
+              : "linear-gradient(90deg,#1e3a8a,#489cfbff,transparent)",
+            opacity: 0.9,
+            // animation: "fadeSlideIn 0.5s ease forwards",
+          }} /> */}
+      {/* )} */}
     </div>
   );
 }
@@ -195,13 +195,38 @@ export default function Login() {
     setLoading(true);
     setLoginText("");
 
+    // Web Audio typing sound — single shared context, zero latency
+    let audioCtx = null;
+    const playClick = () => {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const buf = audioCtx.createBuffer(1, Math.floor(audioCtx.sampleRate * 0.035), audioCtx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let k = 0; k < data.length; k++) {
+          data[k] = (Math.random() * 2 - 1) * Math.pow(1 - k / data.length, 10) * 0.15;
+        }
+        const src = audioCtx.createBufferSource();
+        src.buffer = buf;
+        const gain = audioCtx.createGain();
+        gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.035);
+        src.connect(gain);
+        gain.connect(audioCtx.destination);
+        src.start(audioCtx.currentTime);
+      } catch {}
+    };
+
     // Start typewriter immediately on click
     const msg = "Your Trust, Our Priority.";
     let i = 0;
     const tick = setInterval(() => {
       i++;
       setLoginText(msg.slice(0, i));
-      if (i >= msg.length) clearInterval(tick);
+      if (msg[i - 1] !== ' ') playClick(); // skip spaces
+      if (i >= msg.length) {
+        clearInterval(tick);
+        if (audioCtx) audioCtx.close().catch(() => {});
+      }
     }, 60);
 
     const result = await login(credential.trim(), password);

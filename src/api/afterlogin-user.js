@@ -71,8 +71,8 @@ export async function getAdminBankDetailsInfo() {
  *   globalDealType, minimumParticipation, maxParticipation,
  *   monthlyInterest, quartelyInterest, halfInterest, yearlyInterest }
  */
-export async function getSdLots() {
-  return get('/oxybrick-service/getDealsBasedOnDealType/NORMAL');
+export async function getSdLots(dealType) {
+  return get('/oxybrick-service/getDealsBasedOnDealType/'+ dealType);
 }
 
 /**

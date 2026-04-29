@@ -31,6 +31,7 @@ import WalletHistory from './pages/WalletHistory.jsx';
 import SDLotParticipate from './pages/SDLotParticipate.jsx';
 import MyParticipations from './pages/MyParticipations.jsx';
 import Profile from './pages/Profile.jsx';
+import SDLotsTest from './UserAPI/SDLotsTest.jsx';
 
 import AdminWalletApprovals from './pages/admin/AdminWalletApprovals.jsx';
 import CreateDeal from './pages/CreateDeal.jsx';
@@ -127,6 +128,7 @@ function UserLayout() {
             <Route path="/" element={<Navigate replace to="/dashboard" />} />
             <Route path="/dashboard" element={<UnifiedDashboard />} />
             <Route path="/sd-lots" element={<SDLots />} />
+            <Route path="/sd-lots-test" element={<SDLotsTest />} />
             <Route path="/sd-lot/participate/:id" element={<SDLotParticipate />} />
             <Route path="/my-participations" element={<MyParticipations />} />
             <Route path="/wallet" element={<WalletDashboard />} />
