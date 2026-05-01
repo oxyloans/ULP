@@ -291,7 +291,8 @@ function DepositSlipForm({ adminBanks }) {
       {/* Ref ID — UTR number */}
       <div>
         <label className="block text-xs font-semibold mb-1.5" style={{ color: 'var(--text-muted)' }}>
-          UTR / Reference ID <span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span>
+          UTR / Reference ID 
+          {/* {" "}<span style={{ color: 'var(--text-muted)', fontWeight: 400 }}>(optional)</span> */}
         </label>
         <input type="text" placeholder="e.g. NEFT2025051001"
           value={form.refId} onChange={e => set('refId', e.target.value)}
