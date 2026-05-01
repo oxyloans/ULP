@@ -101,6 +101,7 @@ function DepositSlipForm({ adminBanks }) {
   const validate = () => {
     const e = {};
     if (!form.amount || isNaN(parseInt(form.amount.replace(/,/g, ''), 10))) e.amount = 'Enter a valid amount';
+    if (!form.refId) e.refId = 'Reference ID is required';
     if (!form.date) e.date = 'Date is required';
     if (!file) e.file = 'Please upload a deposit slip';
     return e;
@@ -297,6 +298,7 @@ function DepositSlipForm({ adminBanks }) {
         <input type="text" placeholder="e.g. NEFT2025051001"
           value={form.refId} onChange={e => set('refId', e.target.value)}
           style={{ ...inputStyle('refId'), fontFamily: "'JetBrains Mono', monospace" }} />
+           {errors.refId && <p className="text-xs mt-1" style={{ color: '#ef4444' }}>{errors.refId}</p>}
       </div>
 
       {/* Date */}
