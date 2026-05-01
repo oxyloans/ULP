@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react';
-import { login as apiLogin, hiddenLogin as apiHiddenLogin } from '../api/beforelogin';
-import { clearSession, getToken, getUserId, getRole } from '../api/client';
+import { login as apiLogin, hiddenLogin as apiHiddenLogin, getUserMe } from '../api/beforelogin';
+import { clearSession, getToken, getUserId, getRole, setSession } from '../api/client';
 
 const AuthContext = createContext(null);
 
@@ -47,6 +47,32 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /**
+   * googleLogin(token) — called from OAuthCallback after redirect
+   * Fetches user info from /auth-service/user/me then sets session
+   */
+  const googleLogin = async (token) => {
+    setLoading(true);
+    try {
+      const me = await getUserMe(token);
+      const userId = me.userId ?? me.user_id ?? me.id ?? '';
+      const role   = me.roles?.[0]?.name ?? me.role ?? 'INVESTOR';
+      setSession({ accessToken: token, userId, role });
+      setUser({
+        userId,
+        name:  me.name ?? me.fullName ?? me.firstName ?? '',
+        email: me.email ?? '',
+        lrId:  me.lrId ?? userId,
+        role:  role === 'ADMIN' ? 'admin' : 'user',
+      });
+      return { success: true, role: role === 'ADMIN' ? 'admin' : 'user' };
+    } catch (err) {
+      return { success: false, error: err.message ?? 'Google login failed.' };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const logout = () => {
     setUser(null);
     clearSession();
@@ -82,7 +108,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, loading, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, loading, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

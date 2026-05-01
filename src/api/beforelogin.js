@@ -14,7 +14,7 @@
  *   Admin → ADMIN   / admin123
  */
 
-import { post, setSession } from './client';
+import { post, get, setSession } from './client';
 
 const SIGN_IN = '/auth-service/auth/sign-in';
 
@@ -128,6 +128,25 @@ export async function hiddenLogin({ credential, password }) {
 }
 export async function forgotPassword({ email }) {
   return post('/auth-service/auth/forgot-password', { email }, { auth: false });
+}
+
+// ─── Google OAuth ─────────────────────────────────────────────────────────────
+const OAUTH_BASE     = 'http://ec2-65-0-147-157.ap-south-1.compute.amazonaws.com:9000';
+const OAUTH_REDIRECT = typeof window !== 'undefined'
+  ? window.location.origin + '/oauth/callback'
+  : 'https://ulp.oxybricks.world/oauth/callback';
+
+export const GOOGLE_AUTH_URL =
+  `${OAUTH_BASE}/oauth2/authorize/google?redirect_uri=${encodeURIComponent(OAUTH_REDIRECT)}`;
+
+/**
+ * getUserMe(token)
+ * GET /auth-service/user/me  — fetch userId + role after OAuth redirect
+ */
+export async function getUserMe(token) {
+  return get('/auth-service/user/me', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 // ─── Reset password ───────────────────────────────────────────────────────────

@@ -651,7 +651,7 @@ function EditBankDetails({ profile, onBack, onSaved }) {
 // ══════════════════════════════════════════════════════════════════════════════
 function EditPanCard({ profile, onBack, onSaved }) {
   const userId = getUserId();
-  const [panNumber,     setPanNumber]     = useState(profile.panNumber ?? '');
+  const [panNumber,     setPanNumber]     = useState(profile.panNumber.trim() ?? '');
   const [name,          setName]          = useState(`${(profile.firstName ?? '').trim()} ${(profile.lastName ?? '').trim()}`.trim());
   const [panError,      setPanError]      = useState('');
   const [nameError,     setNameError]     = useState('');
@@ -784,7 +784,7 @@ function EditPanCard({ profile, onBack, onSaved }) {
             <label className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>PAN Number</label>
             <div className="relative">
               <input
-                value={panNumber}
+                value={panNumber.trim()}
                 onChange={e => { setPanNumber(e.target.value.toUpperCase()); setPanError(''); setApiError(''); }}
                 placeholder="ABCDE1234F"
                 maxLength={10}
