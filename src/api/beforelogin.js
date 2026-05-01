@@ -28,15 +28,18 @@ const DEMO_USERS = {
 /**
  * login({ credential, password })
  *
- * credential = LR ID | email | "ADMIN"
+ * credential = email | 10-digit mobile number | "ADMIN"
+ *
+ * - Email   → POST { email, password }
+ * - Mobile  → POST { mobileNumber, password }
  *
  * Returns: { accessToken, userId, role, name, email, lrId }
  * Throws:  Error with .status on failure
- *
- * Flow:
- *  1. If credential matches a DEMO_USER key → return dummy data (no API call)
- *  2. Otherwise → call real API, store token, return normalised result
  */
+
+const EMAIL_RE  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
+const MOBILE_RE = /^[6-9]\d{9}$/;
+
 export async function login({ credential, password }) {
   const key = credential.trim().toUpperCase();
 
@@ -52,8 +55,19 @@ export async function login({ credential, password }) {
   }
 
   // ── Real API path ───────────────────────────────────────────────────────────
-  // credential is treated as email; backend also accepts LR ID as email field
-  const response = await post(SIGN_IN, { email: credential.trim(), password }, { auth: false });
+  const raw = credential.trim();
+  let body;
+
+  if (EMAIL_RE.test(raw)) {
+    body = { email: raw.toLowerCase(), password };
+  } else if (MOBILE_RE.test(raw)) {
+    body = { mobileNumber: raw, password };
+  } else {
+    const err = new Error('Enter a valid email or 10-digit mobile number.');
+    err.status = 400; throw err;
+  }
+
+  const response = await post(SIGN_IN, body, { auth: false });
 
   const accessToken = response.accessToken ?? response.access_token ?? '';
   const userId      = response.userId      ?? response.user_id      ?? '';

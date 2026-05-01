@@ -433,10 +433,10 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
-              {/* Email */}
+              {/* Email / Mobile */}
               <div>
                 <label className="block text-xs font-bold mb-2 uppercase tracking-wider" style={{ color: subC }}>
-                  Email
+                  Email or Mobile
                 </label>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: iconC }}>
@@ -444,7 +444,7 @@ export default function Login() {
                   </span>
                   <input
                     type="text"
-                    placeholder="your.name@email.com"
+                    placeholder="email@example.com or 9876543210"
                     value={credential}
                     onChange={e => { setCredential(e.target.value); setError(""); }}
                     required
@@ -452,6 +452,16 @@ export default function Login() {
                     style={{ padding: "13px 18px 13px 46px", background: inputBg, color: textC, border: "none" }}
                   />
                 </div>
+                {/* Inline validation hint */}
+                {credential.length > 0 && (() => {
+                  const v = credential.trim();
+                  const isEmail  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i.test(v);
+                  const isMobile = /^[6-9]\d{9}$/.test(v);
+                  if (isEmail)  return <p className="text-xs mt-1 font-medium" style={{ color: '#10b981' }}>✓ Valid email</p>;
+                  if (isMobile) return <p className="text-xs mt-1 font-medium" style={{ color: '#10b981' }}>✓ Valid mobile number</p>;
+                  if (v.length >= 5) return <p className="text-xs mt-1 font-medium" style={{ color: '#f59e0b' }}>Enter a valid email or 10-digit mobile number</p>;
+                  return null;
+                })()}
               </div>
 
               {/* Password */}
