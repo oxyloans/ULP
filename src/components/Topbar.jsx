@@ -5,6 +5,7 @@ import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfile } from '../api/afterlogin-user';
 import { getUserId } from '../api/client';
+import logo from '../assets/ulp.png';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const MenuIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
@@ -240,7 +241,7 @@ export default function Topbar({ onMenuClick }) {
   const pageLabel = Object.entries(PAGE_LABELS).find(([k]) => location.pathname.startsWith(k))?.[1] ?? 'Dashboard';
 
   return (
-    <header className="topbar-shell lg:pl-[35px]">
+    <header className="topbar-shell lg:pl-[55px]">
 
       {/* Hamburger — mobile only */}
       <button onClick={onMenuClick}
@@ -249,15 +250,9 @@ export default function Topbar({ onMenuClick }) {
       </button>
 
       {/* Brand — end of left section */}
-        <div className="hidden sm:flex items-center gap-2 ml-4 pl-4 flex-shrink-0"
-          // style={{ borderLeft: '1px solid var(--border)' }}
-          >
-          <div className="w-6 h-6 rounded-lg flex items-center justify-center"
-            style={{ background: 'linear-gradient(135deg,#818cf8,#4338ca)', boxShadow: '0 0 10px rgba(99,102,241,0.4)' }}>
-            <svg viewBox="0 0 24 24" fill="none" className="w-3.5 h-3.5">
-              <path d="M5 12 L12 5 L19 12 L12 19 Z" fill="white" opacity="0.95"/>
-            </svg>
-          </div>
+        <div className="hidden sm:flex items-center gap-2 ml-4 pl-4 flex-shrink-0">
+          <img src={logo} alt="Oxy Portfolio" className="w-9 h-9 rounded-full object-cover flex-shrink-0"
+            style={{ background: '#fff', boxShadow: '0 0 10px rgba(99,102,241,0.4)' }} />
           <span className="text-xs font-black tracking-widest uppercase"
             style={{ color: 'var(--text-primary)', letterSpacing: '0.1em' }}>
             Oxy Portfolio
@@ -266,7 +261,7 @@ export default function Topbar({ onMenuClick }) {
 
       {/* Left: page label + greeting + live + Brand at end */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{pageLabel}</span>
+        {/* <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{pageLabel}</span> */}
         <span className="topbar-sep">·</span>
         <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
           Good {getGreeting()},{' '}

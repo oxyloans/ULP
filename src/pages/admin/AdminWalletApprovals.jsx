@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getWalletSlips, approveWalletSlip, rejectWalletSlip } from '../../api/afterlogin-admin';
+import FilePreviewModal from '../../components/FilePreviewModal';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const CheckIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>;
@@ -51,31 +52,6 @@ function StatusChip({ status }) {
         : <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.text }} />}
       {cfg.label}
     </span>
-  );
-}
-
-function SlipModal({ url, onClose }) {
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(6px)' }}
-      onClick={onClose}>
-      <div className="relative rounded-2xl overflow-hidden max-w-lg w-full"
-        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.5)' }}
-        onClick={e => e.stopPropagation()}>
-        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
-          <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Deposit Slip</p>
-          <button onClick={onClose}
-            className="w-7 h-7 rounded-lg flex items-center justify-center"
-            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-            <CloseIcon />
-          </button>
-        </div>
-        <div className="p-4">
-          <img src={url} alt="Deposit Slip" className="w-full rounded-xl object-contain"
-            style={{ maxHeight: 480, background: '#f8fafc' }} />
-        </div>
-      </div>
-    </div>
   );
 }
 
@@ -262,7 +238,7 @@ export default function AdminWalletApprovals() {
 
   return (
     <>
-      {slipUrl && <SlipModal url={slipUrl} onClose={() => setSlipUrl(null)} />}
+      {slipUrl && <FilePreviewModal url={slipUrl} name="Deposit Slip" onClose={() => setSlipUrl(null)} />}
       {confirmModal && (
         <ConfirmModal
           txn={confirmModal.txn}

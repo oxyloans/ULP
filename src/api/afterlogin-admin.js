@@ -56,7 +56,22 @@ export async function rejectWalletSlip({ utrNumber, transactionAmount, transacti
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * GET /oxybrick-service/getDealsBasedOnDealType/NORMAL
+ * GET /oxybrick-service/getRunningAndClosedDeals/{type}
+ * type: running | closed | test
+ */
+export async function getRunningClosedDeals(type = 'running') {
+  return get(`/oxybrick-service/getRunningAndClosedDeals/${type}`);
+}
+
+/**
+ * GET /oxybrick-service/getDealParticipantsData/{dealId}
+ */
+export async function getDealParticipants(dealId) {
+  return get(`/oxybrick-service/getDealParticipantsData/${dealId}`);
+}
+
+/**
+ * GET /oxybrick-service/getDealsBasedOnDealType/{dealType}
  */
 export async function getAdminDeals(dealType = 'NORMAL') {
   return get(`/oxybrick-service/getDealsBasedOnDealType/${dealType}`);

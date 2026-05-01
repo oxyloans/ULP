@@ -3,6 +3,7 @@ import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { GOOGLE_AUTH_URL } from "../api/beforelogin";
+import logo from "../assets/ulp.png";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ChatIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
@@ -306,7 +307,8 @@ export default function Login() {
 
             {/* Brand */}
             <div className="relative z-10 flex items-center gap-3 mb-5 fade-in">
-              <Logo size={36} />
+              <img src={logo} alt="Oxy Portfolio" className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                style={{ background: '#fff', boxShadow: '0 0 12px rgba(255,255,255,0.25)' }} />
               <div>
                 <p className="text-white font-black text-base tracking-wide leading-none">Oxy Portfolio</p>
                 <p className="text-blue-300 text-xs font-medium mt-0.5 opacity-80">Financial Intelligence Platform</p>

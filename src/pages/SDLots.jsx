@@ -61,43 +61,54 @@ function BankCard({ bank }) {
   );
 }
 
-function SDLotCard({ lot }) {
+function SDLotCard({ lot, index }) {
   const navigate = useNavigate();
-  console.log({lot})
   const raisedPct = lot.totalSize > 0 ? Math.min(Math.round((lot.raised / lot.totalSize) * 100), 100) : 0;
   const isClosed  = lot.status === 'Closed' || lot.remaining === 0;
-  const accentColor = isClosed ? '#64748b' : '#6366f1';
+
+  // Alternate indigo (even) / green (odd) for open deals
+  const isGreen      = !isClosed && index % 2 === 1;
+  const accentColor  = isClosed ? '#64748b' : isGreen ? '#10b981' : '#6366f1';
+  const heroBg       = isClosed
+    ? 'linear-gradient(145deg,#1e293b,#0f172a)'
+    : isGreen
+      ? 'linear-gradient(145deg,#052e16 0%,#064e3b 60%,#065f46 100%)'
+      : 'linear-gradient(145deg,#1e1b4b 0%,#312e81 60%,#1e3a8a 100%)';
+  const heroBorder   = isClosed ? 'rgba(255,255,255,0.06)' : isGreen ? 'rgba(16,185,129,0.25)' : 'rgba(99,102,241,0.25)';
+  const glowColor    = isClosed ? 'rgba(100,116,139,0.15)' : isGreen ? 'rgba(16,185,129,0.15)' : 'rgba(129,140,248,0.15)';
+  const textGlow     = isClosed ? 'none' : isGreen ? '0 0 20px rgba(16,185,129,0.5)' : '0 0 20px rgba(129,140,248,0.5)';
+  const progressBg   = isClosed ? '#64748b' : isGreen ? 'linear-gradient(90deg,#10b981,#34d399)' : 'linear-gradient(90deg,#818cf8,#10b981)';
+  const progressGlow = isClosed ? 'none' : isGreen ? '0 0 8px rgba(16,185,129,0.6)' : '0 0 8px rgba(129,140,248,0.6)';
+  const subTextColor = isClosed ? 'rgba(148,163,184,0.6)' : isGreen ? 'rgba(110,231,183,0.7)' : 'rgba(165,180,252,0.7)';
+  const ctaBg        = isClosed ? 'var(--input-bg)' : isGreen ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#6366f1,#4338ca)';
+  const ctaShadow    = isClosed ? 'none' : isGreen ? '0 4px 14px rgba(16,185,129,0.4)' : '0 4px 14px rgba(99,102,241,0.4)';
+  const cardBorder   = isClosed ? 'var(--border)' : isGreen ? 'rgba(16,185,129,0.18)' : 'rgba(99,102,241,0.18)';
 
   return (
     <div
       className="rounded-2xl overflow-hidden"
       style={{
         background: 'var(--surface-card)',
-        border: `1px solid ${isClosed ? 'var(--border)' : 'rgba(99,102,241,0.18)'}`,
+        border: `1px solid ${cardBorder}`,
         boxShadow: '0 2px 20px rgba(0,0,0,0.07)',
         opacity: isClosed ? 0.75 : 1,
         transition: 'transform 0.2s, box-shadow 0.2s',
       }}
-      onMouseEnter={e => { if (!isClosed) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = '0 10px 36px rgba(99,102,241,0.14)'; } }}
+      onMouseEnter={e => { if (!isClosed) { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = isGreen ? '0 10px 36px rgba(16,185,129,0.14)' : '0 10px 36px rgba(99,102,241,0.14)'; } }}
       onMouseLeave={e => { e.currentTarget.style.transform = ''; e.currentTarget.style.boxShadow = '0 2px 20px rgba(0,0,0,0.07)'; }}
     >
       <div className="flex items-stretch">
 
         {/* ── Left: Total Fund hero panel ── */}
         <div className="w-[180px] flex-shrink-0 flex flex-col items-center justify-center p-5 relative overflow-hidden"
-          style={{
-            background: isClosed
-              ? 'linear-gradient(145deg,#1e293b,#0f172a)'
-              : 'linear-gradient(145deg,#1e1b4b 0%,#312e81 60%,#1e3a8a 100%)',
-            borderRight: `1px solid ${isClosed ? 'rgba(255,255,255,0.06)' : 'rgba(99,102,241,0.25)'}`,
-          }}>
+          style={{ background: heroBg, borderRight: `1px solid ${heroBorder}` }}>
           <div className="absolute -top-8 -right-8 w-28 h-28 rounded-full pointer-events-none"
-            style={{ background: 'rgba(129,140,248,0.15)', filter: 'blur(20px)' }} />
+            style={{ background: glowColor, filter: 'blur(20px)' }} />
 
           <p className="text-xs font-bold uppercase tracking-widest mb-1 relative z-10"
-            style={{ color: 'rgba(165,180,252,0.7)' }}>Total Fund</p>
+            style={{ color: subTextColor }}>Total Fund</p>
           <p className="text-2xl font-black leading-none relative z-10 text-center"
-            style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: '0 0 20px rgba(129,140,248,0.5)' }}>
+            style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: textGlow }}>
             {fmtINR(lot.totalSize)}
           </p>
 
@@ -105,17 +116,17 @@ function SDLotCard({ lot }) {
           <div className="w-full mt-4 relative z-10 grid gap-1">
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
               <div className="h-full rounded-full transition-all duration-700"
-                style={{ width: `${raisedPct}%`, background: isClosed ? '#64748b' : 'linear-gradient(90deg,#818cf8,#10b981)', boxShadow: isClosed ? 'none' : '0 0 8px rgba(129,140,248,0.6)' }} />
+                style={{ width: `${raisedPct}%`, background: progressBg, boxShadow: progressGlow }} />
             </div>
             <div className="flex items-center justify-between">
-              <span style={{ color: 'rgba(165,180,252,0.6)', fontSize: 9 }}>Raised {raisedPct}%</span>
-              <span style={{ color: 'rgba(165,180,252,0.6)', fontSize: 9 }}>{fmtINR(lot.remaining)} left</span>
+              <span style={{ color: subTextColor, fontSize: 9 }}>Raised {raisedPct}%</span>
+              <span style={{ color: subTextColor, fontSize: 9 }}>{fmtINR(lot.remaining)} left</span>
             </div>
           </div>
-           <p className="text-xs uppercase tracking-widest mb-1 relative z-10"
-            style={{ color: 'rgba(165,180,252,0.7)' }}>Remaining...</p>
-           <p className="text-2xl font-black leading-none relative z-10 text-center"
-            style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: '0 0 20px rgba(129,140,248,0.5)' }}>
+          <p className="text-xs uppercase tracking-widest mb-1 relative z-10"
+            style={{ color: subTextColor }}>Remaining...</p>
+          <p className="text-2xl font-black leading-none relative z-10 text-center"
+            style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: textGlow }}>
             {fmtINR(lot.remaining)}
           </p>
         </div>
@@ -166,14 +177,14 @@ function SDLotCard({ lot }) {
               <div className="flex flex-wrap gap-2">
                 {(lot.interestOptions ?? []).length > 0 ? lot.interestOptions.map(opt => (
                   <div key={opt.type} className="flex flex-col items-center px-3 py-2 rounded-xl"
-                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    <span className="text-base font-black leading-none" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{opt.rate}%</span>
+                    style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
+                    <span className="text-base font-black leading-none" style={{ color: accentColor, fontFamily: "'JetBrains Mono', monospace" }}>{opt.rate}%</span>
                     <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{opt.label}</span>
                   </div>
                 )) : (
                   <div className="flex flex-col items-center px-3 py-2 rounded-xl"
-                    style={{ background: 'rgba(16,185,129,0.08)', border: '1px solid rgba(16,185,129,0.2)' }}>
-                    <span className="text-base font-black leading-none" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{lot.roiMonthly}%</span>
+                    style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
+                    <span className="text-base font-black leading-none" style={{ color: accentColor, fontFamily: "'JetBrains Mono', monospace" }}>{lot.roiMonthly}%</span>
                     <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>Monthly</span>
                   </div>
                 )}
@@ -183,7 +194,7 @@ function SDLotCard({ lot }) {
             {/* Tenure / Min / Max — equal 3-column row */}
             <div className="grid grid-cols-3 gap-2">
               {[
-                { label: 'Tenure',          value: lot.tenure,                color: '#818cf8' },
+                { label: 'Tenure',          value: lot.tenure,                color: accentColor },
                 { label: 'Min Investment',  value: fmtINR(lot.minInvestment), color: '#f59e0b' },
                 { label: 'Max Investment',  value: fmtINR(lot.maxInvestment), color: '#f59e0b' },
               ].map(f => (
@@ -208,9 +219,9 @@ function SDLotCard({ lot }) {
                 style={{ background: 'rgba(245,158,11,0.06)', border: '1.5px solid rgba(245,158,11,0.35)', boxShadow: '0 0 12px rgba(245,158,11,0.12)' }}>
                 {/* Header */}
                 <div className="flex items-center gap-2 px-3 py-2.5"
-                  style={{ borderBottom: '1px solid rgba(99,102,241,0.1)', background: 'rgba(99,102,241,0.08)' }}>
+                  style={{ borderBottom: `1px solid ${accentColor}18`, background: `${accentColor}0d` }}>
                   <div className="w-6 h-6 rounded-lg flex items-center justify-center flex-shrink-0"
-                    style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8' }}>
+                    style={{ background: `${accentColor}20`, color: accentColor }}>
                     <Bank />
                   </div>
                   <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>
@@ -242,16 +253,16 @@ function SDLotCard({ lot }) {
               disabled={isClosed}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all"
               style={{
-                background: isClosed ? 'var(--input-bg)' : 'linear-gradient(135deg,#6366f1,#4338ca)',
+                background: ctaBg,
                 color: isClosed ? 'var(--text-muted)' : '#fff',
                 border: isClosed ? '1px solid var(--border)' : 'none',
-                boxShadow: isClosed ? 'none' : '0 4px 14px rgba(99,102,241,0.4)',
+                boxShadow: ctaShadow,
                 cursor: isClosed ? 'not-allowed' : 'pointer',
               }}
               onMouseEnter={e => { if (!isClosed) e.currentTarget.style.transform = 'translateY(-1px)'; }}
               onMouseLeave={e => { e.currentTarget.style.transform = ''; }}
             >
-              {isClosed ? 'Achevied' : 'Participate Now'}
+              {isClosed ? 'Achieved' : 'Participate Now'}
               {!isClosed && <ArrowRight />}
             </button>
           </div>
@@ -600,7 +611,7 @@ export default function SDLots() {
                 Clear Filters
               </button>
             </div>
-          : filtered.map(lot => <SDLotCard key={lot.id} lot={lot} />)
+          : [...filtered].reverse().map((lot, index) => <SDLotCard key={lot.id} lot={lot} index={index} />)
         }
       </div>
     </div>

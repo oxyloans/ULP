@@ -257,7 +257,7 @@ function DepositSlipForm({ adminBanks }) {
       </div>
 
       {/* Analysis result banner */}
-      {analysis && (
+      {/* {analysis && (
         <div className="rounded-xl px-4 py-3 flex items-start gap-3"
           style={{
             background: analysis.valid ? 'rgba(16,185,129,0.07)' : 'rgba(239,68,68,0.07)',
@@ -276,7 +276,7 @@ function DepositSlipForm({ adminBanks }) {
             )}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Amount */}
       <div>

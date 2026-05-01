@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { sendMobileOtp, signUp } from '../api/beforelogin';
+import logo from '../assets/ulp.png';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const UserIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
@@ -150,7 +151,8 @@ function LeftPanel() {
         style={{ background: 'rgba(99,102,241,0.25)', filter: 'blur(2px)' }} />
 
       <div className="relative z-10 flex items-center gap-3 mb-6">
-        <Logo size={36} />
+        <img src={logo} alt="Oxy Portfolio" className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+          style={{ background: '#fff', boxShadow: '0 0 12px rgba(255,255,255,0.25)' }} />
         <div>
           <p className="text-white font-black text-base tracking-wide leading-none">Oxy Portfolio</p>
           <p className="text-blue-300 text-xs font-medium mt-0.5 opacity-80">Financial Intelligence Platform</p>

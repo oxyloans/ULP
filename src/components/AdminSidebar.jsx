@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/ulp.png';
 
 const HomeIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
 const CheckIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
@@ -32,6 +33,15 @@ function AdminSidebarContent({ onClose }) {
   return (
     <>
       <div className="px-5 pt-5 pb-2">
+        {/* Logo */}
+        {/* <div className="flex items-center gap-2.5 mb-3">
+          <img src={logo} alt="Oxy Portfolio" className="w-8 h-8 rounded-xl object-cover flex-shrink-0"
+            style={{ boxShadow: '0 0 10px rgba(168,85,247,0.4)' }} />
+          <span className="text-sm font-black tracking-widest uppercase"
+            style={{ color: '#e9d5ff', letterSpacing: '0.08em' }}>
+            Oxy Portfolio
+          </span>
+        </div> */}
         <span className="admin-sidebar-section-label">Admin Panel</span>
       </div>
       <nav className="flex-1 px-3 pb-3 flex flex-col gap-0.5 overflow-y-auto">

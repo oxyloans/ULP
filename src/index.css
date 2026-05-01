@@ -720,14 +720,14 @@ body {
 /* Topbar: no left padding on mobile (no sidebar) */
 .topbar-shell,
 .admin-topbar-shell {
-  padding-left: 16px !important;
+  padding-left: 6px !important;
 }
 @media (min-width: 1024px) {
   .topbar-shell {
-    padding-left: 35px !important;
+    padding-left: 5px !important;
   }
   .admin-topbar-shell {
-    padding-left: 35px !important;
+    padding-left: 25px !important;
   }
 }
 

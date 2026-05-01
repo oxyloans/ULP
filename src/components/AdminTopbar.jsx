@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
+import logo from '../assets/ulp.png';
 
 const ShieldIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>;
 const MenuIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
@@ -44,10 +45,8 @@ export default function AdminTopbar({ onMenuClick }) {
 
       {/* Brand — far left */}
       <div className="flex items-center gap-2 flex-shrink-0">
-        <div className="w-7 h-7 rounded-xl flex items-center justify-center"
-          style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', boxShadow: '0 0 14px rgba(168,85,247,0.45)' }}>
-          <ShieldIcon />
-        </div>
+        <img src={logo} alt="Oxy Portfolio" className="w-7 h-7 rounded-full object-cover flex-shrink-0"
+          style={{ background: '#fff', boxShadow: '0 0 14px rgba(168,85,247,0.45)' }} />
         <span className="text-sm font-black tracking-widest uppercase hidden sm:block"
           style={{ color: '#e9d5ff', letterSpacing: '0.1em' }}>
           Oxy Portfolio
