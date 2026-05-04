@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRunningClosedDeals, getDealParticipants } from '../../api/afterlogin-admin';
+import { getRunningClosedDeals, getDealParticipants,getAdminDeals } from '../../api/afterlogin-admin';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
@@ -17,9 +17,9 @@ function fmtINR(n) {
 }
 
 const TABS = [
-  { key: 'running', label: 'Running', color: '#10b981' },
+  { key: 'NORMAL', label: 'Running', color: '#10b981' },
   { key: 'closed',  label: 'Closed',  color: '#6366f1' },
-  { key: 'test',    label: 'Test',    color: '#f59e0b' },
+  { key: 'TEST',    label: 'Test',    color: '#f59e0b' },
 ];
 
 // ─── Participants panel (lazy-loaded per deal) ────────────────────────────────
@@ -123,10 +123,11 @@ function ParticipantsPanel({ dealId }) {
 
 // ─── Deal row ─────────────────────────────────────────────────────────────────
 function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
-  const expanded = expandedId === deal.dealId;
+  const dealKey = deal.dealId ?? deal.id;
+  const expanded = expandedId === dealKey;
 
-  const total      = deal.dealValue ?? 0;
-  const invested   = deal.totalParticipationAmount ?? 0;
+  const total      = deal.dealValue ?? deal.dealAmount ?? 0;
+  const invested   = deal.totalParticipationAmount ?? deal.dealParticipationValue ?? 0;
   const remaining  = deal.currentDealValue ?? Math.max(0, total - invested);
   const fillPct    = total > 0 ? Math.min(Math.round((invested / total) * 100), 100) : 0;
   const isAchieved = deal.dealStatus === 'ACHIEVED';
@@ -136,7 +137,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
       <tr
         className="transition-colors cursor-pointer"
         style={{ borderBottom: '1px solid var(--border)' }}
-        onClick={() => onToggle(deal.dealId)}
+        onClick={() => onToggle(dealKey)}
         onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
         onMouseLeave={e => e.currentTarget.style.background = expanded ? 'rgba(168,85,247,0.04)' : 'transparent'}>
 
@@ -146,7 +147,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
         {/* Deal Name */}
         <td className="py-3.5 px-4">
           <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{deal.dealName}</p>
-          <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>{String(deal.dealId ?? '').slice(0, 8)}…</p>
+          <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>{String(deal.dealId ?? deal.id ?? '').slice(0, 8)}…</p>
         </td>
 
         {/* Deal Value */}
@@ -178,7 +179,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
 
         {/* ROI */}
         <td className="py-3.5 px-4 font-bold tabular-nums text-sm" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
-          {deal.rateofinterest ?? '—'}%
+          {deal.rateofinterest ?? deal.monthlyInterest ?? '—'}%
         </td>
 
         {/* Status */}
@@ -207,7 +208,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
       {expanded && (
         <tr>
           <td colSpan={9} style={{ padding: 0 }}>
-            <ParticipantsPanel dealId={deal.dealId} />
+            <ParticipantsPanel dealId={dealKey} />
           </td>
         </tr>
       )}
@@ -217,7 +218,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminOffline() {
-  const [activeTab, setActiveTab]   = useState('running');
+  const [activeTab, setActiveTab]   = useState('NORMAL');
   const [deals, setDeals]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -230,7 +231,8 @@ export default function AdminOffline() {
 
   const load = (tab = activeTab) => {
     setLoading(true); setError(''); setDeals([]);
-    getRunningClosedDeals(tab)
+    // getRunningClosedDeals(tab)
+    getAdminDeals(tab)
       .then(res => {
         const list = res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
         setDeals(list);
@@ -248,11 +250,11 @@ export default function AdminOffline() {
   );
 
   // KPIs
-  const totalDealValue   = deals.reduce((s, d) => s + (d.dealValue ?? 0), 0);
-  const totalParticipated = deals.reduce((s, d) => s + (d.totalParticipationAmount ?? 0), 0);
-  const totalRemaining   = deals.reduce((s, d) => s + (d.currentDealValue ?? 0), 0);
+  const totalDealValue   = deals.reduce((s, d) => s + (d.dealValue ?? d.dealAmount ?? 0), 0);
+  const totalParticipated = deals.reduce((s, d) => s + (d.totalParticipationAmount ?? d.dealParticipationValue ?? 0), 0);
+  const totalRemaining   = deals.reduce((s, d) => s + (d.currentDealValue ?? d.remainingDealValue ?? 0), 0);
   const avgRoi           = deals.length
-    ? (deals.reduce((s, d) => s + (d.rateofinterest ?? 0), 0) / deals.length).toFixed(2)
+    ? (deals.reduce((s, d) => s + (d.rateofinterest ?? d.monthlyInterest ?? 0), 0) / deals.length).toFixed(2)
     : '—';
 
   const kpis = [
@@ -382,7 +384,7 @@ export default function AdminOffline() {
                     </td>
                   </tr>
                 ) : filtered.map((deal, idx) => (
-                  <DealRow key={deal.dealId ?? idx} deal={deal} idx={idx} tabColor={tabColor} expandedId={expandedDealId} onToggle={handleToggle} />
+                  <DealRow key={deal.dealId ?? deal.id ?? idx} deal={deal} idx={idx} tabColor={tabColor} expandedId={expandedDealId} onToggle={handleToggle} />
                 ))}
               </tbody>
             </table>

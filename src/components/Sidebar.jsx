@@ -14,6 +14,7 @@ const TrendIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 const DealsIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>;
 const CloseIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const ProfileIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const Building    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="4" width="18" height="17" rx="1"/><path d="M3 8h18"/><rect x="6" y="11" width="3" height="3" rx="0.5"/><rect x="10.5" y="11" width="3" height="3" rx="0.5"/><rect x="15" y="11" width="3" height="3" rx="0.5"/><rect x="6" y="16" width="3" height="2" rx="0.5"/><rect x="15" y="16" width="3" height="2" rx="0.5"/><rect x="10" y="16" width="4" height="5" rx="0.5"/><path d="M1 21h22"/></svg>
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 // To add more sub-items under Deals, just push to the `children` array.
@@ -25,6 +26,7 @@ const NAV_ITEMS = [
     // no `path` — this is a collapsible group
     children: [
       { title: 'SD Lots',           path: '/sd-lots',           Icon: SDLotIcon,   comingSoon: false },
+      { title: 'Asset',           path: '/asset',           Icon: Building,   comingSoon: false },
       // Add more deal types here, e.g.:
       // { title: 'Gold Deals',     path: '/gold-deals',        Icon: ZapIcon,     comingSoon: true  },
     ],
