@@ -164,8 +164,36 @@ export async function updateTicketStatus(id, status) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// PLATFORM STATS
+// USER NAME LOOKUP
 // ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /student-service/user/profile?id={userId}
+ * Fetch name for a single userId.
+ */
+export async function getUserNameById(userId) {
+  const data = await get(`/student-service/user/profile?id=${userId}`);
+  const first = data?.firstName ?? data?.name ?? '';
+  const last  = data?.lastName  ?? '';
+  return (first + ' ' + last).trim() || userId;
+}
+
+/**
+ * Fetch names for multiple comma-separated or array of userIds.
+ * Returns: [{ id, name }]
+ */
+export async function getUserNamesByIds(ids) {
+  const list = (Array.isArray(ids) ? ids : String(ids).split(','))
+    .map(s => s.trim()).filter(Boolean);
+  const results = await Promise.allSettled(list.map(id => getUserNameById(id)));
+  return list.map((id, i) => ({
+    id,
+    name: results[i].status === 'fulfilled' ? results[i].value : 'Not found',
+    error: results[i].status === 'rejected',
+  }));
+}
+
+
 
 export async function getPlatformStats() {
   return get('/admin-service/stats/platform');

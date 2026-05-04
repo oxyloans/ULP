@@ -171,39 +171,42 @@ function SDLotCard({ lot, index }) {
 
           {/* ── Section B: ROI + metrics ── */}
           <div className="px-5 py-4 lg:flex-1">
-            {/* Interest options grid */}
-            <div className="mb-3">
-              <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', fontSize: 10 }}>Interest Options</p>
-              <div className="flex flex-wrap gap-2">
-                {(lot.interestOptions ?? []).length > 0 ? lot.interestOptions.map(opt => (
-                  <div key={opt.type} className="flex flex-col items-center px-3 py-2 rounded-xl"
-                    style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
-                    <span className="text-base font-black leading-none" style={{ color: accentColor, fontFamily: "'JetBrains Mono', monospace" }}>{opt.rate}%</span>
-                    <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{opt.label}</span>
-                  </div>
-                )) : (
-                  <div className="flex flex-col items-center px-3 py-2 rounded-xl"
-                    style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
-                    <span className="text-base font-black leading-none" style={{ color: accentColor, fontFamily: "'JetBrains Mono', monospace" }}>{lot.roiMonthly}%</span>
-                    <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>Monthly</span>
-                  </div>
-                )}
-              </div>
-            </div>
+            <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', fontSize: 10 }}>Details</p>
 
-            {/* Tenure / Min / Max — equal 3-column row */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* Interest pills + Tenure/Min/Max all in one row */}
+            <div className="flex flex-wrap items-start gap-2">
+
+              {/* Interest option pills */}
+              {(lot.interestOptions ?? []).length > 0 ? lot.interestOptions.map(opt => (
+                <div key={opt.type} className="flex flex-col items-center px-3 py-2 rounded-xl"
+                  style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
+                  <span className="text-base font-black leading-none" style={{ color: accentColor, fontFamily: "'JetBrains Mono', monospace" }}>{opt.rate}%</span>
+                  <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{opt.label}</span>
+                </div>
+              )) : (
+                <div className="flex flex-col items-center px-3 py-2 rounded-xl"
+                  style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
+                  <span className="text-base font-black leading-none" style={{ color: accentColor, fontFamily: "'JetBrains Mono', monospace" }}>{lot.roiMonthly}%</span>
+                  <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>Monthly</span>
+                </div>
+              )}
+
+              {/* Thin separator */}
+              <div className="self-stretch w-px mx-1" style={{ background: 'var(--border)' }} />
+
+              {/* Tenure / Min / Max cards */}
               {[
-                { label: 'Tenure',          value: lot.tenure,                color: accentColor },
-                { label: 'Min Investment',  value: fmtINR(lot.minInvestment), color: '#f59e0b' },
-                { label: 'Max Investment',  value: fmtINR(lot.maxInvestment), color: '#f59e0b' },
+                { label: 'Tenure',         value: lot.tenure,                color: accentColor },
+                { label: 'Min Investment', value: fmtINR(lot.minInvestment), color: '#f59e0b'   },
+                { label: 'Max Investment', value: fmtINR(lot.maxInvestment), color: '#f59e0b'   },
               ].map(f => (
-                <div key={f.label} className="rounded-xl px-3 py-2.5"
+                <div key={f.label} className="flex flex-col items-center px-3 py-2 rounded-xl"
                   style={{ background: `${f.color}08`, border: `1px solid ${f.color}18` }}>
-                  <p className="text-xs mb-1" style={{ color: 'var(--text-muted)', fontSize: 10 }}>{f.label}</p>
-                  <p className="text-sm font-extrabold" style={{ color: f.color, fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</p>
+                  <span className="text-sm font-extrabold leading-none" style={{ color: f.color, fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</span>
+                  <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
                 </div>
               ))}
+
             </div>
           </div>
 

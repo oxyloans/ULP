@@ -37,7 +37,7 @@ import SDLotsTest from './UserAPI/SDLotsTest.jsx';
 import AssetDeals from './pages/AssetDeals.jsx';
 
 import AdminWalletApprovals from './pages/admin/AdminWalletApprovals.jsx';
-import CreateDeal from './pages/CreateDeal.jsx';
+import CreateDeal from './pages/admin/CreateDeal.jsx';
 import AdminDashboard from './pages/admin/AdminDashboard.jsx';
 import AdminApprovals from './pages/admin/AdminApprovals.jsx';
 import AdminProperties from './pages/admin/AdminProperties.jsx';

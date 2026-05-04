@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals } from "../api/afterlogin-admin";
+import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals } from "../../api/afterlogin-admin";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 const DEAL_TYPES       = ["NORMAL", "TEST"];
@@ -12,6 +12,147 @@ const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 const CheckCircle = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
 const PlusIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const TrendUp     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
+const UsersIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const CloseIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const SearchIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const ChevronDown = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="6 9 12 15 18 9"/></svg>;
+const TagIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>;
+
+// ─── Pill selector (replaces <select> for small enum lists) ──────────────────
+function PillSelect({ value, onChange, options, accent = "#818cf8" }) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      {options.map(opt => {
+        const active = value === opt;
+        return (
+          <button
+            key={opt}
+            type="button"
+            onClick={() => onChange(opt)}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95"
+            style={active ? {
+              background: `linear-gradient(135deg,${accent},${accent}cc)`,
+              color: "#fff",
+              border: `1px solid ${accent}`,
+              boxShadow: `0 2px 10px ${accent}40`,
+            } : {
+              background: "var(--input-bg)",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)",
+            }}>
+            {opt}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Custom bank dropdown ─────────────────────────────────────────────────────
+function BankSelect({ value, onChange, accounts, loading, error }) {
+  const [open, setOpen] = useState(false);
+  const selected = accounts.find(b => String(b.id ?? b.accountNumber) === value) ?? null;
+
+  return (
+    <div className="relative">
+      {loading ? (
+        <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
+          style={{ background: "var(--input-bg)", border: "1.5px solid var(--border)" }}>
+          <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+            <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+          </svg>
+          <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading bank accounts…</span>
+        </div>
+      ) : (
+        <>
+          {/* Trigger */}
+          <button
+            type="button"
+            onClick={() => setOpen(o => !o)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl text-left transition-all"
+            style={{
+              background: "var(--input-bg)",
+              border: `1.5px solid ${error ? "#ef4444" : open ? "#06b6d4" : "var(--border)"}`,
+              boxShadow: open ? "0 0 0 3px rgba(6,182,212,0.12)" : "none",
+            }}>
+            {selected ? (
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-black"
+                  style={{ background: "rgba(6,182,212,0.15)", color: "#06b6d4", border: "1px solid rgba(6,182,212,0.25)" }}>
+                  {(selected.bankName ?? "B").charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-bold truncate" style={{ color: "var(--text-primary)" }}>
+                    {selected.companyName ?? selected.bankName}
+                  </p>
+                  <p className="text-xs font-mono truncate" style={{ color: "var(--text-muted)" }}>
+                    {selected.bankName} · {selected.accountNumber}
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>— Select bank account —</span>
+            )}
+            <span className="flex-shrink-0 transition-transform duration-200"
+              style={{ transform: open ? "rotate(180deg)" : "rotate(0)", color: "var(--text-muted)" }}>
+              <ChevronDown />
+            </span>
+          </button>
+
+          {/* Dropdown */}
+          {open && (
+            <div className="absolute z-30 w-full mt-1.5 rounded-xl overflow-hidden"
+              style={{ background: "var(--surface-card)", border: "1px solid var(--border)", boxShadow: "0 12px 40px rgba(0,0,0,0.2)" }}>
+              {accounts.length === 0 ? (
+                <p className="px-4 py-3 text-sm text-center" style={{ color: "var(--text-muted)" }}>No bank accounts found</p>
+              ) : accounts.map(b => {
+                const key    = String(b.id ?? b.accountNumber);
+                const active = value === key;
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => { onChange(key, b); setOpen(false); }}
+                    className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
+                    style={{
+                      background: active ? "rgba(6,182,212,0.08)" : "transparent",
+                      borderBottom: "1px solid var(--border)",
+                    }}
+                    onMouseEnter={e => { if (!active) e.currentTarget.style.background = "var(--row-hover)"; }}
+                    onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}>
+                    <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 text-xs font-black"
+                      style={{
+                        background: active ? "rgba(6,182,212,0.2)" : "var(--input-bg)",
+                        color: active ? "#06b6d4" : "var(--text-muted)",
+                        border: `1px solid ${active ? "rgba(6,182,212,0.3)" : "var(--border)"}`,
+                      }}>
+                      {(b.bankName ?? "B").charAt(0)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate" style={{ color: active ? "#06b6d4" : "var(--text-primary)" }}>
+                        {b.companyName ?? b.bankName}
+                      </p>
+                      <p className="text-xs font-mono truncate" style={{ color: "var(--text-muted)" }}>
+                        {b.bankName} · {b.accountNumber} · {b.ifscCode}
+                      </p>
+                    </div>
+                    {active && (
+                      <svg viewBox="0 0 24 24" fill="none" stroke="#06b6d4" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0">
+                        <polyline points="20 6 9 17 4 12"/>
+                      </svg>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
+
 
 function fmtINR(n) {
   if (!n) return "";
@@ -81,7 +222,7 @@ const EMPTY_FORM = {
 
 export default function CreateDeal({ editDeal: editDealProp = null }) {
   const navigate   = useNavigate();
-  const { id: editId } = useParams();          // present when route is /admin/create-deal/:id
+  const { id: editId } = useParams();
 
   const [editDeal,   setEditDeal]   = useState(editDealProp);
   const [dealLoading, setDealLoading] = useState(!!editId && !editDealProp);
@@ -90,6 +231,9 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [errors, setErrors]   = useState({});
+  const [IdsField,setIdsField] = useState();
+  const [showIdsField, setShowIdsField] = useState(false)
+
 
   // Bank accounts from API
   const [bankAccounts, setBankAccounts] = useState([]);
@@ -360,7 +504,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               value={form.dealName} onChange={e => set("dealName", e.target.value)}
               style={inp(errors.dealName)} />
           </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
+           <div className="grid gap-4 sm:grid-cols-3">
             <Field label="Deal Type" required>
               <select value={form.dealType} onChange={e => set("dealType", e.target.value)}
                 style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
@@ -380,6 +524,68 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               </select>
             </Field>
           </div>
+            <button
+              type="button"
+              onClick={() => setShowIdsField(v => !v)}
+              className="flex items-center gap-2 w-full px-3 py-2.5 rounded-xl transition-all"
+              style={{
+                background: showIdsField ? "rgba(99,102,241,0.08)" : "var(--input-bg)",
+                border: `1px solid ${showIdsField ? "rgba(99,102,241,0.3)" : "var(--border)"}`,
+                color: showIdsField ? "#818cf8" : "var(--text-muted)",
+              }}
+            >
+              <TagIcon />
+              <span className="text-xs font-bold flex-1 text-left">Restrict to Particular IDs</span>
+              {IdsField && IdsField.trim() && (
+                <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                  style={{ background: "rgba(99,102,241,0.15)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.25)" }}>
+                  {IdsField.split(",").filter(s => s.trim()).length} ID{IdsField.split(",").filter(s => s.trim()).length !== 1 ? "s" : ""}
+                </span>
+              )}
+              <span className="transition-transform duration-200 flex-shrink-0"
+                style={{ transform: showIdsField ? "rotate(180deg)" : "rotate(0deg)" }}>
+                <ChevronDown />
+              </span>
+            </button>
+            {showIdsField && (
+              <div className="rounded-xl overflow-hidden"
+                style={{ border: "1px solid rgba(99,102,241,0.25)", background: "rgba(99,102,241,0.04)" }}>
+                <div className="px-4 py-2.5 flex items-center gap-2"
+                  style={{ borderBottom: "1px solid rgba(99,102,241,0.15)" }}>
+                  <TagIcon />
+                  <span className="text-xs font-bold uppercase tracking-widest" style={{ color: "#818cf8" }}>Participant IDs</span>
+                  <span className="text-xs ml-auto" style={{ color: "var(--text-muted)" }}>Separate with commas</span>
+                </div>
+                <div className="p-3">
+                  <textarea
+                    rows={3}
+                    placeholder="e.g. USR001, USR002, USR003"
+                    value={IdsField ?? ""}
+                    onChange={e => setIdsField(e.target.value)}
+                    className="w-full rounded-xl text-sm outline-none resize-none font-mono"
+                    style={{
+                      padding: "10px 14px",
+                      background: "var(--input-bg)",
+                      border: `1.5px solid ${errors.IdsField ? "#ef4444" : "var(--border)"}`,
+                      color: "var(--text-primary)",
+                    }}
+                  />
+                  {errors.IdsField && (
+                    <p className="text-xs mt-1 font-medium" style={{ color: "#ef4444" }}>{errors.IdsField}</p>
+                  )}
+                  {IdsField && IdsField.trim() && (
+                    <div className="flex flex-wrap gap-1.5 mt-2.5">
+                      {IdsField.split(",").map(s => s.trim()).filter(Boolean).map(id => (
+                        <span key={id} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-mono font-semibold"
+                          style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8", border: "1px solid rgba(99,102,241,0.2)" }}>
+                          {id}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
         </div>
 
         {/* Financial Details */}
@@ -466,38 +672,21 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
 
           {/* Transfer Funds — bank dropdown */}
           <Field label="Transfer Funds (Bank Account)" error={errors.transferFundsId}>
-            {banksLoading ? (
-              <div className="flex items-center gap-2 px-3 py-3 rounded-xl"
-                style={{ background: "var(--input-bg)", border: "1.5px solid var(--border)" }}>
-                <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-                  <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
-                </svg>
-                <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading bank accounts…</span>
-              </div>
-            ) : (
-              <select
-                value={form.transferFundsId}
-                onChange={e => {
-                  const id   = e.target.value;
-                  const bank = bankAccounts.find(b => String(b.id ?? b.accountNumber) === id);
-                  setForm(f => ({
-                    ...f,
-                    transferFundsId: id,
-                    transferFunds:   bank?.bankName ?? "",
-                    transferTo:      id,
-                  }));
-                  setErrors(err => ({ ...err, transferFundsId: "" }));
-                }}
-                style={{ ...inp(errors.transferFundsId), appearance: "none", cursor: "pointer" }}>
-                <option value="">— Select bank account —</option>
-                {bankAccounts.map(b => {
-                  const key   = String(b.id ?? b.accountNumber);
-                  const label = [b.companyName, b.bankName, b.accountNumber, b.ifscCode].filter(Boolean).join(' · ');
-                  return <option key={key} value={key}>{label}</option>;
-                })}
-              </select>
-            )}
+            <BankSelect
+              value={form.transferFundsId}
+              loading={banksLoading}
+              accounts={bankAccounts}
+              error={errors.transferFundsId}
+              onChange={(id, bank) => {
+                setForm(f => ({
+                  ...f,
+                  transferFundsId: id,
+                  transferFunds:   bank?.bankName ?? "",
+                  transferTo:      id,
+                }));
+                setErrors(err => ({ ...err, transferFundsId: "" }));
+              }}
+            />
           </Field>
 
           {/* Selected bank preview card */}
