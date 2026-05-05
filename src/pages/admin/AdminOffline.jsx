@@ -76,7 +76,7 @@ function ParticipantsPanel({ dealId }) {
           <table className="w-full text-xs">
             <thead>
               <tr style={{ background: 'var(--input-bg)', borderBottom: '1px solid var(--border)' }}>
-                {['#', 'Investor Name', 'Amount', 'ROI', 'Payout', 'Duration', 'Bank A/C', 'IFSC'].map(h => (
+                {['#', 'Investor Name', 'Amount', 'ROI', 'Payout', 'Duration'].map(h => (
                   <th key={h} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider whitespace-nowrap"
                     style={{ color: 'var(--text-muted)', fontSize: 10 }}>{h}</th>
                 ))}
@@ -108,12 +108,12 @@ function ParticipantsPanel({ dealId }) {
                   <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {p.dealDuration ? `${p.dealDuration} mo` : '—'}
                   </td>
-                  <td className="py-2.5 px-3 font-mono" style={{ color: 'var(--text-primary)' }}>
+                  {/* <td className="py-2.5 px-3 font-mono" style={{ color: 'var(--text-primary)' }}>
                     {p.bankAccountNo ?? '—'}
                   </td>
                   <td className="py-2.5 px-3 font-mono" style={{ color: 'var(--text-muted)' }}>
                     {p.ifscCode ?? '—'}
-                  </td>
+                  </td> */}
                 </tr>
               ))}
             </tbody>
@@ -139,7 +139,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
     <>
       <tr
         className="transition-colors cursor-pointer"
-        style={{ borderBottom: '1px solid var(--border)' }}
+        style={{ borderBottom: '1px solid var(--border)', }}
         onClick={() => onToggle(dealKey)}
         onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
         onMouseLeave={e => e.currentTarget.style.background = expanded ? 'rgba(168,85,247,0.04)' : 'transparent'}>

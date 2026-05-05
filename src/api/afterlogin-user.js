@@ -156,3 +156,25 @@ export async function getUserProfile() {
 export async function updateUserProfile({ name, email, phone }) {
   return put('/user-service/user/profile', { name, email, phone });
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GOLD DEALS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/{userId}/getUserGainedPercentage
+ * Returns overall + per-deal gold earnings for the logged-in user.
+ */
+export async function getGoldDealsEarnings() {
+  const userId = getUserId();
+  return get(`/oxybrick-service/${userId}/getUserGainedPercentage`);
+}
+
+/**
+ * GET /oxybrick-service/{userId}/{dealId}/goldGrowthPercentage
+ * Returns gold growth breakdown for a specific deal.
+ */
+export async function getGoldGrowthDetail(dealId) {
+  const userId = getUserId();
+  return get(`/oxybrick-service/${userId}/${dealId}/goldGrowthPercentage`);
+}

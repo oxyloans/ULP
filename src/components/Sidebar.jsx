@@ -15,6 +15,7 @@ const DealsIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 const CloseIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const ProfileIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const Building    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="4" width="18" height="17" rx="1"/><path d="M3 8h18"/><rect x="6" y="11" width="3" height="3" rx="0.5"/><rect x="10.5" y="11" width="3" height="3" rx="0.5"/><rect x="15" y="11" width="3" height="3" rx="0.5"/><rect x="6" y="16" width="3" height="2" rx="0.5"/><rect x="15" y="16" width="3" height="2" rx="0.5"/><rect x="10" y="16" width="4" height="5" rx="0.5"/><path d="M1 21h22"/></svg>
+const GoldIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><circle cx="12" cy="12" r="9"/><path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3"/><path d="M9 12h3"/></svg>
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 // To add more sub-items under Deals, just push to the `children` array.
@@ -25,10 +26,9 @@ const NAV_ITEMS = [
     Icon: DealsIcon,
     // no `path` — this is a collapsible group
     children: [
-      { title: 'SD Lots',           path: '/sd-lots',           Icon: SDLotIcon,   comingSoon: false },
-      { title: 'Asset',           path: '/asset',           Icon: Building,   comingSoon: false },
-      // Add more deal types here, e.g.:
-      // { title: 'Gold Deals',     path: '/gold-deals',        Icon: ZapIcon,     comingSoon: true  },
+      { title: 'SD Lots',   path: '/sd-lots',     Icon: SDLotIcon, comingSoon: false },
+      { title: 'Gold Deals',path: '/gold-deals',  Icon: GoldIcon,  comingSoon: false },
+      { title: 'Asset',     path: '/asset',       Icon: Building,  comingSoon: false },
     ],
   },
   { title: 'My Participations', path: '/my-participations', Icon: TrendIcon,   comingSoon: false },
@@ -37,7 +37,7 @@ const NAV_ITEMS = [
   { title: 'Contact Us',        path: '/contact',           Icon: ContactIcon, comingSoon: false },
 ];
 
-const DEALS_PATHS = ['/sd-lots', '/sd-lot'];
+const DEALS_PATHS = ['/sd-lots', '/sd-lot', '/gold-deals'];
 
 const activeStyle = {
   background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(99,102,241,0.06) 100%)',

@@ -342,6 +342,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         transferFundsId:           form.transferFundsId,          // bank account id
         transferFunds:             form.transferFunds,             // bank name
         transferTo:                form.transferTo,                // company name
+        userIds:                   IdsField
       };
       if (isEdit && editDeal?.id) payload.id = editDeal.id;
 
