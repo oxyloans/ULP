@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSdLots } from '../api/afterlogin-user';
+import { useAuth } from '../context/AuthContext';
 
 const USE_DUMMY = false;
 
@@ -291,6 +292,7 @@ function mapDeal(raw) {
     dealSubType:    raw.dealSubType ?? '',
     loanActiveDate: raw.loanActiveDate ?? '',
     emiEndDate:     raw.emiEndDate ?? '',
+    userIds:        raw.userIds ?? '',   // comma-separated allowed user IDs (empty = open to all)
     interestOptions,
     bankDetails: {
       bankName:      raw.bankName    ?? raw.transferFunds ?? '—',
@@ -480,6 +482,7 @@ function MyParticipations() {
 }
 
 export default function SDLotsTest() {
+  const { user } = useAuth();
   const [lots, setLots]           = useState([]);
   const [loading, setLoading]     = useState(true);
   const [statusFilter, setStatusFilter] = useState('All');
@@ -499,6 +502,11 @@ export default function SDLotsTest() {
   const feeOptions    = ['All', 'Zero Fee', 'Has Fee'];
 
   const filtered = lots.filter(l => {
+    // If deal has a userIds restriction, only show to included users
+    if (l.userIds && l.userIds.trim()) {
+      const allowed = l.userIds.split(',').map(id => id.trim()).filter(Boolean);
+      if (allowed.length > 0 && !allowed.includes(user?.userId ?? '')) return false;
+    }
     if (statusFilter !== 'All' && l.status !== statusFilter) return false;
     if (roiFilter === '< 1.5%'  && l.roiMonthly >= 1.5) return false;
     if (roiFilter === '1.5–2%'  && (l.roiMonthly < 1.5 || l.roiMonthly > 2)) return false;

@@ -703,7 +703,7 @@ export default function GoldDeals() {
       </div>
 
       {/* ── KPI Strip ── */}
-      <div style={{
+      {/* <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
         gap: 14,
@@ -736,7 +736,7 @@ export default function GoldDeals() {
           color={PURPLE}
           Icon={ShieldIcon}
         />
-      </div>
+      </div> */}
 
       {/* ── Deals list ── */}
       {deals.length === 0 ? (
