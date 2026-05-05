@@ -135,31 +135,66 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
   const fillPct    = total > 0 ? Math.min(Math.round((invested / total) * 100), 100) : 0;
   const isAchieved = deal.dealStatus === 'ACHIEVED';
 
+  const fillColor  = fillPct >= 100 ? '#ef4444' : fillPct >= 80 ? '#f59e0b' : '#10b981';
+
   return (
     <>
       <tr
-        className="transition-colors cursor-pointer"
-        style={{ borderBottom: '1px solid var(--border)', }}
+        className="cursor-pointer"
+        style={{
+          borderBottom: expanded ? 'none' : '1px solid var(--border)',
+          background: expanded
+            ? `linear-gradient(90deg, ${tabColor}18 0%, ${tabColor}08 100%)`
+            : 'transparent',
+          boxShadow: expanded ? `inset 4px 0 0 ${tabColor}` : 'none',
+          transition: 'background 0.2s ease, box-shadow 0.2s ease',
+        }}
         onClick={() => onToggle(dealKey)}
-        onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
-        onMouseLeave={e => e.currentTarget.style.background = expanded ? 'rgba(168,85,247,0.04)' : 'transparent'}>
+        onMouseEnter={e => {
+          if (!expanded) {
+            e.currentTarget.style.background = 'var(--row-hover)';
+            e.currentTarget.style.boxShadow  = `inset 4px 0 0 ${tabColor}55`;
+          }
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.background = expanded
+            ? `linear-gradient(90deg, ${tabColor}18 0%, ${tabColor}08 100%)`
+            : 'transparent';
+          e.currentTarget.style.boxShadow = expanded ? `inset 4px 0 0 ${tabColor}` : 'none';
+        }}>
 
         {/* # */}
-        <td className="py-3.5 px-4 font-bold text-xs" style={{ color: 'var(--text-muted)' }}>{idx + 1}</td>
+        <td className="py-3.5 px-4">
+          <span className="text-xs font-bold tabular-nums w-5 h-5 rounded-md flex items-center justify-center"
+            style={{
+              background: expanded ? `${tabColor}20` : 'transparent',
+              color: expanded ? tabColor : 'var(--text-muted)',
+              border: expanded ? `1px solid ${tabColor}30` : '1px solid transparent',
+              transition: 'all 0.2s',
+            }}>
+            {idx + 1}
+          </span>
+        </td>
 
         {/* Deal Name */}
         <td className="py-3.5 px-4">
-          <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{deal.dealName}</p>
-          <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>{String(deal.dealId ?? deal.id ?? '').slice(0, 8)}…</p>
+          <p className="font-bold text-sm" style={{ color: expanded ? tabColor : 'var(--text-primary)', transition: 'color 0.2s' }}>
+            {deal.dealName}
+          </p>
+          <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            {String(deal.dealId ?? deal.id ?? '').slice(0, 8)}…
+          </p>
         </td>
 
         {/* Deal Value */}
-        <td className="py-3.5 px-4 font-bold tabular-nums text-sm" style={{ color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
+        <td className="py-3.5 px-4 font-bold tabular-nums text-sm"
+          style={{ color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
           {fmtINR(total)}
         </td>
 
         {/* Participated */}
-        <td className="py-3.5 px-4 font-bold tabular-nums text-sm" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
+        <td className="py-3.5 px-4 font-bold tabular-nums text-sm"
+          style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
           {fmtINR(invested)}
         </td>
 
@@ -174,14 +209,15 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
           <div className="flex items-center gap-2">
             <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--border)' }}>
               <div className="h-full rounded-full transition-all"
-                style={{ width: `${fillPct}%`, background: fillPct >= 100 ? '#ef4444' : fillPct >= 80 ? '#f59e0b' : '#10b981' }} />
+                style={{ width: `${fillPct}%`, background: fillColor, boxShadow: expanded ? `0 0 6px ${fillColor}88` : 'none' }} />
             </div>
-            <span className="text-xs font-bold tabular-nums" style={{ color: fillPct >= 100 ? '#ef4444' : 'var(--text-primary)' }}>{fillPct}%</span>
+            <span className="text-xs font-bold tabular-nums" style={{ color: fillColor }}>{fillPct}%</span>
           </div>
         </td>
 
         {/* ROI */}
-        <td className="py-3.5 px-4 font-bold tabular-nums text-sm" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
+        <td className="py-3.5 px-4 font-bold tabular-nums text-sm"
+          style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
           {deal.rateofinterest ?? deal.monthlyInterest ?? '—'}%
         </td>
 
@@ -197,20 +233,30 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
 
         {/* Expand toggle */}
         <td className="py-3.5 px-4">
-          <div className="flex items-center gap-1.5 text-xs font-semibold"
-            style={{ color: 'var(--text-muted)' }}>
+          <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg transition-all"
+            style={{
+              background: expanded ? `${tabColor}18` : 'transparent',
+              border: `1px solid ${expanded ? tabColor + '35' : 'transparent'}`,
+              color: expanded ? tabColor : 'var(--text-muted)',
+            }}>
             <UsersIcon />
-            <span className="transition-transform duration-200" style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}>
+            <span className="text-xs font-semibold hidden sm:inline">
+              {expanded ? 'Hide' : 'View'}
+            </span>
+            <span className="transition-transform duration-200"
+              style={{ display: 'inline-block', transform: expanded ? 'rotate(180deg)' : 'rotate(0)' }}>
               <ChevronDown />
             </span>
           </div>
         </td>
       </tr>
 
-      {/* Expanded participants */}
+      {/* Expanded participants — top border matches accent */}
       {expanded && (
-        <tr>
-          <td colSpan={9} style={{ padding: 0 }}>
+        <tr style={{ borderBottom: '1px solid var(--border)' }}>
+          <td colSpan={9} style={{ padding: 0, boxShadow: `inset 4px 0 0 ${tabColor}` }}>
+            {/* Thin accent top line */}
+            <div style={{ height: 2, background: `linear-gradient(90deg, ${tabColor}, ${tabColor}00)` }} />
             <ParticipantsPanel dealId={dealKey} />
           </td>
         </tr>
