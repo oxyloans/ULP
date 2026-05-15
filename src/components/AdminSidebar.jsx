@@ -1,4 +1,5 @@
-import { NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/ulp.png';
 
@@ -12,14 +13,25 @@ const WalletIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 const LogoutIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 const PlusIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const AssetIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
+const ChevronDown  = ({ open }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 transition-transform duration-200" style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}><polyline points="6 9 12 15 18 9"/></svg>;
 
-const navItems = [
+const assetSubItems = [
+  { title: 'Load Asset',        path: '/admin/assets/load'      },
+  { title: 'View Assets',       path: '/admin/assets/view'      },
+  { title: 'Allocated Assets',  path: '/admin/assets/allocated' },
+];
+
+const navItemsBefore = [
   { title: 'Dashboard',        path: '/admin/dashboard',        Icon: HomeIcon,     badge: null },
   { title: 'Family Approvals', path: '/admin/approvals',        Icon: CheckIcon,    badge: null },
   { title: 'Wallet Approvals', path: '/admin/wallet-approvals', Icon: WalletIcon,   badge: '3'  },
   { title: 'Create Deal',      path: '/admin/create-deal',      Icon: PlusIcon,     badge: null },
   { title: 'OxyLoans',         path: '/admin/oxyloans',         Icon: BankIcon,     badge: null },
   { title: 'Offline Deals',    path: '/admin/offline',          Icon: PackageIcon,  badge: null },
+];
+
+const navItemsAfter = [
   { title: 'Properties',       path: '/admin/properties',       Icon: BuildingIcon, badge: null },
   { title: 'Bank Accounts',    path: '/admin/bank-accounts',    Icon: BankIcon,     badge: null },
   { title: 'Support',          path: '/admin/support',          Icon: SupportIcon,  badge: null },
@@ -28,24 +40,77 @@ const navItems = [
 function AdminSidebarContent({ onClose }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isAssetActive = location.pathname.startsWith('/admin/assets');
+  const [assetOpen, setAssetOpen] = useState(isAssetActive);
+
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); onClose?.(); };
 
   return (
     <>
       <div className="px-5 pt-5 pb-2">
-        {/* Logo */}
-        {/* <div className="flex items-center gap-2.5 mb-3">
-          <img src={logo} alt="Oxy Portfolio" className="w-8 h-8 rounded-xl object-cover flex-shrink-0"
-            style={{ boxShadow: '0 0 10px rgba(168,85,247,0.4)' }} />
-          <span className="text-sm font-black tracking-widest uppercase"
-            style={{ color: '#e9d5ff', letterSpacing: '0.08em' }}>
-            Oxy Portfolio
-          </span>
-        </div> */}
         <span className="admin-sidebar-section-label">Admin Panel</span>
       </div>
       <nav className="flex-1 px-3 pb-3 flex flex-col gap-0.5 overflow-y-auto">
-        {navItems.map(item => (
+        {navItemsBefore.map(item => (
+          <NavLink key={item.path} to={item.path} onClick={() => onClose?.()}
+            className="admin-sidebar-item"
+            style={({ isActive }) => isActive
+              ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
+              : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+            }>
+            {({ isActive }) => (
+              <>
+                <span className="admin-sidebar-icon" style={{ color: isActive ? '#c084fc' : undefined }}><item.Icon /></span>
+                <span className="admin-sidebar-label">{item.title}</span>
+                {item.badge && (
+                  <span className="ml-auto text-xs font-bold px-1.5 py-0.5 rounded-full"
+                    style={{ background: 'rgba(239,68,68,0.15)', color: '#f87171', border: '1px solid rgba(239,68,68,0.25)', fontSize: 10 }}>
+                    {item.badge}
+                  </span>
+                )}
+                {isActive && !item.badge && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: '#c084fc', boxShadow: '0 0 6px #c084fc' }} />}
+              </>
+            )}
+          </NavLink>
+        ))}
+
+        {/* ── Assets accordion ── */}
+        <button
+          onClick={() => setAssetOpen(o => !o)}
+          className="admin-sidebar-item w-full text-left"
+          style={isAssetActive
+            ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
+            : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+          }>
+          <span className="admin-sidebar-icon" style={{ color: isAssetActive ? '#c084fc' : undefined }}><AssetIcon /></span>
+          <span className="admin-sidebar-label">Assets</span>
+          <span className="ml-auto"><ChevronDown open={assetOpen} /></span>
+        </button>
+
+        {assetOpen && (
+          <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
+            {assetSubItems.map(sub => (
+              <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
+                className="admin-sidebar-item text-xs"
+                style={({ isActive }) => isActive
+                  ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
+                  : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+                }>
+                {({ isActive }) => (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
+                      style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
+                    <span className="admin-sidebar-label">{sub.title}</span>
+                    {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        )}
+
+        {navItemsAfter.map(item => (
           <NavLink key={item.path} to={item.path} onClick={() => onClose?.()}
             className="admin-sidebar-item"
             style={({ isActive }) => isActive

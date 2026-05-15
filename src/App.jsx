@@ -46,6 +46,9 @@ import AdminOxyLoans from './pages/admin/AdminOxyLoans.jsx';
 import AdminOffline from './pages/admin/AdminOffline.jsx';
 import AdminSupport from './pages/admin/AdminSupport.jsx';
 import AdminBankAccounts from './pages/admin/AdminBankAccounts.jsx';
+import LoadAsset from './pages/admin/LoadAsset.jsx';
+import ViewAssets from './pages/admin/ViewAssets.jsx';
+import AllocatedAssets from './pages/admin/AllocatedAssets.jsx';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -173,6 +176,9 @@ function AdminLayout() {
             <Route path="offline"               element={<AdminOffline />} />
             <Route path="support"               element={<AdminSupport />} />
             <Route path="bank-accounts"         element={<AdminBankAccounts />} />
+            <Route path="assets/load"           element={<LoadAsset />} />
+            <Route path="assets/view"           element={<ViewAssets />} />
+            <Route path="assets/allocated"      element={<AllocatedAssets />} />
             <Route path="*"                     element={<NotFound />} />
           </Routes>
         </main>
