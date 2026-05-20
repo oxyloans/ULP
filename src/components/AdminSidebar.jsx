@@ -8,6 +8,7 @@ const CheckIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 const BuildingIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>;
 const BankIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/></svg>;
 const PackageIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><line x1="16.5" y1="9.4" x2="7.5" y2="4.21"/><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>;
+const CoinIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><circle cx="12" cy="12" r="10"/><path d="M12 6v2m0 8v2M9 9h4a2 2 0 0 1 0 4H9v4h6"/></svg>;
 const SupportIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>;
 const WalletIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="18" cy="12" r="2"/></svg>;
 const LogoutIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
@@ -22,13 +23,18 @@ const assetSubItems = [
   { title: 'Allocated Assets',  path: '/admin/assets/allocated' },
 ];
 
+const interestSubItems = [
+  { title: 'SD Lot',       path: '/admin/interest/sd-lot'  },
+  { title: 'Asset Payout', path: '/admin/interest/asset'   },
+];
+
 const navItemsBefore = [
-  { title: 'Dashboard',        path: '/admin/dashboard',        Icon: HomeIcon,     badge: null },
-  { title: 'Family Approvals', path: '/admin/approvals',        Icon: CheckIcon,    badge: null },
-  { title: 'Wallet Approvals', path: '/admin/wallet-approvals', Icon: WalletIcon,   badge: '3'  },
-  { title: 'Create Deal',      path: '/admin/create-deal',      Icon: PlusIcon,     badge: null },
-  { title: 'OxyLoans',         path: '/admin/oxyloans',         Icon: BankIcon,     badge: null },
-  { title: 'Offline Deals',    path: '/admin/offline',          Icon: PackageIcon,  badge: null },
+  { title: 'Dashboard',        path: '/admin/dashboard',        Icon: HomeIcon,    badge: null },
+  { title: 'Family Approvals', path: '/admin/approvals',        Icon: CheckIcon,   badge: null },
+  { title: 'Wallet Approvals', path: '/admin/wallet-approvals', Icon: WalletIcon,  badge: '3'  },
+  { title: 'Create Deal',      path: '/admin/create-deal',      Icon: PlusIcon,    badge: null },
+  { title: 'OxyLoans',         path: '/admin/oxyloans',         Icon: BankIcon,    badge: null },
+  { title: 'Offline Deals',    path: '/admin/offline',          Icon: PackageIcon, badge: null },
 ];
 
 const navItemsAfter = [
@@ -41,8 +47,10 @@ function AdminSidebarContent({ onClose }) {
   const { logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isAssetActive = location.pathname.startsWith('/admin/assets');
-  const [assetOpen, setAssetOpen] = useState(isAssetActive);
+  const isAssetActive    = location.pathname.startsWith('/admin/assets');
+  const isInterestActive = location.pathname.startsWith('/admin/interest');
+  const [assetOpen,    setAssetOpen]    = useState(isAssetActive);
+  const [interestOpen, setInterestOpen] = useState(isInterestActive);
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); onClose?.(); };
 
@@ -74,6 +82,41 @@ function AdminSidebarContent({ onClose }) {
             )}
           </NavLink>
         ))}
+
+        {/* ── Interest Payout accordion ── */}
+        <button
+          onClick={() => setInterestOpen(o => !o)}
+          className="admin-sidebar-item w-full text-left"
+          style={isInterestActive
+            ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
+            : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+          }>
+          <span className="admin-sidebar-icon" style={{ color: isInterestActive ? '#c084fc' : undefined }}><CoinIcon /></span>
+          <span className="admin-sidebar-label">Interest Payout</span>
+          <span className="ml-auto"><ChevronDown open={interestOpen} /></span>
+        </button>
+
+        {interestOpen && (
+          <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
+            {interestSubItems.map(sub => (
+              <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
+                className="admin-sidebar-item text-xs"
+                style={({ isActive }) => isActive
+                  ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
+                  : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+                }>
+                {({ isActive }) => (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
+                      style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
+                    <span className="admin-sidebar-label">{sub.title}</span>
+                    {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        )}
 
         {/* ── Assets accordion ── */}
         <button

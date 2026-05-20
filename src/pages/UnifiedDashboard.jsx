@@ -1829,6 +1829,7 @@ function CopyId({ id }) {
       setTimeout(() => setCopied(false), 2000);
     });
   };
+
   return (
     <div className="flex items-center gap-1.5 mt-0.5">
       <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>ID: {id}</span>
@@ -1915,8 +1916,8 @@ function MemberDashboard({ memberId, mode }) {
             )}
             {isOwn && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(38,115,187,0.1)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.2)' }}>You</span>}
           </div>
-          {id && (
-            <CopyId id={id} />
+          {sessionStorage.getItem('userId') || id && (
+            <CopyId id={sessionStorage.getItem('userId') || id} />
           )}
         </div>
       </div>

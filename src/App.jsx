@@ -20,6 +20,7 @@ import HiddenLogin    from './pages/HiddenLogin.jsx';
 import OAuthCallback  from './pages/OAuthCallback.jsx';
 import PreLoginContact from './pages/PreLoginContact.jsx';
 import Register from './pages/Register.jsx';
+import LoginOTP from './pages/LoginOTP.jsx';
 
 // User pages
 import UnifiedDashboard from './pages/UnifiedDashboard.jsx';
@@ -49,6 +50,8 @@ import AdminBankAccounts from './pages/admin/AdminBankAccounts.jsx';
 import LoadAsset from './pages/admin/LoadAsset.jsx';
 import ViewAssets from './pages/admin/ViewAssets.jsx';
 import AllocatedAssets from './pages/admin/AllocatedAssets.jsx';
+import AdminInterestPayments from './pages/admin/AdminInterestPayments.jsx';
+import AdminAssetPayouts from './pages/admin/AdminAssetPayouts.jsx';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -179,6 +182,8 @@ function AdminLayout() {
             <Route path="assets/load"           element={<LoadAsset />} />
             <Route path="assets/view"           element={<ViewAssets />} />
             <Route path="assets/allocated"      element={<AllocatedAssets />} />
+            <Route path="interest/sd-lot"       element={<AdminInterestPayments />} />
+            <Route path="interest/asset"        element={<AdminAssetPayouts />} />
             <Route path="*"                     element={<NotFound />} />
           </Routes>
         </main>
@@ -195,6 +200,7 @@ function AppRoutes() {
     <Routes>
       {/* Public routes */}
       <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <Login />} />
+      <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <LoginOTP />} />
       <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <HiddenLogin />} />
       <Route path="/oauth/callback" element={<OAuthCallback />} />
       <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />

@@ -326,57 +326,60 @@ export default function Login() {
               </p>
             </div>
 
-            {/* ── 3D Bar Chart ── */}
-            <div className="relative z-10 flex items-end justify-center gap-4 fade-in-2" style={{ height: 155 }}>
-              {/* Ground reflection */}
-              <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[260px] h-8 rounded-[100%]"
-                style={{ background: "rgba(0,0,0,0.3)", filter: "blur(14px)" }} />
+           <div className="relative z-10 flex-1 flex items-center justify-center fade-in-2">
+             <div className="relative flex items-end justify-center" style={{ height: 155, width: '100%' }}>
+                <div className="relative flex items-end justify-center gap-4" style={{ width: 210 }}>
+                  {/* Ground reflection */}
+                  <div className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[220px] h-8 rounded-[100%]"
+                    style={{ background: 'rgba(0,0,0,0.3)', filter: 'blur(14px)' }} />
 
-              {/* Bar 1 — Blue */}
-              <div className="relative rounded-[14px] flex-shrink-0"
-                style={{
-                  width: 58, height: 90,
-                  background: "linear-gradient(160deg,#93c5fd 0%,#3b82f6 50%,#1d4ed8 100%)",
-                  boxShadow: "inset 4px 4px 8px rgba(255,255,255,0.3), inset -4px -4px 10px rgba(0,0,0,0.3), 8px 16px 28px rgba(29,78,216,0.5)",
-                }}>
-                <div className="absolute top-2 left-2 w-3 h-8 rounded-full opacity-40"
-                  style={{ background: "linear-gradient(180deg,rgba(255,255,255,0.8),transparent)" }} />
-              </div>
+                  {/* Bar 1 — Blue */}
+                  <div className="relative rounded-[14px] flex-shrink-0"
+                    style={{
+                      width: 58, height: 90,
+                      background: 'linear-gradient(160deg,#93c5fd 0%,#3b82f6 50%,#1d4ed8 100%)',
+                      boxShadow: 'inset 4px 4px 8px rgba(255,255,255,0.3), inset -4px -4px 10px rgba(0,0,0,0.3), 8px 16px 28px rgba(29,78,216,0.5)',
+                    }}>
+                    <div className="absolute top-2 left-2 w-3 h-8 rounded-full opacity-40"
+                      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.8),transparent)' }} />
+                  </div>
 
-              {/* Bar 2 — Green (tallest + floating) */}
-              <div className="relative rounded-[14px] flex-shrink-0 bar-float flex flex-col items-center pt-3"
-                style={{
-                  width: 58, height: 135,
-                  background: "linear-gradient(160deg,#6ee7b7 0%,#10b981 50%,#047857 100%)",
-                  boxShadow: "inset 4px 4px 8px rgba(255,255,255,0.3), inset -4px -4px 10px rgba(0,0,0,0.3), 8px 16px 28px rgba(4,120,87,0.5)",
-                }}>
-                <div className="absolute top-2 left-2 w-3 h-8 rounded-full opacity-40"
-                  style={{ background: "linear-gradient(180deg,rgba(255,255,255,0.8),transparent)" }} />
-                <div className="text-white drop-shadow-lg"><TrendUp /></div>
-              </div>
+                  {/* Bar 2 — Green (tallest + floating) */}
+                  <div className="relative rounded-[14px] flex-shrink-0 bar-float flex flex-col items-center pt-3"
+                    style={{
+                      width: 58, height: 135,
+                      background: 'linear-gradient(160deg,#6ee7b7 0%,#10b981 50%,#047857 100%)',
+                      boxShadow: 'inset 4px 4px 8px rgba(255,255,255,0.3), inset -4px -4px 10px rgba(0,0,0,0.3), 8px 16px 28px rgba(4,120,87,0.5)',
+                    }}>
+                    <div className="absolute top-2 left-2 w-3 h-8 rounded-full opacity-40"
+                      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.8),transparent)' }} />
+                    <div className="text-white drop-shadow-lg"><TrendUp /></div>
+                  </div>
 
-              {/* Bar 3 — Purple */}
-              <div className="relative rounded-[14px] flex-shrink-0"
-                style={{
-                  width: 58, height: 112,
-                  background: "linear-gradient(160deg,#c4b5fd 0%,#8b5cf6 50%,#5b21b6 100%)",
-                  boxShadow: "inset 4px 4px 8px rgba(255,255,255,0.3), inset -4px -4px 10px rgba(0,0,0,0.3), 8px 16px 28px rgba(91,33,182,0.5)",
-                }}>
-                <div className="absolute top-2 left-2 w-3 h-8 rounded-full opacity-40"
-                  style={{ background: "linear-gradient(180deg,rgba(255,255,255,0.8),transparent)" }} />
-              </div>
+                  {/* Bar 3 — Purple */}
+                  <div className="relative rounded-[14px] flex-shrink-0"
+                    style={{
+                      width: 58, height: 112,
+                      background: 'linear-gradient(160deg,#c4b5fd 0%,#8b5cf6 50%,#5b21b6 100%)',
+                      boxShadow: 'inset 4px 4px 8px rgba(255,255,255,0.3), inset -4px -4px 10px rgba(0,0,0,0.3), 8px 16px 28px rgba(91,33,182,0.5)',
+                    }}>
+                    <div className="absolute top-2 left-2 w-3 h-8 rounded-full opacity-40"
+                      style={{ background: 'linear-gradient(180deg,rgba(255,255,255,0.8),transparent)' }} />
+                  </div>
 
-              {/* Gold coin */}
-              <div className="absolute coin-float flex items-center justify-center rounded-full"
-                style={{
-                  width: 46, height: 46,
-                  top: -6, right: "calc(50% - 118px)",
-                  background: "linear-gradient(145deg,#fef08a,#fbbf24,#d97706,#92400e)",
-                  boxShadow: "inset 3px 3px 6px rgba(255,255,255,0.5), inset -3px -3px 8px rgba(0,0,0,0.35), 5px 10px 18px rgba(217,119,6,0.55)",
-                }}>
-                <span className="text-white font-black text-xl" style={{ textShadow: "0 2px 6px rgba(0,0,0,0.4)" }}>$</span>
+                  {/* Gold coin — floats above bar 3 */}
+                  <div className="absolute coin-float flex items-center justify-center rounded-full"
+                    style={{
+                      width: 46, height: 46,
+                      top: -6, right: 0,
+                      background: 'linear-gradient(145deg,#fef08a,#fbbf24,#d97706,#92400e)',
+                      boxShadow: 'inset 3px 3px 6px rgba(255,255,255,0.5), inset -3px -3px 8px rgba(0,0,0,0.35), 5px 10px 18px rgba(217,119,6,0.55)',
+                    }}>
+                    <span className="text-white font-black text-xl" style={{ textShadow: '0 2px 6px rgba(0,0,0,0.4)' }}>$</span>
+                  </div>
+                </div>
               </div>
-            </div>
+           </div>
 
             {/* Feature pills */}
             <div className="relative z-10 flex flex-col gap-2 mt-auto pt-5 fade-in-3">
@@ -527,6 +530,20 @@ export default function Login() {
               Don't have an account?{" "}
               <Link to="/register" className="font-bold" style={{ color: "#3b82f6" }}>Sign Up</Link>
             </p>
+
+            {/* OTP Login */}
+            <Link to="/login-otp"
+              className="mt-3 w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+              style={{
+                background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(30,58,138,0.04)',
+                color: dark ? '#93c5fd' : '#2563eb',
+                border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(30,58,138,0.12)',
+              }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.61 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.82a16 16 0 0 0 6.29 6.29l.96-.96a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/>
+              </svg>
+              Login with Mobile OTP
+            </Link>
 
             {/* Google Sign-In */}
             <div className="flex items-center gap-3 my-4">

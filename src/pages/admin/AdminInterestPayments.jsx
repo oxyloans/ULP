@@ -1,0 +1,592 @@
+import { useState, useEffect } from 'react';
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+const RefreshIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
+const CoinIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><circle cx="12" cy="12" r="10"/><path d="M12 6v2m0 8v2M9 9h4a2 2 0 0 1 0 4H9v4h6"/></svg>;
+const CheckIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>;
+const CalendarIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
+const UsersIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
+const DownloadIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>;
+const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+const ArrowLeft    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
+const SearchIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+export function fmtINR(n) {
+  if (!n && n !== 0) return '—';
+  const abs = Math.abs(n);
+  if (abs >= 10000000) return `₹${(n / 10000000).toFixed(2).replace(/\.?0+$/, '')}Cr`;
+  if (abs >= 100000)   return `₹${(n / 100000).toFixed(2).replace(/\.?0+$/, '')}L`;
+  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+}
+
+export const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+
+export const STATUS_CFG = {
+  PENDING:    { bg: '#fef3c7', text: '#d97706', border: '#fde68a', label: 'Pending',    pulse: true  },
+  PAID:       { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Paid',       pulse: false },
+  PROCESSING: { bg: '#eff6ff', text: '#3b82f6', border: '#bfdbfe', label: 'Processing', pulse: true  },
+};
+
+export function StatusChip({ status }) {
+  const cfg = STATUS_CFG[status] ?? STATUS_CFG.PENDING;
+  return (
+    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap"
+      style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
+      {cfg.pulse
+        ? <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.text, animation: 'livePulse 1.5s infinite' }} />
+        : <span className="w-1.5 h-1.5 rounded-full" style={{ background: cfg.text }} />}
+      {cfg.label}
+    </span>
+  );
+}
+
+export function downloadCSV(rows, filename) {
+  const headers = ['#', 'Deal Name', 'ROI (%)', 'Lenders', 'Amount (INR)', 'Payment Date', 'Status'];
+  const lines = [
+    headers.join(','),
+    ...rows.map((d, i) =>
+      [i + 1, `"${d.dealName}"`, d.roi, d.lenders, d.amount, d.paymentDate ?? '', d.status].join(',')
+    ),
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ─── Paid Date Modal ──────────────────────────────────────────────────────────
+export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel, loading }) {
+  const today = new Date().toISOString().split('T')[0];
+  const [paidDate, setPaidDate] = useState(today);
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+      onClick={onCancel}>
+      <div className="w-full max-w-sm rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-5 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(5,150,105,0.06)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(5,150,105,0.12)', border: '1px solid rgba(5,150,105,0.3)', color: '#059669' }}>
+              <CheckIcon />
+            </div>
+            <div>
+              <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Mark as Paid</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {selectedCount} deal{selectedCount !== 1 ? 's' : ''} · {fmtINR(selectedTotal)}
+              </p>
+            </div>
+          </div>
+          <button onClick={onCancel} className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            <CloseIcon />
+          </button>
+        </div>
+        <div className="px-6 py-5 grid gap-4">
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+              Payment Date
+            </label>
+            <div className="relative">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}><CalendarIcon /></span>
+              <input type="date" value={paidDate} onChange={e => setPaidDate(e.target.value)}
+                className="w-full rounded-xl text-sm outline-none"
+                style={{ padding: '10px 14px 10px 36px', background: 'var(--input-bg)', border: '1.5px solid rgba(5,150,105,0.35)', color: 'var(--text-primary)' }} />
+            </div>
+          </div>
+          <div className="px-4 py-3 rounded-xl flex items-center justify-between"
+            style={{ background: 'rgba(5,150,105,0.07)', border: '1px solid rgba(5,150,105,0.2)' }}>
+            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Total Payout</span>
+            <span className="text-base font-black" style={{ color: '#059669', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(selectedTotal)}</span>
+          </div>
+        </div>
+        <div className="px-6 pb-5 flex gap-3">
+          <button onClick={onCancel} className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+            style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            Cancel
+          </button>
+          <button onClick={() => onSubmit(paidDate)} disabled={loading || !paidDate}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] disabled:opacity-60 flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
+            {loading
+              ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+              : <><CheckIcon /> Confirm Paid</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Date Select Screen ───────────────────────────────────────────────────────
+// helper — days in a given month/year
+function daysInMonth(month, year) {
+  return new Date(year, month + 1, 0).getDate();
+}
+
+export function DateSelectScreen({ title, subtitle, onProceed }) {
+  const now  = new Date();
+  const [month, setMonth] = useState(now.getMonth());
+  const [year,  setYear]  = useState(now.getFullYear());
+  const [day,   setDay]   = useState(now.getDate());
+  const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
+
+  // clamp day when month/year changes (e.g. Feb 31 → Feb 28)
+  const maxDay = daysInMonth(month, year);
+  const safeDay = Math.min(day, maxDay);
+  const days = Array.from({ length: maxDay }, (_, i) => i + 1);
+
+  const label = `${String(safeDay).padStart(2,'0')} ${MONTHS[month]} ${year}`;
+
+  return (
+    <div className="grid gap-6">
+      <div>
+        <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>{title}</h1>
+        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
+      </div>
+      <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 8px 40px rgba(168,85,247,0.12)' }}>
+
+        {/* Card header */}
+        <div className="px-6 py-5 flex items-center gap-3"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(168,85,247,0.05)' }}>
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
+            style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>
+            <CalendarIcon />
+          </div>
+          <div>
+            <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Select Payment Date</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Choose the exact date for which interest is being paid</p>
+          </div>
+        </div>
+
+        <div className="px-6 py-6 grid gap-6">
+
+          {/* ── Month ── */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Month</label>
+            <div className="grid grid-cols-4 gap-2">
+              {MONTHS.map((m, i) => (
+                <button key={m} onClick={() => setMonth(i)}
+                  className="py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                  style={month === i
+                    ? { background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 12px rgba(168,85,247,0.4)' }
+                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  {m.slice(0, 3)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Day ── */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
+              Day <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>({maxDay} days in {MONTHS[month]})</span>
+            </label>
+            <div className="grid grid-cols-7 gap-1.5">
+              {days.map(d => (
+                <button key={d} onClick={() => setDay(d)}
+                  className="py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                  style={safeDay === d
+                    ? { background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 3px 8px rgba(168,85,247,0.4)' }
+                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  {d}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Year ── */}
+          <div>
+            <label className="block text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Year</label>
+            <div className="flex gap-2 flex-wrap">
+              {years.map(y => (
+                <button key={y} onClick={() => setYear(y)}
+                  className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                  style={year === y
+                    ? { background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 12px rgba(168,85,247,0.4)' }
+                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                  {y}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Selected date preview ── */}
+          <div className="px-4 py-3 rounded-xl flex items-center gap-3"
+            style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)' }}>
+            <CalendarIcon />
+            <span className="text-sm font-bold" style={{ color: '#c084fc' }}>{label}</span>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6">
+          <button onClick={() => onProceed({ month, year, day: safeDay, label })}
+            className="w-full py-3 rounded-xl text-sm font-black transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
+            style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 6px 20px rgba(168,85,247,0.4)' }}>
+            <SearchIcon /> View Deals for {label}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Deals Table (shared) ─────────────────────────────────────────────────────
+export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
+  const [deals, setDeals]       = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [selected, setSelected] = useState(new Set());
+  const [paidMap, setPaidMap]   = useState({});   // id → { date }
+  const [tab, setTab]           = useState('PENDING');
+  const [paidModal, setPaidModal]   = useState(false);
+  const [payLoading, setPayLoading] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    setTimeout(() => { setDeals(mockDeals); setLoading(false); }, 600);
+  }, [mockDeals]);
+
+  const getStatus = (d) => (paidMap[d.id] ? 'PAID' : d.status);
+  const getPaidDate = (d) => paidMap[d.id]?.date ?? null;
+
+  const pendingDeals = deals.filter(d => getStatus(d) === 'PENDING');
+  const paidDeals    = deals.filter(d => getStatus(d) === 'PAID');
+
+  const TABS = [
+    { key: 'PENDING', label: 'Pending', color: '#d97706', count: pendingDeals.length },
+    { key: 'PAID',    label: 'Paid',    color: '#059669', count: paidDeals.length    },
+    { key: 'ALL',     label: 'All',     color: '#6366f1', count: deals.length        },
+  ];
+
+  const filtered = tab === 'ALL' ? deals : tab === 'PENDING' ? pendingDeals : paidDeals;
+  const pendingFiltered = filtered.filter(d => getStatus(d) === 'PENDING');
+  const allPendingSelected = pendingFiltered.length > 0 && pendingFiltered.every(d => selected.has(d.id));
+
+  const toggleAll = () => {
+    if (allPendingSelected) {
+      setSelected(prev => { const n = new Set(prev); pendingFiltered.forEach(d => n.delete(d.id)); return n; });
+    } else {
+      setSelected(prev => { const n = new Set(prev); pendingFiltered.forEach(d => n.add(d.id)); return n; });
+    }
+  };
+  const toggleOne = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const selectedDeals = deals.filter(d => selected.has(d.id));
+  const selectedTotal = selectedDeals.reduce((s, d) => s + d.amount, 0);
+  const totalPending  = pendingDeals.reduce((s, d) => s + d.amount, 0);
+  const totalPaid     = paidDeals.reduce((s, d) => s + d.amount, 0);
+
+  const handleMarkPaid = async (paidDate) => {
+    setPayLoading(true);
+    await new Promise(r => setTimeout(r, 900));
+    setPaidMap(prev => {
+      const n = { ...prev };
+      selected.forEach(id => { n[id] = { date: paidDate }; });
+      return n;
+    });
+    setSelected(new Set());
+    setPaidModal(false);
+    setPayLoading(false);
+  };
+
+  const kpis = [
+    { label: 'Total Deals',    value: String(deals.length), color: '#a855f7' },
+    { label: 'Pending Payout', value: fmtINR(totalPending), color: '#d97706' },
+    { label: 'Paid Out',       value: fmtINR(totalPaid),    color: '#059669' },
+    { label: 'Selected',       value: String(selected.size),color: '#6366f1' },
+  ];
+
+  return (
+    <>
+      {paidModal && (
+        <PaidDateModal
+          selectedCount={selectedDeals.length}
+          selectedTotal={selectedTotal}
+          loading={payLoading}
+          onSubmit={handleMarkPaid}
+          onCancel={() => setPaidModal(false)}
+        />
+      )}
+
+      <div className="grid gap-5">
+        {/* Header */}
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <div className="flex items-center gap-3">
+            <button onClick={onBack}
+              className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              <ArrowLeft />
+            </button>
+            <div>
+              <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>{pageTitle}</h1>
+              <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Interest payouts — <span style={{ color: '#c084fc', fontWeight: 700 }}>{period.label}</span>
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {selected.size > 0 && (
+              <>
+                <button
+                  onClick={() => downloadCSV(
+                    selectedDeals.map(d => ({ ...d, paymentDate: getPaidDate(d) ?? '' })),
+                    `interest-${period.label.replace(' ','-')}-selected.csv`
+                  )}
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+                  style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
+                  <DownloadIcon /> Download Selected ({selected.size})
+                </button>
+                <button onClick={() => setPaidModal(true)}
+                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
+                  <CheckIcon /> Paid ({selected.size})
+                </button>
+              </>
+            )}
+            <button
+              onClick={() => { setLoading(true); setTimeout(() => { setDeals(mockDeals); setLoading(false); }, 500); }}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+              style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              <RefreshIcon />
+            </button>
+          </div>
+        </div>
+
+        {/* KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {kpis.map(k => (
+            <div key={k.label} className="rounded-xl px-4 py-3"
+              style={{ background: `${k.color}0a`, border: `1px solid ${k.color}20` }}>
+              <p className="text-xl font-extrabold" style={{ color: k.color, fontFamily: "'JetBrains Mono', monospace" }}>{k.value}</p>
+              <p className="text-xs font-bold mt-0.5" style={{ color: 'var(--text-primary)' }}>{k.label}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Tabs */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex gap-1 p-1 rounded-2xl" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            {TABS.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all"
+                style={tab === t.key
+                  ? { background: `linear-gradient(135deg,${t.color},${t.color}cc)`, color: '#fff', boxShadow: `0 2px 8px ${t.color}40` }
+                  : { background: 'transparent', color: 'var(--text-muted)' }}>
+                {t.label} · {t.count}
+              </button>
+            ))}
+          </div>
+          {selected.size > 0 && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
+              style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)' }}>
+              <span className="text-xs font-bold" style={{ color: '#c084fc' }}>
+                {selected.size} selected · {fmtINR(selectedTotal)}
+              </span>
+              <button onClick={() => setSelected(new Set())}
+                className="w-5 h-5 rounded-md flex items-center justify-center"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                <CloseIcon />
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Table card */}
+        <div className="rounded-2xl overflow-hidden"
+          style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 4px 24px rgba(0,0,0,0.07)' }}>
+          <div className="px-5 py-3.5 flex items-center gap-3 flex-wrap"
+            style={{ borderBottom: '1px solid var(--border)', background: 'rgba(168,85,247,0.04)' }}>
+            <div className="w-2 h-2 rounded-full" style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
+            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
+              {tab === 'ALL' ? 'All Deals' : tab === 'PENDING' ? 'Pending Payouts' : 'Paid Deals'} — {period.label}
+            </h2>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc' }}>{filtered.length}</span>
+            {tab === 'PENDING' && !loading && (
+              <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl"
+                style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                <CoinIcon />
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Pending</p>
+                  <p className="text-sm font-black" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalPending)}</p>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {loading && (
+            <div className="flex items-center justify-center gap-3 py-16">
+              <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Loading deals…</span>
+            </div>
+          )}
+
+          {!loading && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+                    <th className="py-3 px-4 text-xs uppercase tracking-widest font-semibold text-left whitespace-nowrap"
+                      style={{ color: 'var(--text-muted)' }}>
+                      <div className="flex items-center gap-2">
+                        <button onClick={toggleAll}
+                          className="w-5 h-5 rounded-md flex items-center justify-center transition-all flex-shrink-0"
+                          style={{
+                            background: allPendingSelected ? 'rgba(168,85,247,0.8)' : 'var(--input-bg)',
+                            border: '1.5px solid rgba(168,85,247,0.4)', color: '#fff',
+                          }}>
+                          {allPendingSelected && <CheckIcon />}
+                        </button>
+                        <span>Payment</span>
+                      </div>
+                    </th>
+                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Amount', 'Payment Date', 'Status', 'Download'].map(h => (
+                      <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
+                        style={{ color: 'var(--text-muted)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.length === 0 ? (
+                    <tr><td colSpan={9} className="py-14 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No deals in this category</td></tr>
+                  ) : filtered.map((deal, idx) => {
+                    const isPaid    = getStatus(deal) === 'PAID';
+                    const isChecked = selected.has(deal.id);
+                    const paidDate  = getPaidDate(deal);
+                    return (
+                      <tr key={deal.id}
+                        style={{ borderBottom: '1px solid var(--border)', background: isChecked ? 'rgba(168,85,247,0.05)' : 'transparent' }}
+                        onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = 'var(--row-hover)'; }}
+                        onMouseLeave={e => { e.currentTarget.style.background = isChecked ? 'rgba(168,85,247,0.05)' : 'transparent'; }}>
+
+                        {/* Payment checkbox */}
+                        <td className="py-3.5 px-4">
+                          {!isPaid ? (
+                            <button onClick={() => toggleOne(deal.id)}
+                              className="w-5 h-5 rounded-md flex items-center justify-center transition-all"
+                              style={{
+                                background: isChecked ? 'rgba(168,85,247,0.8)' : 'var(--input-bg)',
+                                border: `1.5px solid ${isChecked ? 'rgba(168,85,247,0.8)' : 'rgba(168,85,247,0.3)'}`,
+                                color: '#fff',
+                              }}>
+                              {isChecked && <CheckIcon />}
+                            </button>
+                          ) : (
+                            <span className="w-5 h-5 rounded-md flex items-center justify-center"
+                              style={{ background: 'rgba(5,150,105,0.15)', border: '1.5px solid rgba(5,150,105,0.4)', color: '#059669' }}>
+                              <CheckIcon />
+                            </span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4">
+                          <span className="text-xs font-bold tabular-nums" style={{ color: 'var(--text-muted)' }}>{idx + 1}</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="font-bold text-sm" style={{ color: 'var(--text-primary)' }}>{deal.dealName}</p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-sm font-extrabold tabular-nums"
+                            style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{deal.roi}%</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-1.5">
+                            <UsersIcon />
+                            <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{deal.lenders}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-sm font-extrabold tabular-nums"
+                            style={{ color: '#a855f7', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(deal.amount)}</span>
+                        </td>
+
+                        {/* Payment Date */}
+                        <td className="py-3.5 px-4">
+                          {paidDate ? (
+                            <div className="flex items-center gap-1.5">
+                              <CalendarIcon />
+                              <span className="text-xs font-semibold whitespace-nowrap" style={{ color: '#059669' }}>{paidDate}</span>
+                            </div>
+                          ) : (
+                            <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                          )}
+                        </td>
+
+                        <td className="py-3.5 px-4"><StatusChip status={getStatus(deal)} /></td>
+
+                        {/* Per-row download */}
+                        <td className="py-3.5 px-4">
+                          <button
+                            onClick={() => downloadCSV(
+                              [{ ...deal, paymentDate: paidDate ?? '' }],
+                              `${deal.dealName.replace(/\s+/g,'-')}-${period.label.replace(' ','-')}.csv`
+                            )}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                            style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                            <DownloadIcon />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {!loading && filtered.length > 0 && (
+            <div className="px-5 py-3 flex items-center justify-between flex-wrap gap-2"
+              style={{ borderTop: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {filtered.length} deal{filtered.length !== 1 ? 's' : ''} · {period.label}
+              </span>
+              {selected.size > 0 && (
+                <span className="text-xs font-bold" style={{ color: '#c084fc' }}>
+                  {selected.size} selected · {fmtINR(selectedTotal)}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Mock data ────────────────────────────────────────────────────────────────
+const SD_LOT_DEALS = [
+  { id: 1, dealName: 'SD Lot Alpha',  roi: 2, lenders: 14, amount: 280000, status: 'PENDING' },
+  { id: 2, dealName: 'SD Lot Beta',   roi: 3, lenders: 20, amount: 450000, status: 'PENDING' },
+  { id: 3, dealName: 'SD Lot Gamma',  roi: 2, lenders: 8,  amount: 160000, status: 'PAID'    },
+  { id: 4, dealName: 'SD Lot Delta',  roi: 2, lenders: 30, amount: 600000, status: 'PENDING' },
+  { id: 5, dealName: 'SD Lot Eta',    roi: 2, lenders: 25, amount: 500000, status: 'PENDING' },
+  { id: 6, dealName: 'SD Lot Zeta',   roi: 3, lenders: 18, amount: 360000, status: 'PAID'    },
+];
+
+// ─── SD Lot Interest Payout page ──────────────────────────────────────────────
+export default function AdminInterestPayments() {
+  const [period, setPeriod] = useState(null);
+  if (!period) {
+    return (
+      <DateSelectScreen
+        title="SD Lot Interest Payout"
+        subtitle="Select a payment month to view and process SD Lot interest payouts"
+        onProceed={setPeriod}
+      />
+    );
+  }
+  return (
+    <InterestDealsTable
+      period={period}
+      onBack={() => setPeriod(null)}
+      pageTitle="SD Lot Interest Payout"
+      mockDeals={SD_LOT_DEALS}
+    />
+  );
+}

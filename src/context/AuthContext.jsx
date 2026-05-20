@@ -1,5 +1,5 @@
 import { createContext, useContext, useState } from 'react';
-import { login as apiLogin, hiddenLogin as apiHiddenLogin, getUserMe } from '../api/beforelogin';
+import { login as apiLogin, hiddenLogin as apiHiddenLogin, getUserMe, verifyLoginOtp } from '../api/beforelogin';
 import { clearSession, getToken, getUserId, getRole, setSession } from '../api/client';
 
 const AuthContext = createContext(null);
@@ -107,8 +107,35 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /**
+   * otpLogin({ countryCode, mobileNumber, otpSession, otpValue })
+   * Verifies mobile OTP and logs the user in.
+   * Returns { success, role } or { success: false, error }
+   */
+  const otpLogin = async ({ countryCode, mobileNumber, otpSession, otpValue }) => {
+    setLoading(true);
+    try {
+      const result = await verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue });
+      const role = (Array.isArray(result.role) ? result.role[0] : result.role) === 'ADMIN' ? 'admin' : 'user';
+      setUser({
+        userId: result.userId,
+        name:   result.name   ?? '',
+        email:  result.email  ?? '',
+        lrId:   result.lrId   ?? result.userId,
+        role,
+      });
+      return { success: true, role };
+    } catch (err) {
+      let message = err.message ?? 'OTP verification failed.';
+      if (err.status === 401) message = 'Invalid or expired OTP.';
+      return { success: false, error: message };
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, loading, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, otpLogin, loading, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

@@ -201,3 +201,64 @@ export async function signUp({ firstName, lastName, email, gender, mobileNumber,
 export async function submitSupportQuery({ name, email, phone, message }) {
   return post('/user-service/support/contact', { name, email, phone, message }, { auth: false });
 }
+
+// ─── OTP Login — Step 1: send OTP to mobile ───────────────────────────────────
+/**
+ * sendLoginOtp({ countryCode, mobileNumber })
+ * POST /auth-service/auth/registerwithMobileAndWhatsappNumber
+ * Returns: { mobileOtpSession, ... }
+ */
+export async function sendLoginOtp({ countryCode, mobileNumber }) {
+  const response = await post(
+    '/auth-service/auth/registerwithMobileAndWhatsappNumber',
+    {
+      countryCode:      `+${countryCode}`,
+      mobileNumber,
+      registrationType: 'mobile',
+      userType:         'Login',
+      primaryType:      'OXYBRICKS',
+    },
+    { auth: false }
+  );
+  // API returns the session inside response.data when accessToken is null
+  const data = response?.data ?? response;
+  if (data?.accessToken != null) {
+    // Edge case: already logged in — treat as success
+    return { mobileOtpSession: null, _directToken: data };
+  }
+  return data;
+}
+
+// ─── OTP Login — Step 2: verify OTP ──────────────────────────────────────────
+/**
+ * verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue })
+ * POST /auth-service/auth/registerwithMobileAndWhatsappNumber
+ * Returns: { accessToken, userId, roles, ... }
+ */
+export async function verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue }) {
+  const response = await post(
+    '/auth-service/auth/registerwithMobileAndWhatsappNumber',
+    {
+      mobileNumber,
+      countryCode:      `+${countryCode}`,
+      mobileOtpSession: otpSession,
+      mobileOtpValue:   otpValue,
+      userType:         'Login',
+      primaryType:      'OXYBRICKS',
+    },
+    { auth: false }
+  );
+  const data = response?.data ?? response;
+
+  const accessToken = data?.accessToken ?? '';
+  const userId      = data?.userId      ?? '';
+  const role        = data?.roles ?? data?.role ?? 'INVESTOR';
+
+  if (!accessToken) {
+    const err = new Error('OTP verification failed — no token received.');
+    err.status = 401; throw err;
+  }
+
+  setSession({ accessToken, userId, role: Array.isArray(role) ? role[0] : role });
+  return { accessToken, userId, role: Array.isArray(role) ? role[0] : role };
+}
