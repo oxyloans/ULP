@@ -198,3 +198,46 @@ export async function getUserNamesByIds(ids) {
 export async function getPlatformStats() {
   return get('/admin-service/stats/platform');
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TOTAL USERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /auth-service/user/registered-users1
+ * Params: pageIndex, pageSize, sortBy, sortOrder, status
+ */
+export async function getRegisteredUsers({ pageIndex = 0, pageSize = 20, sortBy = 'id', sortOrder = 'DESC', status = 'live' } = {}) {
+  return get(`/auth-service/user/registered-users1?pageIndex=${pageIndex}&pageSize=${pageSize}&sortBy=${sortBy}&sortOrder=${sortOrder}&status=${status}`);
+}
+
+/**
+ * POST /oxybrick-service/getUserInfoBySource
+ * Body: { email, mobileNumber, userName }
+ */
+export async function searchUserByInfo({ email = null, mobileNumber = null, userName = null } = {}) {
+  return post('/oxybrick-service/getUserInfoBySource', { email, mobileNumber, userName });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRATED USERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/getAllMigratedUsersData
+ */
+export async function getAllMigratedUsers() {
+  return get('/oxybrick-service/getAllMigratedUsersData');
+}
+
+/**
+ * POST /oxybrick-service/migrateApprovedAndRejection
+ * Body: { approvedBy, migrationStatus, userId }
+ */
+export async function approveMigratedUser(userId, approvedBy = '', migrationStatus = 'APPROVED') {
+  return post('/oxybrick-service/migrateApprovedAndRejection', {
+    approvedBy:      approvedBy.toUpperCase(),
+    migrationStatus,
+    userId,
+  });
+}

@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
-import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals } from '../api/afterlogin-user';
+import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData } from '../api/afterlogin-user';
 import ProfileWarningBanner from '../components/ProfileWarningBanner';
 
 //  SVG Icons 
@@ -1856,10 +1856,213 @@ function CopyId({ id }) {
 }
 
 // ─── Single member dashboard ──────────────────────────────────────────────────
+function MigrateConfirmModal({ onConfirm, onCancel }) {
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}
+      onClick={onCancel}>
+      <div className="rounded-2xl overflow-hidden w-full max-w-sm"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Icon + title */}
+        <div className="px-6 pt-6 pb-4 flex flex-col items-center text-center gap-3">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(233,83,48,0.1)', border: '1px solid rgba(233,83,48,0.25)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#e95330" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+              <line x1="12" y1="9" x2="12" y2="13"/>
+              <line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+          </div>
+          <div>
+            <h3
+              className="text-base font-extrabold"
+              style={{ color: 'var(--text-primary)' }}
+            >
+              Confirm Migration
+            </h3>
+
+            <p
+              className="text-sm mt-1"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              Are you sure you want to migrate the data?
+              <br />
+              Once admin approved, you can see migrated data.
+              <br />
+              <span
+                className="font-semibold"
+                style={{ color: '#e95330' }}
+              >
+                This action cannot be undone.
+              </span>
+            </p>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button onClick={onCancel}
+            className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            No, Cancel
+          </button>
+          <button onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+            style={{ background: 'linear-gradient(135deg,#e95330,#c73d1f)', color: '#fff', boxShadow: '0 4px 14px rgba(233,83,48,0.35)' }}>
+            Yes, Migrate
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MigrateDataModal({ displayName,onClose }) {
+  const [form, setForm] = useState({ id: '', passcode: '', mobile: '' });
+  const [errors, setErrors] = useState({});
+  const [showConfirm, setShowConfirm] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [apiError, setApiError] = useState('');
+  const { user } = useAuth();
+  console.log(user)
+
+  const validate = () => {
+    const e = {};
+    if (!form.id.trim())       e.id       = 'ID is required';
+    if (!form.passcode.trim()) e.passcode = 'Passcode is required';
+    if (!form.mobile.trim())   e.mobile   = 'Mobile number is required';
+    else if (!/^\d{10}$/.test(form.mobile.trim())) e.mobile = 'Enter a valid 10-digit mobile number';
+    return e;
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setApiError('');
+    setShowConfirm(true);
+  };
+
+  const handleConfirm = async () => {
+    setShowConfirm(false);
+    setSubmitting(true);
+    setApiError('');
+    try {
+      await migrateUserData({
+        lenderId:         form.id.trim(),
+        mobileNumber:     form.mobile.trim(),
+        password:         form.passcode.trim(),
+        userName:         displayName || '',
+        migrationConsent: 'yes',
+      });
+      onClose();
+    } catch (err) {
+      setApiError(err.message ?? 'Migration failed. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const field = (key, label, type = 'text', placeholder = '') => (
+    <div className="grid gap-1.5">
+      <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{label}</label>
+      <input
+        type={type}
+        value={form[key]}
+        onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setErrors(er => ({ ...er, [key]: '' })); }}
+        placeholder={placeholder}
+        className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
+        style={{
+          background: 'var(--input-bg)',
+          border: `1px solid ${errors[key] ? '#e95330' : 'var(--border)'}`,
+          color: 'var(--text-primary)',
+          boxShadow: errors[key] ? '0 0 0 3px rgba(233,83,48,0.12)' : 'none',
+        }}
+      />
+      {errors[key] && <p className="text-xs" style={{ color: '#e95330' }}>{errors[key]}</p>}
+    </div>
+  );
+
+  return (
+    <>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}>
+      <div className="rounded-2xl overflow-hidden w-full max-w-md"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.3)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="px-6 py-5 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(38,115,187,0.05)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+              style={{ background: 'rgba(38,115,187,0.12)', border: '1px solid rgba(38,115,187,0.25)', color: '#2673bb' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrate Data</h2>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter your credentials to proceed</p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="px-6 py-5 grid gap-4">
+          {field('id',       'Given Lender ID', 'text',     'Enter your Lender ID')}
+          {field('passcode', 'Given Passcode',  'text', 'Enter your given passcode')}
+          {field('mobile',   'Mobile Number',   'tel',      'Enter 10-digit mobile number')}
+
+          {/* API error */}
+          {apiError && (
+            <div className="px-4 py-2.5 rounded-xl text-xs font-semibold"
+              style={{ background: 'rgba(233,83,48,0.08)', color: '#e95330', border: '1px solid rgba(233,83,48,0.2)' }}>
+              {apiError}
+            </div>
+          )}
+
+          <div className="flex gap-3 pt-1">
+            <button type="button" onClick={onClose} disabled={submitting}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80 disabled:opacity-40"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              Cancel
+            </button>
+            <button type="submit" disabled={submitting}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-60 disabled:scale-100 flex items-center justify-center gap-2"
+              style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 14px rgba(38,115,187,0.35)' }}>
+              {submitting && (
+                <span className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin"
+                  style={{ borderColor: '#fff', borderTopColor: 'transparent' }} />
+              )}
+              {submitting ? 'Migrating…' : 'Migrate'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+    {showConfirm && <MigrateConfirmModal onConfirm={()=>handleConfirm()} onCancel={() => setShowConfirm(false)} />}
+    </>
+  );
+}
+
 function MemberDashboard({ memberId, mode }) {
-  const [fin, setFin]         = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [profile, setProfile] = useState(null);
+  const [fin, setFin]             = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [profile, setProfile]     = useState(null);
+  const [migrateOpen, setMigrateOpen] = useState(false);
   const { user } = useAuth();
   const memberColor = MEMBER_COLORS[memberId] ?? '#2673bb';
 
@@ -1888,7 +2091,7 @@ function MemberDashboard({ memberId, mode }) {
   const lastName    = profile?.lastName  ?? '';
   const profileName = (firstName + ' ' + lastName).trim();
   const displayName = profileName || user?.name || data.name || '—';
-  const id =  memberId === 'self' ? user?.userId : memberId;
+  const id = sessionStorage.getItem('userId');
 
   const showOL   = mode === 'B' || mode === 'C';
   const showOff  = mode === 'A' || mode === 'C';
@@ -1916,11 +2119,26 @@ function MemberDashboard({ memberId, mode }) {
             )}
             {isOwn && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'rgba(38,115,187,0.1)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.2)' }}>You</span>}
           </div>
-          {sessionStorage.getItem('userId') || id && (
-            <CopyId id={sessionStorage.getItem('userId') || id} />
+          {id && (
+            <CopyId id={id} />
           )}
         </div>
+        <div>
+          <button
+            onClick={() => setMigrateOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+            style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 14px rgba(38,115,187,0.3)', border: '1px solid rgba(38,115,187,0.3)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="17 8 12 3 7 8"/>
+              <line x1="12" y1="3" x2="12" y2="15"/>
+            </svg>
+            Migrate Data
+          </button>
+        </div>
       </div>
+
+      {migrateOpen && <MigrateDataModal displayName={displayName} onClose={() => setMigrateOpen(false)} />}
 
       {showBoth && <CombinedAnalysis fin={data} memberColor={memberColor} />}
       {showOL  && <><Divider /><OxyLoansSection  fin={data} memberColor={memberColor} /></>}

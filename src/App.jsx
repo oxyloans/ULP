@@ -52,6 +52,8 @@ import ViewAssets from './pages/admin/ViewAssets.jsx';
 import AllocatedAssets from './pages/admin/AllocatedAssets.jsx';
 import AdminInterestPayments from './pages/admin/AdminInterestPayments.jsx';
 import AdminAssetPayouts from './pages/admin/AdminAssetPayouts.jsx';
+import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
+import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -184,6 +186,8 @@ function AdminLayout() {
             <Route path="assets/allocated"      element={<AllocatedAssets />} />
             <Route path="interest/sd-lot"       element={<AdminInterestPayments />} />
             <Route path="interest/asset"        element={<AdminAssetPayouts />} />
+            <Route path="total-users"           element={<AdminTotalUsers />} />
+            <Route path="migrated-users"        element={<AdminMigratedUsers />} />
             <Route path="*"                     element={<NotFound />} />
           </Routes>
         </main>

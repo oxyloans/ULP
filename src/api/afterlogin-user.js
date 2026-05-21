@@ -178,3 +178,23 @@ export async function getGoldGrowthDetail(dealId) {
   const userId = getUserId();
   return get(`/oxybrick-service/${userId}/${dealId}/goldGrowthPercentage`);
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRATE DATA
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /oxybrick-service/migratedUsersData
+ * Body: { lenderId, migrationConsent, mobileNumber, password, userId, userName }
+ */
+export async function migrateUserData({ lenderId, migrationConsent = 'yes', mobileNumber, password, userName }) {
+  const userId = getUserId();
+  return post('/oxybrick-service/migratedUsersData', {
+    lenderId,
+    migrationConsent,
+    mobileNumber,
+    password,
+    userId,
+    userName,
+  });
+}
