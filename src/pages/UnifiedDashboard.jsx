@@ -1891,6 +1891,8 @@ function MigrateConfirmModal({ onConfirm, onCancel }) {
               <br />
               Once admin approved, you can see migrated data.
               <br />
+              Only active deals will be migrated.
+              <br />
               <span
                 className="font-semibold"
                 style={{ color: '#e95330' }}
@@ -2009,6 +2011,7 @@ function MigrateDataModal({ displayName,onClose }) {
             <div>
               <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrate Data</h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter your credentials to proceed</p>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Only active deals will be migrated</p>
             </div>
           </div>
           <button onClick={onClose}
