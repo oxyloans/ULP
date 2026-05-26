@@ -61,6 +61,64 @@ function fmtNullable(v, fallback = "-") {
   return v === null || v === undefined || v === "" ? fallback : String(v);
 }
 
+function parseDdMmYyyy(value) {
+  if (!value || typeof value !== "string") return null;
+  const [dd, mm, yyyy] = value.split("/");
+  const d = Number(dd);
+  const m = Number(mm);
+  const y = Number(yyyy);
+  if (!d || !m || !y) return null;
+  const dt = new Date(y, m - 1, d);
+  return Number.isNaN(dt.getTime()) ? null : dt;
+}
+
+function mergeMigratedByRoi(items) {
+  const groups = new Map();
+  for (const item of items ?? []) {
+    const key = `${item?.dealName ?? "Unknown"}|${item?.roi ?? 0}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        dealName: item?.dealName ?? "Unknown",
+        roi: Number(item?.roi ?? 0),
+        payOutType: item?.payOutType ?? null,
+        earliestDate: item?.participationDate ?? null,
+        entries: [],
+      });
+    }
+    const g = groups.get(key);
+    g.entries.push(item);
+    g.payOutType = g.payOutType ?? item?.payOutType ?? null;
+    const oldDate = parseDdMmYyyy(g.earliestDate);
+    const nextDate = parseDdMmYyyy(item?.participationDate);
+    if (!oldDate || (nextDate && nextDate < oldDate)) g.earliestDate = item?.participationDate ?? g.earliestDate;
+  }
+
+  return Array.from(groups.values()).map(g => {
+    const currentPrincipalTotal = g.entries.reduce((s, e) => s + Number(e?.currentPrincipalAmount ?? 0), 0);
+    const monthlyInterestTotal = g.entries.reduce(
+      (s, e) => s + monthlyEquiv(Number(e?.currentPrincipalAmount ?? 0), Number(e?.roi ?? g.roi ?? 0), "MONTHLY"),
+      0
+    );
+    const returnedTotal = g.entries.reduce((s, e) => s + Number(e?.principalReturnedAmount ?? 0), 0);
+    const sortedEntries = [...g.entries].sort((a, b) => {
+      const ad = parseDdMmYyyy(a?.participationDate);
+      const bd = parseDdMmYyyy(b?.participationDate);
+      if (!ad && !bd) return 0;
+      if (!ad) return 1;
+      if (!bd) return -1;
+      return ad - bd;
+    });
+    return {
+      ...g,
+      participationAmount: currentPrincipalTotal,
+      monthlyInterest: monthlyInterestTotal,
+      returnedAmount: returnedTotal,
+      entryCount: sortedEntries.length,
+      entries: sortedEntries,
+    };
+  });
+}
+
 const PAYOUT = {
   MONTHLY:      { label: "Monthly",     months: 1  },
   QUARTELY:     { label: "Quarterly",   months: 3  },
@@ -129,10 +187,10 @@ function DealRow({ p, index, navigate }) {
     >
       <div className="flex">
         <div className="w-1 flex-shrink-0" style={{ background: `linear-gradient(180deg,${INDIGO},${GREEN})` }} />
-        <div className="flex-1 px-5 py-4">
-          <div className="flex items-center gap-4 flex-wrap">
+        <div className="flex-1 px-4 py-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
 
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-black"
                 style={{ background: `${INDIGO}15`, color: INDIGO, border: `2px solid ${INDIGO}30`, boxShadow: `0 0 20px ${INDIGO}20` }}
@@ -146,7 +204,7 @@ function DealRow({ p, index, navigate }) {
                 >
                   {p.dealName}
                 </p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
                     <CalIcon /> Since {p.participatedDate}
                   </span>
@@ -168,7 +226,7 @@ function DealRow({ p, index, navigate }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {[
                 { label: "Total Invested",   value: fmtINR(totalInvested), color: INDIGO },
                 { label: "Monthly Interest", value: fmtINR(totalMonthly),  color: GREEN  },
@@ -177,27 +235,27 @@ function DealRow({ p, index, navigate }) {
               ].map(s => (
                 <div
                   key={s.label}
-                  className="flex flex-col items-center px-4 py-2.5 rounded-xl min-w-[80px] transition-all duration-200"
+                  className="flex flex-col items-center px-3 py-2 rounded-xl min-w-[72px] transition-all duration-200"
                   style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}
                   onMouseEnter={e => { e.currentTarget.style.background = `${s.color}14`; e.currentTarget.style.transform = "scale(1.05)"; }}
                   onMouseLeave={e => { e.currentTarget.style.background = `${s.color}08`; e.currentTarget.style.transform = "scale(1)"; }}
                 >
                   <span
-                    className="text-base font-black leading-none"
+                    className="text-[20px] font-black leading-none"
                     style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}
                   >
                     {s.value}
                   </span>
-                  <span className="text-xs mt-1.5 font-semibold" style={{ color: "var(--text-muted)" }}>{s.label}</span>
+                  <span className="text-[11px] mt-1 font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{s.label}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               {canMore && (
                 <button
                   onClick={() => navigate(`/sd-lot/participate/${p.dealId}`)}
-                  className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
                   style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, color: "#fff", boxShadow: `0 4px 16px ${INDIGO}50` }}
                 >
                   <PlusIcon /> Add More
@@ -205,7 +263,7 @@ function DealRow({ p, index, navigate }) {
               )}
               <button
                 onClick={() => setExpanded(v => !v)}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all"
                 style={{
                   background: expanded ? `${INDIGO}12` : "var(--input-bg)",
                   color: INDIGO,
@@ -346,11 +404,10 @@ function DealRow({ p, index, navigate }) {
 
 function MigratedDealRow({ d, index }) {
   const [expanded, setExpanded] = useState(false);
-  const participation = d.participationAmount ?? 0;
-  const currentPrincipal = d.currentPrincipalAmount ?? 0;
-  const returnedPrincipal = d.principalReturnedAmount ?? 0;
   const roi = d.roi ?? 0;
-  const monthly = monthlyEquiv(participation, roi, "MONTHLY");
+  const participation = d.participationAmount ?? 0;
+  const monthly = d.monthlyInterest ?? 0;
+  const entryCount = d.entryCount ?? (d.entries?.length ?? 0);
 
   return (
     <div
@@ -369,9 +426,9 @@ function MigratedDealRow({ d, index }) {
     >
       <div className="flex">
         <div className="w-1 flex-shrink-0" style={{ background: `linear-gradient(180deg,${AMBER},${GREEN})` }} />
-        <div className="flex-1 px-5 py-4">
-          <div className="flex items-center gap-4 flex-wrap">
-            <div className="flex items-center gap-3 flex-1 min-w-0">
+        <div className="flex-1 px-4 py-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="flex items-center gap-2.5 flex-1 min-w-0">
               <div
                 className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-black"
                 style={{ background: `${AMBER}15`, color: AMBER, border: `2px solid ${AMBER}30`, boxShadow: `0 0 20px ${AMBER}20` }}
@@ -382,9 +439,9 @@ function MigratedDealRow({ d, index }) {
                 <p className="text-lg font-extrabold truncate" style={{ color: "var(--text-primary)", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "-0.02em" }}>
                   {fmtNullable(d.dealName)}
                 </p>
-                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                   <span className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <CalIcon /> Since {fmtNullable(d.participationDate)}
+                    <CalIcon /> Since {fmtNullable(d.earliestDate)}
                   </span>
                   <span className="text-xs px-2.5 py-0.5 rounded-full font-bold" style={{ background: `${AMBER}15`, color: AMBER, border: `1px solid ${AMBER}30` }}>
                     Migrated
@@ -396,24 +453,31 @@ function MigratedDealRow({ d, index }) {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {[
                 { label: "Participation", value: fmtINR(participation), color: INDIGO },
-                { label: "Current Principal", value: fmtINR(currentPrincipal), color: GREEN },
+                { label: "Monthly Interest", value: fmtINR(monthly), color: GREEN },
                 { label: "ROI", value: `${roi}%`, color: AMBER },
-                { label: "Returned", value: d.principalReturnedAmount === null ? "-" : fmtINR(returnedPrincipal), color: PURPLE },
+                { label: "Entries", value: String(entryCount), color: PURPLE },
               ].map(s => (
-                <div key={s.label} className="flex flex-col items-center px-4 py-2.5 rounded-xl min-w-[80px]" style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}>
-                  <span className="text-base font-black leading-none" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</span>
-                  <span className="text-xs mt-1.5 font-semibold" style={{ color: "var(--text-muted)" }}>{s.label}</span>
+                <div key={s.label} className="flex flex-col items-center px-3 py-2 rounded-xl min-w-[72px]" style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}>
+                  <span className="text-[20px] font-black leading-none" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</span>
+                  <span className="text-[11px] mt-1 font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{s.label}</span>
                 </div>
               ))}
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                disabled
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold cursor-not-allowed opacity-60"
+                style={{ background: "var(--input-bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+              >
+                <PlusIcon /> Add More
+              </button>
               <button
                 onClick={() => setExpanded(v => !v)}
-                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all"
                 style={{ background: expanded ? `${AMBER}12` : "var(--input-bg)", color: AMBER, border: `1px solid ${expanded ? `${AMBER}30` : "var(--border)"}` }}
               >
                 Details
@@ -427,33 +491,68 @@ function MigratedDealRow({ d, index }) {
       </div>
 
       {expanded && (
-        <div className="p-5" style={{ borderTop: "1px solid var(--border)", background: "var(--input-bg)" }}>
+        <div className="p-3" style={{ borderTop: "1px solid var(--border)", background: "var(--input-bg)" }}>
           <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1120px] text-sm">
                 <thead>
                   <tr style={{ background: "var(--table-header-bg)", borderBottom: "1px solid var(--border)" }}>
-                    {["Deal", "ROI", "Participation", "Current Principal", "Returned", "Payout", "Transaction", "Interest Date", "Participation Date", "Monthly Equiv."].map(h => (
-                      <th key={h} className="text-left py-3 px-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
+                    {[
+                      { short: "Deal", title: "Deal" },
+                      { short: "ROI", title: "Return on Investment" },
+                      { short: "Part.", title: "Participation" },
+                      { short: "Curr. Prin.", title: "Current Principal" },
+                      { short: "Ret.", title: "Returned" },
+                      { short: "Payout", title: "Payout Type" },
+                      { short: "Txn", title: "Transaction Type" },
+                      { short: "Int. Dt", title: "Interest Date" },
+                      { short: "Part. Dt", title: "Participation Date" },
+                      { short: "Mth. Eqv.", title: "Monthly Equivalent" },
+                    ].map(h => (
+                      <th
+                        key={h.short}
+                        title={h.title}
+                        className="text-left py-2 px-2 text-xs font-bold uppercase tracking-wider whitespace-nowrap"
+                        style={{ color: "var(--text-muted)" }}
+                      >
+                        {h.short}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td className="py-3 px-3 font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fmtNullable(d.dealName)}</td>
-                    <td className="py-3 px-3 font-bold whitespace-nowrap" style={{ color: AMBER }}>{roi}%</td>
-                    <td className="py-3 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(participation)}</td>
-                    <td className="py-3 px-3 font-semibold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(currentPrincipal)}</td>
-                    <td className="py-3 px-3 font-semibold tabular-nums whitespace-nowrap" style={{ color: "var(--text-primary)", fontFamily: "'JetBrains Mono',monospace" }}>
-                      {d.principalReturnedAmount === null ? "-" : fmtINR(returnedPrincipal)}
-                    </td>
-                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.payOutType)}</td>
-                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.typeOfTransaction)}</td>
-                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.interestDate)}</td>
-                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.participationDate)}</td>
-                    <td className="py-3 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(monthly)}</td>
-                  </tr>
+                  {d.entries.map((entry, rowIdx) => (
+                    <tr key={`${d.dealName}-${entry?.participationDate ?? rowIdx}-${rowIdx}`} style={{ borderBottom: rowIdx < d.entries.length - 1 ? "1px solid var(--border)" : "none" }}>
+                      <td className="py-2 px-2 font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fmtNullable(entry?.dealName)}</td>
+                      <td className="py-2 px-2 font-bold whitespace-nowrap" style={{ color: AMBER }}>{fmtNullable(entry?.roi)}%</td>
+                      <td className="py-2 px-2 font-bold tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(entry?.participationAmount ?? 0)}</td>
+                      <td className="py-2 px-2 font-semibold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(entry?.currentPrincipalAmount ?? 0)}</td>
+                      <td className="py-2 px-2 font-semibold tabular-nums whitespace-nowrap" style={{ color: "var(--text-primary)", fontFamily: "'JetBrains Mono',monospace" }}>
+                        {entry?.principalReturnedAmount === null ? "-" : fmtINR(entry?.principalReturnedAmount ?? 0)}
+                      </td>
+                      <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.payOutType)}</td>
+                      <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.typeOfTransaction)}</td>
+                      <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.interestDate)}</td>
+                      <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.participationDate)}</td>
+                      <td className="py-2 px-2 font-bold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>
+                        {fmtINR(monthlyEquiv(entry?.currentPrincipalAmount ?? 0, entry?.roi ?? 0, "MONTHLY"))}
+                      </td>
+                    </tr>
+                  ))}
                 </tbody>
+                <tfoot>
+                  <tr style={{ borderTop: "2px solid var(--border)", background: `${AMBER}08` }}>
+                    <td colSpan={2} className="py-2 px-2 text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total</td>
+                    <td className="py-2 px-2 font-black tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(d.entries.reduce((s, e) => s + (e?.participationAmount ?? 0), 0))}</td>
+                    <td className="py-2 px-2 font-black tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(participation)}</td>
+                    <td className="py-2 px-2 font-black tabular-nums whitespace-nowrap" style={{ color: PURPLE, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(d.returnedAmount ?? 0)}</td>
+                    <td className="py-2 px-2" />
+                    <td className="py-2 px-2" />
+                    <td className="py-2 px-2" />
+                    <td className="py-2 px-2" />
+                    <td className="py-2 px-2 font-black tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(monthly)}</td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -504,16 +603,17 @@ export default function MyParticipations() {
 
   const participations = data?.participationInfo ?? [];
   const runningItems = participations.map((p, i) => ({ source: "running", key: p.dealId ?? `running-${i}`, payload: p }));
-  const migratedItems = migratedDeals.map((d, i) => ({ source: "migrated", key: `${d.dealName ?? "deal"}-${d.participationDate ?? "date"}-${i}`, payload: d }));
+  const mergedMigrated = mergeMigratedByRoi(migratedDeals);
+  const migratedItems = mergedMigrated.map((d, i) => ({ source: "migrated", key: `${d.dealName ?? "deal"}-${d.roi ?? 0}-${i}`, payload: d }));
   const combinedItems = [...runningItems, ...migratedItems];
   const filteredItems = combinedItems.filter(item => sourceFilter === "all" || item.source === sourceFilter);
 
-  const totalInvested = participations.reduce((s, p) => {
+  const runningInvested = participations.reduce((s, p) => {
     const upds = (p.updatedParticipation ?? []).reduce((ss, u) => ss + (u.updationParticipation ?? 0), 0);
     return s + (p.participatedAmount ?? 0) + upds;
   }, 0);
 
-  const totalMonthly = participations.reduce((s, p) => {
+  const runningMonthly = participations.reduce((s, p) => {
     const entries = [
       { amount: p.participatedAmount ?? 0, roi: p.rateOfInterest ?? 0, payout: p.amountTye },
       ...(p.updatedParticipation ?? []).map(u => ({ amount: u.updationParticipation ?? 0, roi: u.rateOfInterest ?? p.rateOfInterest ?? 0, payout: u.amountTye ?? p.amountTye })),
@@ -521,13 +621,24 @@ export default function MyParticipations() {
     return s + entries.reduce((ss, e) => ss + monthlyEquiv(e.amount, e.roi, e.payout), 0);
   }, 0);
 
-  const totalEntries = participations.reduce((s, p) => s + 1 + (p.updatedParticipation?.length ?? 0), 0);
-  const avgRoi = participations.length
-    ? (participations.reduce((s, p) => s + (p.rateOfInterest ?? 0), 0) / participations.length).toFixed(1)
+  const runningEntries = participations.reduce((s, p) => s + 1 + (p.updatedParticipation?.length ?? 0), 0);
+  const migratedInvested = mergedMigrated.reduce((s, d) => s + (d.participationAmount ?? 0), 0);
+  const migratedMonthly = mergedMigrated.reduce((s, d) => s + (d.monthlyInterest ?? 0), 0);
+  const migratedEntries = mergedMigrated.reduce((s, d) => s + (d.entryCount ?? 0), 0);
+
+  const totalInvested = runningInvested + migratedInvested;
+  const totalMonthly = runningMonthly + migratedMonthly;
+  const totalEntries = runningEntries + migratedEntries;
+
+  const runningRois = participations.map(p => Number(p.rateOfInterest ?? 0)).filter(v => Number.isFinite(v));
+  const migratedRois = mergedMigrated.map(d => Number(d.roi ?? 0)).filter(v => Number.isFinite(v));
+  const roiValues = [...runningRois, ...migratedRois];
+  const avgRoi = roiValues.length
+    ? (roiValues.reduce((s, v) => s + v, 0) / roiValues.length).toFixed(1)
     : 0;
 
   const STATS = [
-    { label: "Active Deals",     value: String(participations.length), color: INDIGO, Icon: PulseIcon,   badge: participations.length > 0 ? "Live" : null },
+    { label: "Active Deals",     value: String(combinedItems.length), color: INDIGO, Icon: PulseIcon,   badge: combinedItems.length > 0 ? "Live" : null },
     { label: "Total Invested",   value: fmtINR(totalInvested),         color: PURPLE, Icon: WalletIcon,  badge: `${totalEntries} entries` },
     { label: "Monthly Interest", value: fmtINR(totalMonthly),          color: GREEN,  Icon: TrendUpIcon, badge: "per month" },
     { label: "Avg ROI",          value: `${avgRoi}%`,                  color: AMBER,  Icon: TrendUpIcon, badge: null },
