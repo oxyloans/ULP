@@ -48,7 +48,7 @@ export default function AdminTopbar({ onMenuClick }) {
         <img src={logo} alt="Oxy Portfolio" className="w-7 h-7 rounded-full object-cover flex-shrink-0"
           style={{ background: '#fff', boxShadow: '0 0 14px rgba(168,85,247,0.45)' }} />
         <span className="text-sm font-black tracking-widest uppercase hidden sm:block"
-          style={{ color: '#e9d5ff', letterSpacing: '0.1em' }}>
+          style={{ color: 'var(--text-primary)', letterSpacing: '0.1em' }}>
           Oxy Portfolio
         </span>
       </div>
@@ -68,7 +68,7 @@ export default function AdminTopbar({ onMenuClick }) {
           ))}
         </div>
         <span style={{ color: 'rgba(168,85,247,0.2)', margin: '0 2px' }}>·</span>
-        <span className="text-xs font-medium truncate" style={{ color: 'rgba(255,255,255,0.5)' }}>
+        <span className="text-xs font-medium truncate" style={{ color: 'var(--text-muted)' }}>
           Good {getGreeting()},{' '}
           <span style={{ color: '#c084fc', fontWeight: 700 }}>Admin</span>
         </span>
@@ -96,7 +96,7 @@ export default function AdminTopbar({ onMenuClick }) {
             A
           </div>
           <div className="hidden sm:block leading-none">
-            <p className="text-xs font-bold" style={{ color: '#e9d5ff' }}>Admin</p>
+            <p className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>Admin</p>
             <p style={{ color: '#a855f7', fontSize: 9, fontWeight: 600 }}>Logout</p>
           </div>
         </button>

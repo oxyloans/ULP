@@ -139,7 +139,7 @@ function UserLayout() {
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface)' }}>
         <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
         <Topbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 p-4 sm:p-5 lg:p-7 lg:pl-[248px] grid gap-5 content-start">
+        <main className="main-with-fixed-topbar flex-1 p-4 sm:p-5 lg:p-7 lg:pl-[248px] grid gap-5 content-start">
           <Routes>
             <Route path="/" element={<Navigate replace to="/dashboard" />} />
             <Route path="/dashboard" element={<UnifiedDashboard />} />
@@ -176,7 +176,7 @@ function AdminLayout() {
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface)' }}>
         <AdminSidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
         <AdminTopbar onMenuClick={() => setMobileOpen(true)} />
-        <main className="flex-1 p-4 sm:p-5 lg:p-7 lg:pl-[248px] grid gap-5 content-start">
+        <main className="main-with-fixed-topbar flex-1 p-4 sm:p-5 lg:p-7 lg:pl-[248px] grid gap-5 content-start">
           <Routes>
             <Route index                        element={<Navigate replace to="dashboard" />} />
             <Route path="dashboard"             element={<AdminDashboard />} />

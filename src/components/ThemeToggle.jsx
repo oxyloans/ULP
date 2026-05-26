@@ -26,9 +26,9 @@ export default function ThemeToggle() {
       title={isDark ? 'Switch to Light mode' : 'Switch to Dark mode'}
       className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110"
       style={{
-        background: 'var(--input-bg)',
-        border: '1px solid var(--border)',
-        color: isDark ? '#f59e0b' : '#6366f1',
+        background: 'var(--topbar-icon-bg)',
+        border: '1px solid var(--topbar-icon-border)',
+        color: 'var(--topbar-icon-color)',
       }}
     >
       {isDark ? <SunIcon /> : <MoonIcon />}

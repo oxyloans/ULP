@@ -1236,6 +1236,7 @@ function OfflineSection({ fin, memberColor }) {
   const off = fin.offline;
   const [modeFilter, setModeFilter] = useState('All');
   const [dealTab, setDealTab] = useState('Active');
+  const [dealSummaryOpen, setDealSummaryOpen] = useState(false);
   const [interestPayment, setInterestPayment] = useState(null);
   const [participationData, setParticipationData] = useState(null);
   const PAYOUT_LABELS = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
@@ -1332,6 +1333,67 @@ function OfflineSection({ fin, memberColor }) {
     }, 0);
   }, 0);
 
+  const monthlyEquivalent = (amount, payout, roi) => {
+    if (!amount) return 0;
+    let mr = 0;
+    if      (payout === 'MONTHLY')      mr = roi / 100;
+    else if (payout === 'QUARTELY')     mr = (roi / 100) / 3;
+    else if (payout === 'HALFLY')       mr = (roi / 100) / 6;
+    else if (payout === 'YEARLY')       mr = (roi / 100) / 12;
+    return Math.round(amount * mr);
+  };
+
+  const getDealBucket = (p) => {
+    const text = `${p?.dealName ?? ''} ${p?.dealType ?? ''} ${p?.category ?? ''}`.toLowerCase();
+    if (text.includes('gold')) return 'gold';
+    if (text.includes('asset') || text.includes('property')) return 'asset';
+    return 'sd';
+  };
+
+  const summaryRows = [
+    { key: 'sd', label: 'SD Lot' },
+    { key: 'gold', label: 'Gold Deals' },
+    { key: 'asset', label: 'Asset' },
+  ].map(row => ({
+    ...row,
+    deals: 0,
+    monthlyInterest: 0,
+    activeDeals: 0,
+    closedDeals: 0,
+    totalInvested: 0,
+  }));
+
+  const summaryMap = Object.fromEntries(summaryRows.map(r => [r.key, r]));
+  participations.forEach((p) => {
+    const bucket = getDealBucket(p);
+    const row = summaryMap[bucket];
+    if (!row) return;
+
+    const updates = p.updatedParticipation ?? [];
+    const investedFromUpdates = updates.reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
+    const isClosed = p.dealStatus === 'CLOSED' || p.dealStatus === 'ACHIEVED';
+    const roi = p.rateOfInterest ?? 0;
+
+    row.deals += 1;
+    row.totalInvested += (p.participatedAmount ?? 0) + investedFromUpdates;
+    row.monthlyInterest += monthlyEquivalent(p.participatedAmount ?? 0, p.amountTye, roi);
+    row.monthlyInterest += updates.reduce((s, u) => (
+      s + monthlyEquivalent(u.updationParticipation ?? 0, u.amountTye ?? p.amountTye, roi)
+    ), 0);
+    if (isClosed) row.closedDeals += 1;
+    else row.activeDeals += 1;
+  });
+
+  const totalSummary = summaryRows.reduce((acc, r) => ({
+    key: 'total',
+    label: 'Total',
+    deals: acc.deals + r.deals,
+    monthlyInterest: acc.monthlyInterest + r.monthlyInterest,
+    activeDeals: acc.activeDeals + r.activeDeals,
+    closedDeals: acc.closedDeals + r.closedDeals,
+    totalInvested: acc.totalInvested + r.totalInvested,
+  }), { deals: 0, monthlyInterest: 0, activeDeals: 0, closedDeals: 0, totalInvested: 0 });
+
   //  Payout type donut 
   const payoutCount = {};
   participations.forEach(p => { payoutCount[p.amountTye] = (payoutCount[p.amountTye] || 0) + 1; });
@@ -1364,6 +1426,62 @@ function OfflineSection({ fin, memberColor }) {
       {interestPayment && <InterestModal payment={interestPayment} onClose={() => setInterestPayment(null)} />}
       <div className="grid gap-5">
         <SectionHeader icon={I.Package} accent="#f58311" platform="Offline " title="My Investment Portfolio" live />
+
+        <TableWrap accent="#f58311">
+          <button
+            type="button"
+            onClick={() => setDealSummaryOpen(o => !o)}
+            className="w-full px-5 py-3.5 flex items-center justify-between text-left"
+            style={{ borderBottom: dealSummaryOpen ? '1px solid var(--border)' : 'none', background: 'rgba(245,131,17,0.04)' }}>
+            <div>
+              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Deal Summary</h3>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                SD Lot, Gold Deals, Asset, and Total
+              </p>
+            </div>
+            <svg
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className="w-4 h-4 transition-transform"
+              style={{ color: 'var(--text-muted)', transform: dealSummaryOpen ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+          {dealSummaryOpen && (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-header-bg)' }}>
+                    {['Deal', 'Monthly Interest', 'Active Deals', 'Closed Deals', 'Total Invested'].map(h => (
+                      <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
+                        {h}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...summaryRows, totalSummary].map((r) => (
+                    <tr key={r.key}
+                      style={{
+                        borderBottom: '1px solid var(--table-row-border)',
+                        background: r.key === 'total' ? 'rgba(38,115,187,0.06)' : 'transparent',
+                      }}>
+                      <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-primary)' }}>{r.label}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#35a13e' }}>{fmtAmt(r.monthlyInterest)}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#35a13e' }}>{r.activeDeals}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#2673bb' }}>{r.closedDeals}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#f58311' }}>{fmtAmt(r.totalInvested)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </TableWrap>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {kpis.map(k => <KpiCard key={k.label} {...k} />)}
@@ -2009,7 +2127,7 @@ function MigrateDataModal({ displayName,onClose }) {
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrate Data</h2>
+              <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrate My Data</h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter your credentials to proceed</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Only active deals will be migrated</p>
             </div>
@@ -2136,7 +2254,7 @@ function MemberDashboard({ memberId, mode }) {
               <polyline points="17 8 12 3 7 8"/>
               <line x1="12" y1="3" x2="12" y2="15"/>
             </svg>
-            Migrate Data
+            Migrate My Data
           </button>
         </div>
       </div>

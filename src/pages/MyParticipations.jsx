@@ -1,12 +1,13 @@
 ﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getRunningDeals } from "../api/afterlogin-user";
+import { getRunningDeals, getUserOfflineParticipationDealsInfo } from "../api/afterlogin-user";
 
 const INDIGO = '#6366f1';
 const PURPLE = '#818cf8';
 const GREEN  = '#10b981';
 const AMBER  = '#f59e0b';
 const RED    = '#ef4444';
+// const MIGRATED_LENDER_ID = "8f6e032f-2c1d-4b2b-b790-0a6d39919640";
 
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
@@ -54,6 +55,10 @@ function fmtINR(n) {
   if (v >= 10000000) return `${(v / 10000000).toFixed(2)}Cr`;
   if (v >= 100000)   return `${(v / 100000).toFixed(2)}L`;
   return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+}
+
+function fmtNullable(v, fallback = "-") {
+  return v === null || v === undefined || v === "" ? fallback : String(v);
 }
 
 const PAYOUT = {
@@ -339,23 +344,169 @@ function DealRow({ p, index, navigate }) {
   );
 }
 
+function MigratedDealRow({ d, index }) {
+  const [expanded, setExpanded] = useState(false);
+  const participation = d.participationAmount ?? 0;
+  const currentPrincipal = d.currentPrincipalAmount ?? 0;
+  const returnedPrincipal = d.principalReturnedAmount ?? 0;
+  const roi = d.roi ?? 0;
+  const monthly = monthlyEquiv(participation, roi, "MONTHLY");
+
+  return (
+    <div
+      className="rounded-2xl overflow-hidden transition-all duration-300"
+      style={{ background: "var(--surface-card)", border: "1px solid var(--border)", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}
+      onMouseEnter={e => {
+        e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,0.14)";
+        e.currentTarget.style.transform = "translateY(-2px)";
+        e.currentTarget.style.borderColor = `${AMBER}40`;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.boxShadow = "0 2px 16px rgba(0,0,0,0.06)";
+        e.currentTarget.style.transform = "translateY(0)";
+        e.currentTarget.style.borderColor = "var(--border)";
+      }}
+    >
+      <div className="flex">
+        <div className="w-1 flex-shrink-0" style={{ background: `linear-gradient(180deg,${AMBER},${GREEN})` }} />
+        <div className="flex-1 px-5 py-4">
+          <div className="flex items-center gap-4 flex-wrap">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-black"
+                style={{ background: `${AMBER}15`, color: AMBER, border: `2px solid ${AMBER}30`, boxShadow: `0 0 20px ${AMBER}20` }}
+              >
+                {index + 1}
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg font-extrabold truncate" style={{ color: "var(--text-primary)", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "-0.02em" }}>
+                  {fmtNullable(d.dealName)}
+                </p>
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  <span className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
+                    <CalIcon /> Since {fmtNullable(d.participationDate)}
+                  </span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold" style={{ background: `${AMBER}15`, color: AMBER, border: `1px solid ${AMBER}30` }}>
+                    Migrated
+                  </span>
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-semibold" style={{ background: `${PURPLE}12`, color: PURPLE, border: `1px solid ${PURPLE}25` }}>
+                    {fmtNullable(d.payOutType)}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {[
+                { label: "Participation", value: fmtINR(participation), color: INDIGO },
+                { label: "Current Principal", value: fmtINR(currentPrincipal), color: GREEN },
+                { label: "ROI", value: `${roi}%`, color: AMBER },
+                { label: "Returned", value: d.principalReturnedAmount === null ? "-" : fmtINR(returnedPrincipal), color: PURPLE },
+              ].map(s => (
+                <div key={s.label} className="flex flex-col items-center px-4 py-2.5 rounded-xl min-w-[80px]" style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}>
+                  <span className="text-base font-black leading-none" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</span>
+                  <span className="text-xs mt-1.5 font-semibold" style={{ color: "var(--text-muted)" }}>{s.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={() => setExpanded(v => !v)}
+                className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs font-bold transition-all"
+                style={{ background: expanded ? `${AMBER}12` : "var(--input-bg)", color: AMBER, border: `1px solid ${expanded ? `${AMBER}30` : "var(--border)"}` }}
+              >
+                Details
+                <span style={{ transform: expanded ? "rotate(180deg)" : "", transition: "transform 0.3s", display: "inline-flex" }}>
+                  <ChevronIcon />
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="p-5" style={{ borderTop: "1px solid var(--border)", background: "var(--input-bg)" }}>
+          <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)" }}>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[1120px] text-sm">
+                <thead>
+                  <tr style={{ background: "var(--table-header-bg)", borderBottom: "1px solid var(--border)" }}>
+                    {["Deal", "ROI", "Participation", "Current Principal", "Returned", "Payout", "Transaction", "Interest Date", "Participation Date", "Monthly Equiv."].map(h => (
+                      <th key={h} className="text-left py-3 px-3 text-xs font-bold uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="py-3 px-3 font-semibold whitespace-nowrap" style={{ color: "var(--text-primary)" }}>{fmtNullable(d.dealName)}</td>
+                    <td className="py-3 px-3 font-bold whitespace-nowrap" style={{ color: AMBER }}>{roi}%</td>
+                    <td className="py-3 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(participation)}</td>
+                    <td className="py-3 px-3 font-semibold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(currentPrincipal)}</td>
+                    <td className="py-3 px-3 font-semibold tabular-nums whitespace-nowrap" style={{ color: "var(--text-primary)", fontFamily: "'JetBrains Mono',monospace" }}>
+                      {d.principalReturnedAmount === null ? "-" : fmtINR(returnedPrincipal)}
+                    </td>
+                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.payOutType)}</td>
+                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.typeOfTransaction)}</td>
+                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.interestDate)}</td>
+                    <td className="py-3 px-3 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(d.participationDate)}</td>
+                    <td className="py-3 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(monthly)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function MyParticipations() {
   const navigate  = useNavigate();
   const [data,    setData]    = useState(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState("");
+  const [migratedDeals, setMigratedDeals] = useState([]);
+  const [migratedError, setMigratedError] = useState("");
+  const [sourceFilter, setSourceFilter] = useState("all");
 
   const load = () => {
-    setLoading(true); setError("");
-    getRunningDeals()
-      .then(d => { if (d) setData(d); })
-      .catch(e => setError(e.message ?? "Failed to load"))
-      .finally(() => setLoading(false));
+    setLoading(true);
+    setError("");
+    setMigratedError("");
+
+    Promise.allSettled([
+      getRunningDeals(),
+      getUserOfflineParticipationDealsInfo(),
+    ])
+      .then(([runningRes, migratedRes]) => {
+        if (runningRes.status === "fulfilled") {
+          if (runningRes.value) setData(runningRes.value);
+        } else {
+          setError(runningRes.reason?.message ?? "Failed to load");
+        }
+
+        if (migratedRes.status === "fulfilled") {
+          setMigratedDeals(Array.isArray(migratedRes.value) ? migratedRes.value : []);
+        } else {
+          setMigratedDeals([]);
+          setMigratedError(migratedRes.reason?.message ?? "Failed to load migrated data");
+        }
+      })
+      .finally(() => {
+        setLoading(false);
+      });
   };
 
   useEffect(() => { load(); }, []);
 
   const participations = data?.participationInfo ?? [];
+  const runningItems = participations.map((p, i) => ({ source: "running", key: p.dealId ?? `running-${i}`, payload: p }));
+  const migratedItems = migratedDeals.map((d, i) => ({ source: "migrated", key: `${d.dealName ?? "deal"}-${d.participationDate ?? "date"}-${i}`, payload: d }));
+  const combinedItems = [...runningItems, ...migratedItems];
+  const filteredItems = combinedItems.filter(item => sourceFilter === "all" || item.source === sourceFilter);
 
   const totalInvested = participations.reduce((s, p) => {
     const upds = (p.updatedParticipation ?? []).reduce((ss, u) => ss + (u.updationParticipation ?? 0), 0);
@@ -605,8 +756,38 @@ export default function MyParticipations() {
           </div>
         )}
 
-        {/*  Empty State  */}
-        {!loading && !error && participations.length === 0 && (
+        {/* Source Filter */}
+        {!loading && (
+          <div className="rounded-2xl p-3" style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+            <div className="flex items-center gap-2 flex-wrap">
+              {[
+                { key: "all", label: `All (${combinedItems.length})`, color: INDIGO },
+                { key: "running", label: `Running (${runningItems.length})`, color: GREEN },
+                { key: "migrated", label: `Migrated (${migratedItems.length})`, color: AMBER },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setSourceFilter(f.key)}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+                  style={sourceFilter === f.key
+                    ? { background: `${f.color}15`, color: f.color, border: `1px solid ${f.color}30` }
+                    : { background: "var(--input-bg)", color: "var(--text-muted)", border: "1px solid var(--border)" }}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {!loading && migratedError && (
+          <div className="rounded-2xl px-4 py-3 text-sm font-semibold" style={{ background: `${AMBER}08`, color: AMBER, border: `1px solid ${AMBER}25` }}>
+            Migrated data could not be loaded: {migratedError}
+          </div>
+        )}
+
+        {/* Combined Empty State */}
+        {!loading && filteredItems.length === 0 && (
           <div
             className="flex flex-col items-center gap-5 py-20 rounded-2xl text-center"
             style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}
@@ -622,19 +803,23 @@ export default function MyParticipations() {
               </svg>
             </div>
             <div>
-              <p className="text-lg font-black" style={{ color: "var(--text-primary)" }}>No active SD deals</p>
+              <p className="text-lg font-black" style={{ color: "var(--text-primary)" }}>
+                {combinedItems.length === 0 ? "No participations found" : "No deals in selected filter"}
+              </p>
               <p className="text-sm mt-1.5 max-w-xs mx-auto" style={{ color: "var(--text-muted)" }}>
-                Participate in an SD Lot deal to see your portfolio here
+                {combinedItems.length === 0 ? "Your running and migrated participations will appear here." : "Try switching filter to view the other data source."}
               </p>
             </div>
           </div>
         )}
 
-        {/*  Deal Cards  */}
-        {!loading && !error && participations.length > 0 && (
+        {/* Combined Deal Cards */}
+        {!loading && filteredItems.length > 0 && (
           <div className="grid gap-4">
-            {participations.map((p, i) => (
-              <DealRow key={p.dealId ?? i} p={p} index={i} navigate={navigate} />
+            {filteredItems.map((item, i) => (
+              item.source === "running"
+                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} />
+                : <MigratedDealRow key={item.key} d={item.payload} index={i} />
             ))}
           </div>
         )}

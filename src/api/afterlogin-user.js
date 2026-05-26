@@ -144,6 +144,15 @@ export async function getRunningDeals() {
   return get(`/oxybrick-service/getRunningDeals/${userId}`);
 }
 
+/**
+ * GET /oxybrick-service/userOfflineParticipationDealsInfo/{lenderId}
+ * Returns migrated/offline participation deal rows for a lender/user.
+ */
+export async function getUserOfflineParticipationDealsInfo() {
+  const lenderId = getUserId();
+  return get(`/oxybrick-service/userOfflineParticipationDealsInfo/${lenderId}`);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // PROFILE  — GET /student-service/user/profile?id={userId}
 // ══════════════════════════════════════════════════════════════════════════════

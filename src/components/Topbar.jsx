@@ -5,7 +5,7 @@ import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfile } from '../api/afterlogin-user';
 import { getUserId } from '../api/client';
-import logo from '../assets/ulp.png';
+import logo from '../assets/WULP.png';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const MenuIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
@@ -70,7 +70,15 @@ function FamilySwitcher() {
 
       {open && (
         <div className="absolute right-0 mt-2 z-50 rounded-2xl overflow-hidden"
-          style={{ width: 256, background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', backdropFilter: 'blur(24px)' }}>
+          style={{
+            width: 256,
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+            backdropFilter: 'blur(24px)',
+            '--text-primary': '#0f172a',
+            '--text-muted': '#64748b',
+          }}>
           <div className="px-4 py-2.5 flex items-center gap-2"
             style={{ borderBottom: '1px solid var(--border)', background: 'rgba(99,102,241,0.04)' }}>
             <UsersIcon />
@@ -170,7 +178,15 @@ function ProfileDropdown({ userName, userShort, userLr, userColor, fullName }) {
 
       {open && (
         <div className="absolute right-0 mt-2 z-50 rounded-2xl overflow-hidden"
-          style={{ width: 224, background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.18)', backdropFilter: 'blur(24px)' }}>
+          style={{
+            width: 224,
+            background: 'var(--surface-card)',
+            border: '1px solid var(--border)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
+            backdropFilter: 'blur(24px)',
+            '--text-primary': '#0f172a',
+            '--text-muted': '#64748b',
+          }}>
           <div className="px-4 py-4 flex items-center gap-3"
             style={{ borderBottom: '1px solid var(--border)', background: `linear-gradient(135deg,${userColor}0a,transparent)` }}>
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black"
@@ -251,18 +267,17 @@ export default function Topbar({ onMenuClick }) {
 
       {/* Brand — end of left section */}
         <div className="hidden sm:flex items-center gap-2 ml-4 pl-4 flex-shrink-0">
-          <img src={logo} alt="Oxy Portfolio" className="w-9 h-9 rounded-full object-cover flex-shrink-0"
-            style={{ background: '#fff', boxShadow: '0 0 10px rgba(99,102,241,0.4)' }} />
-          <span className="text-xs font-black tracking-widest uppercase"
+          <img src={logo} alt="Unified Lending platform" className="w-32 h-13 object-cover flex-shrink-1"
+            style={{ boxShadow: '0 0 10px rgba(99,102,241,0.4)' }} />
+          {/* <span className="text-xs font-black tracking-widest uppercase"
             style={{ color: 'var(--text-primary)', letterSpacing: '0.1em' }}>
             Oxy Portfolio
-          </span>
+          </span> */}
         </div>
 
       {/* Left: page label + greeting + live + Brand at end */}
       <div className="flex items-center gap-2 flex-1 min-w-0">
-        {/* <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{pageLabel}</span> */}
-        <span className="topbar-sep">·</span>
+        {/* <span className="topbar-sep">·</span>
         <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
           Good {getGreeting()},{' '}
           <span style={{ color: userColor, fontWeight: 700 }}>
@@ -272,9 +287,7 @@ export default function Topbar({ onMenuClick }) {
         <div className="topbar-live-badge">
           <span className="live-dot" style={{ width: 5, height: 5 }} />
           <span style={{ color: '#10b981', fontSize: 10, fontWeight: 600 }}>Live</span>
-        </div>
-
-        
+        </div> */}
       </div>
 
       {/* Right: actions */}

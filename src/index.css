@@ -388,75 +388,81 @@ body {
   --sidebar-text: rgba(255,255,255,0.55);
   --sidebar-text-muted: rgba(255,255,255,0.3);
   --sidebar-hover-bg: rgba(38,115,187,0.1);
-  --sidebar-hover-color: rgba(255,255,255,0.85);
-  --sidebar-section-color: rgba(255,255,255,0.2);
-  --sidebar-footer-border: rgba(255,255,255,0.06);
+  --sidebar-hover-color: rgba(255,255,255,0.9);
+  --sidebar-section-color: rgba(255,255,255,0.35);
+  --sidebar-footer-border: rgba(255,255,255,0.08);
 
-  --admin-sidebar-bg: #0d0618;
-  --admin-sidebar-border: rgba(168,85,247,0.12);
-  --admin-sidebar-text: rgba(255,255,255,0.4);
-  --admin-sidebar-hover-bg: rgba(168,85,247,0.1);
-  --admin-sidebar-hover-color: rgba(255,255,255,0.75);
-  --admin-sidebar-section-color: rgba(168,85,247,0.4);
-  --admin-sidebar-footer-border: rgba(168,85,247,0.1);
+  --admin-sidebar-bg: #1f1a3f;
+  --admin-sidebar-border: rgba(168,85,247,0.2);
+  --admin-sidebar-text: rgba(255,255,255,0.58);
+  --admin-sidebar-hover-bg: rgba(168,85,247,0.18);
+  --admin-sidebar-hover-color: rgba(255,255,255,0.92);
+  --admin-sidebar-section-color: rgba(196,132,252,0.75);
+  --admin-sidebar-footer-border: rgba(168,85,247,0.18);
 
-  --topbar-shell-bg: rgba(13,16,26,0.96);
-  --topbar-shell-border: rgba(255,255,255,0.06);
-  --topbar-sep-color: rgba(255,255,255,0.08);
-  --topbar-icon-bg: rgba(255,255,255,0.05);
-  --topbar-icon-border: rgba(255,255,255,0.08);
-  --topbar-icon-color: rgba(255,255,255,0.45);
+  --topbar-shell-bg: #0f172a;
+  --topbar-shell-border: rgba(148,163,184,0.22);
+  --topbar-sep-color: rgba(226,232,240,0.48);
+  --topbar-icon-bg: rgba(255,255,255,0.08);
+  --topbar-icon-border: rgba(255,255,255,0.14);
+  --topbar-icon-color: #e2e8f0;
+  --topbar-text-primary: #f8fafc;
+  --topbar-text-muted: #cbd5e1;
 }
 
 [data-theme="light"] {
-  --sidebar-bg: #ffffff;
-  --sidebar-border: rgba(0,0,0,0.07);
-  --sidebar-text: #475569;
-  --sidebar-text-muted: #94a3b8;
-  --sidebar-hover-bg: rgba(38,115,187,0.07);
-  --sidebar-hover-color: #1e293b;
-  --sidebar-section-color: #94a3b8;
-  --sidebar-footer-border: rgba(0,0,0,0.07);
+  --sidebar-bg: #EAF5F2;
+  --sidebar-border: rgba(15,42,61,0.14);
+  --sidebar-text: #25465a;
+  --sidebar-text-muted: #5b7788;
+  --sidebar-hover-bg: rgba(38,115,187,0.1);
+  --sidebar-hover-color: #10283b;
+  --sidebar-section-color: #6b8798;
+  --sidebar-footer-border: rgba(15,42,61,0.14);
 
-  --admin-sidebar-bg: #1e1b4b;
-  --admin-sidebar-border: rgba(168,85,247,0.2);
-  --admin-sidebar-text: rgba(255,255,255,0.55);
-  --admin-sidebar-hover-bg: rgba(168,85,247,0.15);
-  --admin-sidebar-hover-color: rgba(255,255,255,0.9);
-  --admin-sidebar-section-color: rgba(196,132,252,0.6);
-  --admin-sidebar-footer-border: rgba(168,85,247,0.15);
+  --admin-sidebar-bg: #EAF5F2;
+  --admin-sidebar-border: rgba(15,42,61,0.14);
+  --admin-sidebar-text: #25465a;
+  --admin-sidebar-hover-bg: rgba(38,115,187,0.1);
+  --admin-sidebar-hover-color: #10283b;
+  --admin-sidebar-section-color: #6b8798;
+  --admin-sidebar-footer-border: rgba(15,42,61,0.14);
 
-  --topbar-shell-bg: rgba(255,255,255,0.97);
-  --topbar-shell-border: rgba(0,0,0,0.07);
-  --topbar-sep-color: rgba(0,0,0,0.08);
-  --topbar-icon-bg: rgba(0,0,0,0.04);
-  --topbar-icon-border: rgba(0,0,0,0.08);
-  --topbar-icon-color: #64748b;
+  --topbar-shell-bg: #1D7EC9;
+  --topbar-shell-border: #1768a6;
+  --topbar-sep-color: rgba(255,255,255,0.6);
+  --topbar-icon-bg: rgba(255,255,255,0.18);
+  --topbar-icon-border: rgba(255,255,255,0.32);
+  --topbar-icon-color: #ffffff;
+  --topbar-text-primary: #fff7f7;
+  --topbar-text-muted: #ffe4e4;
 }
 
 @media (prefers-color-scheme: light) {
   [data-theme="system"] {
-    --sidebar-bg: #ffffff;
-    --sidebar-border: rgba(0,0,0,0.07);
-    --sidebar-text: #475569;
-    --sidebar-text-muted: #94a3b8;
-    --sidebar-hover-bg: rgba(38,115,187,0.07);
-    --sidebar-hover-color: #1e293b;
-    --sidebar-section-color: #94a3b8;
-    --sidebar-footer-border: rgba(0,0,0,0.07);
-    --admin-sidebar-bg: #1e1b4b;
-    --admin-sidebar-border: rgba(168,85,247,0.2);
-    --admin-sidebar-text: rgba(255,255,255,0.55);
-    --admin-sidebar-hover-bg: rgba(168,85,247,0.15);
-    --admin-sidebar-hover-color: rgba(255,255,255,0.9);
-    --admin-sidebar-section-color: rgba(196,132,252,0.6);
-    --admin-sidebar-footer-border: rgba(168,85,247,0.15);
-    --topbar-shell-bg: rgba(255,255,255,0.97);
-    --topbar-shell-border: rgba(0,0,0,0.07);
-    --topbar-sep-color: rgba(0,0,0,0.08);
-    --topbar-icon-bg: rgba(0,0,0,0.04);
-    --topbar-icon-border: rgba(0,0,0,0.08);
-    --topbar-icon-color: #64748b;
+    --sidebar-bg: #EAF5F2;
+    --sidebar-border: rgba(15,42,61,0.14);
+    --sidebar-text: #25465a;
+    --sidebar-text-muted: #5b7788;
+    --sidebar-hover-bg: rgba(38,115,187,0.1);
+    --sidebar-hover-color: #10283b;
+    --sidebar-section-color: #6b8798;
+    --sidebar-footer-border: rgba(15,42,61,0.14);
+    --admin-sidebar-bg: #EAF5F2;
+    --admin-sidebar-border: rgba(15,42,61,0.14);
+    --admin-sidebar-text: #25465a;
+    --admin-sidebar-hover-bg: rgba(38,115,187,0.1);
+    --admin-sidebar-hover-color: #10283b;
+    --admin-sidebar-section-color: #6b8798;
+    --admin-sidebar-footer-border: rgba(15,42,61,0.14);
+    --topbar-shell-bg: #1D7EC9;
+    --topbar-shell-border: #1768a6;
+    --topbar-sep-color: rgba(255,255,255,0.6);
+    --topbar-icon-bg: rgba(255,255,255,0.18);
+    --topbar-icon-border: rgba(255,255,255,0.32);
+    --topbar-icon-color: #ffffff;
+    --topbar-text-primary: #fff7f7;
+    --topbar-text-muted: #ffe4e4;
   }
 }
 
@@ -467,22 +473,24 @@ body {
     --sidebar-text: rgba(255,255,255,0.55);
     --sidebar-text-muted: rgba(255,255,255,0.3);
     --sidebar-hover-bg: rgba(38,115,187,0.1);
-    --sidebar-hover-color: rgba(255,255,255,0.85);
-    --sidebar-section-color: rgba(255,255,255,0.2);
-    --sidebar-footer-border: rgba(255,255,255,0.06);
-    --admin-sidebar-bg: #0d0618;
-    --admin-sidebar-border: rgba(168,85,247,0.12);
-    --admin-sidebar-text: rgba(255,255,255,0.4);
-    --admin-sidebar-hover-bg: rgba(168,85,247,0.1);
-    --admin-sidebar-hover-color: rgba(255,255,255,0.75);
-    --admin-sidebar-section-color: rgba(168,85,247,0.4);
-    --admin-sidebar-footer-border: rgba(168,85,247,0.1);
-    --topbar-shell-bg: rgba(13,16,26,0.96);
-    --topbar-shell-border: rgba(255,255,255,0.06);
-    --topbar-sep-color: rgba(255,255,255,0.08);
-    --topbar-icon-bg: rgba(255,255,255,0.05);
-    --topbar-icon-border: rgba(255,255,255,0.08);
-    --topbar-icon-color: rgba(255,255,255,0.45);
+    --sidebar-hover-color: rgba(255,255,255,0.9);
+    --sidebar-section-color: rgba(255,255,255,0.35);
+    --sidebar-footer-border: rgba(255,255,255,0.08);
+    --admin-sidebar-bg: #1f1a3f;
+    --admin-sidebar-border: rgba(168,85,247,0.2);
+    --admin-sidebar-text: rgba(255,255,255,0.58);
+    --admin-sidebar-hover-bg: rgba(168,85,247,0.18);
+    --admin-sidebar-hover-color: rgba(255,255,255,0.92);
+    --admin-sidebar-section-color: rgba(196,132,252,0.75);
+    --admin-sidebar-footer-border: rgba(168,85,247,0.18);
+    --topbar-shell-bg: #0f172a;
+    --topbar-shell-border: rgba(148,163,184,0.22);
+    --topbar-sep-color: rgba(226,232,240,0.48);
+    --topbar-icon-bg: rgba(255,255,255,0.08);
+    --topbar-icon-border: rgba(255,255,255,0.14);
+    --topbar-icon-color: #e2e8f0;
+    --topbar-text-primary: #f8fafc;
+    --topbar-text-muted: #cbd5e1;
   }
 }
 
@@ -652,10 +660,14 @@ body {
   border-bottom: 1px solid var(--topbar-shell-border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   top: 0;
   z-index: 40;
   min-height: 56px;
+  --text-primary: var(--topbar-text-primary);
+  --text-muted: var(--topbar-text-muted);
 }
 
 .admin-topbar-shell {
@@ -663,14 +675,22 @@ body {
   align-items: center;
   gap: 12px;
   padding: 0 20px;
-  background: rgba(10,5,20,0.97);
-  border-bottom: 1px solid rgba(168,85,247,0.12);
+  background: var(--topbar-shell-bg);
+  border-bottom: 1px solid var(--topbar-shell-border);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  position: sticky;
+  position: fixed;
+  left: 0;
+  right: 0;
   top: 0;
   z-index: 40;
   min-height: 56px;
+  --text-primary: var(--topbar-text-primary);
+  --text-muted: var(--topbar-text-muted);
+}
+
+.main-with-fixed-topbar {
+  margin-top: 56px;
 }
 
 .topbar-sep {
