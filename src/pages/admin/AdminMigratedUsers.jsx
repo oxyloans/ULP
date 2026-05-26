@@ -208,10 +208,12 @@ function InlineApproveBtn({ user, onApproved }) {
   return (
     <>
       <button
+        disabled={user.migrationStatus === "APPROVED"}
+        title={user.migrationStatus ? 'Already processed' : 'Approve migration'}
         onClick={e => { e.stopPropagation(); setApproveErr(''); setShowConfirm(true); }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
         style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', boxShadow: '0 2px 8px rgba(16,185,129,0.15)' }}>
-        ✓ Approve
+        {user.migrationStatus === "APPROVED"  ? 'Already processed' : 'Approve migration'}
       </button>
       {showConfirm && (
         <ApproveConfirmModal
@@ -327,9 +329,10 @@ function DetailDrawer({ user, onClose, onApproved }) {
                 })()
               ) : (
                 <button onClick={() => { setApproveErr(''); setShowConfirm(true); }}
+                  disabled = {approved === "APPROVED"}
                   className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.01]"
                   style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', boxShadow: '0 2px 10px rgba(16,185,129,0.15)' }}>
-                  ✓ Approve Migration
+                   {user.migrationStatus === "APPROVED" ? 'Already processed' : 'Approve migration'}
                 </button>
               )}
             </div>

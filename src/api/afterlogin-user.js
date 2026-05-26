@@ -171,12 +171,107 @@ export async function getGoldDealsEarnings() {
 }
 
 /**
+ * GET /oxybrick-service/getAllParticipation/{userId}
+ * Returns all participations for the logged-in user.
+ */
+export async function getAllParticipationByUser() {
+  const userId = getUserId();
+  return get(`/oxybrick-service/getAllParticipation/${userId}`);
+}
+
+/**
  * GET /oxybrick-service/{userId}/{dealId}/goldGrowthPercentage
  * Returns gold growth breakdown for a specific deal.
  */
 export async function getGoldGrowthDetail(dealId) {
   const userId = getUserId();
   return get(`/oxybrick-service/${userId}/${dealId}/goldGrowthPercentage`);
+}
+
+/**
+ * GET /oxybrick-service/userInterestCalculations?propertyId={propertyId}&userId={userId}
+ * Returns interest payout schedule for logged-in user and selected property.
+ */
+export async function getUserInterestCalculations(propertyId) {
+  const userId = getUserId();
+  return get(`/oxybrick-service/userInterestCalculations?propertyId=${propertyId}&userId=${userId}`);
+}
+
+/**
+ * GET /oxybrick-service
+ * Fetches all open property deals. Filter to propertyType === 'GOLDLOT' on the client.
+ */
+export async function getGoldLotDeals({ pageIndex = 0, pageSize = 100, search = 'OPEN', sortBy = 'id', sortOrder = 'DESC' } = {}) {
+  return get(`/oxybrick-service?pageIndex=${pageIndex}&pageSize=${pageSize}&search=${search}&sortBy=${sortBy}&sortOrder=${sortOrder}`);
+}
+
+/**
+ * GET /oxybrick-service/{id}
+ * Fetch a single property/deal by id.
+ */
+export async function getPropertyById(id) {
+  return get(`/oxybrick-service/${id}`);
+}
+
+/**
+ * GET /oxybrick-service/getAllparticipations?propertyId={propertyId}&userId={userId}
+ */
+export async function getGoldParticipationDetails(propertyId) {
+  const userId = getUserId();
+  return get(`/oxybrick-service/getAllparticipations?propertyId=${propertyId}&userId=${userId}`);
+}
+
+/**
+ * GET /oxybrick-service/api/download/mou?propertyId={propertyId}&userId={userId}
+ * Returns blob data.
+ */
+export async function downloadGoldMou(propertyId, userId) {
+  return get(`/oxybrick-service/api/download/mou?propertyId=${propertyId}&userId=${userId}`, {
+    responseType: 'blob',
+  });
+}
+
+/**
+ * Download MOU for the current logged-in user.
+ */
+export async function downloadGoldMouForCurrentUser(propertyId) {
+  const userId = getUserId();
+  return get(`/oxybrick-service/api/download/mou?propertyId=${propertyId}&userId=${userId}`, {
+    responseType: 'blob',
+  });
+}
+
+/**
+ * POST /upload-service/participationPaymentFeeUpload
+ * Query params:
+ * propertyId, fileType=investment, userId, participationId, paymentAmount
+ */
+export async function uploadGoldParticipationSlip({ propertyId, participationId, amount, file }) {
+  const userId = getUserId();
+  const formData = new FormData();
+  formData.append('file', file);
+  return post(
+    `/upload-service/participationPaymentFeeUpload?propertyId=${propertyId}&fileType=investment&userId=${userId}&participationId=${participationId}&paymentAmount=${amount}`,
+    formData
+  );
+}
+
+/**
+ * POST /upload-service/downloadParticipationPaymentFeeUpload
+ */
+export async function getGoldParticipationSlips({ propertyId, participationId }) {
+  const userId = getUserId();
+  return post(
+    `/upload-service/downloadParticipationPaymentFeeUpload?fileType=investment&userId=${userId}&propertyId=${propertyId}&participationId=${participationId}`,
+    null
+  );
+}
+
+/**
+ * PATCH /upload-service/updateUserDescription/{documentId}?description={description}
+ */
+export async function updateSlipDescription({ documentId, description }) {
+  return patch(`/upload-service/updateUserDescription/${documentId}?description=${encodeURIComponent(description ?? '')}`, null);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -197,4 +292,12 @@ export async function migrateUserData({ lenderId, migrationConsent = 'yes', mobi
     userId,
     userName,
   });
+}
+
+// ═════════════════════════════════════════════════════════════════════════════
+// GOLD RATE
+// ═════════════════════════════════════════════════════════════════════════════
+
+export async function GoldRate(){
+  return get('/user-service/gold_daily-update');
 }

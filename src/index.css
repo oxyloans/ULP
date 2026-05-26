@@ -805,3 +805,8 @@ body {
 }
 
 
+
+@keyframes barPulse {
+  from { transform: scaleY(0.75); }
+  to   { transform: scaleY(1); }
+}

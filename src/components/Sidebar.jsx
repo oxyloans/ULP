@@ -27,7 +27,7 @@ const NAV_ITEMS = [
     Icon: DealsIcon,
     children: [
       { title: 'SD Lots',    path: '/sd-lots',    Icon: SDLotIcon, comingSoon: false },
-      // { title: 'Gold Deals', path: '/gold-deals', Icon: GoldIcon,  comingSoon: false },
+      { title: 'Gold Deals', path: '/gold-deals', Icon: GoldIcon,  comingSoon: false },
       { title: 'Asset',      path: '/asset',      Icon: Building,  comingSoon: false },
     ],
   },
@@ -35,9 +35,9 @@ const NAV_ITEMS = [
     title: 'My Participations',
     Icon: ParticipateIcon,
     children: [
-      { title: 'SD Deals',   path: '/my-participations', Icon: SDLotIcon, comingSoon: false },
-      { title: 'Gold Deals', path: '/gold-deals',        Icon: GoldIcon,  comingSoon: false },
-      { title: 'Asset',      path: '/asset',             Icon: Building,  comingSoon: true  },
+      { title: 'SD Deals',   path: '/my-participations',        Icon: SDLotIcon, comingSoon: false },
+      { title: 'Gold Deals', path: '/gold-deals-participation', Icon: GoldIcon,  comingSoon: false },
+      { title: 'Asset',      path: '/asset',                    Icon: Building,  comingSoon: true  },
     ],
   },
   { title: 'Wallet',     path: '/wallet',   Icon: WalletIcon,  comingSoon: false },
@@ -45,8 +45,12 @@ const NAV_ITEMS = [
   { title: 'Contact Us', path: '/contact',  Icon: ContactIcon, comingSoon: false },
 ];
 
-const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset'];
-const PARTICIPATE_PATHS  = ['/my-participations', '/gold-deals'];
+const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset', '/gold-deals',];
+const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/gold-deals/participation/'];
+
+function pathMatches(pathname, basePath) {
+  return pathname === basePath || pathname.startsWith(`${basePath}/`);
+}
 
 const activeStyle = {
   background: 'linear-gradient(135deg, rgba(99,102,241,0.15) 0%, rgba(99,102,241,0.06) 100%)',
@@ -59,7 +63,7 @@ const idleStyle = { background: 'transparent', border: '1px solid transparent', 
 // ─── Collapsible nav group ────────────────────────────────────────────────────
 function DealsGroup({ item, activePaths, open, onToggle, onClose }) {
   const location = useLocation();
-  const isAnyChildActive = activePaths.some(p => location.pathname.startsWith(p));
+  const isAnyChildActive = activePaths.some(p => pathMatches(location.pathname, p));
 
   return (
     <div>
@@ -122,8 +126,8 @@ function SidebarContent({ onClose }) {
   // Accordion: only one group open at a time.
   // Seed with whichever group has an active child on first render.
   const initialOpen = () => {
-    if (DEALS_PATHS.some(p => location.pathname.startsWith(p)))       return 'Offline Deals';
-    if (PARTICIPATE_PATHS.some(p => location.pathname.startsWith(p))) return 'My Participations';
+    if (DEALS_PATHS.some(p => pathMatches(location.pathname, p)))       return 'Offline Deals';
+    if (PARTICIPATE_PATHS.some(p => pathMatches(location.pathname, p))) return 'My Participations';
     return null;
   };
   const [openGroup, setOpenGroup] = useState(initialOpen);
