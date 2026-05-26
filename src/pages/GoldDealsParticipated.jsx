@@ -613,7 +613,7 @@ function SegBar({ pct, color }) {
   );
 }
 
-function ProcessedDealCard({ deal, onDownloadMou, onRealizationPayout }) {
+function ProcessedDealCard({ deal, onDownloadMou, onRealizationPayout, onOpenDetails }) {
   const status = (deal.userParticipationStatus ?? 'PARTICIPATED').toUpperCase();
   const auctionLabel = (deal.auctionType ?? '').toLowerCase() === 'open' ? 'Open' : 'Closed';
   const statusColor = status === 'MOU' ? GREEN : status === 'CALLFORMONEY' ? GOLD : BLUE;
@@ -711,6 +711,20 @@ function ProcessedDealCard({ deal, onDownloadMou, onRealizationPayout }) {
               cursor: 'pointer',
             }}>
             Download MOU
+          </button>
+          <button
+            onClick={onOpenDetails}
+            style={{
+              padding: '5px 10px',
+              borderRadius: 9,
+              fontSize: 11,
+              fontWeight: 700,
+              border: `1px solid ${GOLD}35`,
+              background: `${GOLD}12`,
+              color: GOLD,
+              cursor: 'pointer',
+            }}>
+            View Details
           </button>
         </div>
       </div>
@@ -1297,6 +1311,14 @@ export default function GoldDealsParticipated() {
                   deal={deal}
                   onDownloadMou={() => handleDownloadMouByProperty(deal)}
                   onRealizationPayout={() => navigate(`/interestPaymentDates/${deal.propertyId}/`)}
+                  onOpenDetails={() => navigate(`/gold-deals/participation/${deal.propertyId}`, {
+                    state: {
+                      propertyId: deal.propertyId,
+                      propertyType: 'GOLDLOT',
+                      auctionType: 'Open',
+                      userParticipationStatus: deal.userParticipationStatus,
+                    },
+                  })}
                 />
               ))}
             </div>
