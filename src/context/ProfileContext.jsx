@@ -36,11 +36,14 @@ export function ProfileProvider({ children }) {
   const bankVerified = profile?.bankVerified === true;
   const hasName      = !!(profile?.firstName?.trim());
   const hasAddress   = !!(profile?.address?.trim());
+  const hasDob       = !!(profile?.dob?.trim());
+  const mobileDigits = (profile?.mobileNumber ?? '').replace(/\D/g, '');
+  const hasMobile    = mobileDigits.length >= 7 && mobileDigits.length <= 15;
+  const isPersonalInfoComplete = hasName && hasDob && hasAddress && hasMobile;
 
   // Items that are incomplete
   const incomplete = [
-    !hasName      && { key: 'name',    label: 'Complete your name',          path: '/profile' },
-    !hasAddress   && { key: 'address', label: 'Add your address',            path: '/profile' },
+    !isPersonalInfoComplete && { key: 'personal', label: 'Complete personal information', path: '/profile' },
     !panVerified  && { key: 'pan',     label: 'Verify your PAN card',        path: '/profile?tab=pan' },
     !bankVerified && { key: 'bank',    label: 'Link a bank account',         path: '/profile?tab=bank' },
   ].filter(Boolean);
@@ -50,7 +53,7 @@ export function ProfileProvider({ children }) {
   return (
     <ProfileContext.Provider value={{
       profile, loading, fetched,
-      panVerified, bankVerified, hasName, hasAddress,
+      panVerified, bankVerified, hasName, hasAddress, hasDob, hasMobile, isPersonalInfoComplete,
       incomplete, isKycComplete,
       refresh: fetchProfile,
     }}>

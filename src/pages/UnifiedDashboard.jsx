@@ -1578,6 +1578,7 @@ function OfflineSection({ fin, memberColor }) {
     const isClosed = p?.dealStatus === 'CLOSED' || p?.dealStatus === 'ACHIEVED';
     return {
       key: p?.dealId ?? `running-${idx}`,
+      source: 'running',
       dealName: p?.dealName ?? '—',
       payoutType: payout,
       baseAmount,
@@ -1591,6 +1592,7 @@ function OfflineSection({ fin, memberColor }) {
   });
   const migratedTableDeals = mergedMigrated.map((d, idx) => ({
     key: `migrated-${d?.dealName ?? 'deal'}-${idx}`,
+    source: 'migrated',
     dealName: d?.dealName ?? 'Migrated',
     payoutType: normalizePayoutType(d?.payOutType),
     baseAmount: Number(d?.participationAmount ?? 0),
@@ -1607,6 +1609,7 @@ function OfflineSection({ fin, memberColor }) {
     if (!id) return;
     goldById.set(id, {
       key: `gold-${id}-${idx}`,
+      source: 'gold',
       dealName: d?.propertyName ?? 'Gold Deal',
       payoutType: null,
       baseAmount: Number(d?.participatedAmount ?? 0),
@@ -1637,6 +1640,7 @@ function OfflineSection({ fin, memberColor }) {
     }
     goldById.set(id, {
       key: `gold-running-${id}-${idx}`,
+      source: 'gold',
       dealName: d?.dealName ?? 'Gold Deal',
       payoutType,
       baseAmount: amount,
@@ -1858,6 +1862,18 @@ function OfflineSection({ fin, memberColor }) {
                             <I.Activity />
                           </div>
                           <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{p.dealName ?? '—'}</span>
+                          {p.source === 'migrated' && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full"
+                              style={{ background: 'rgba(245,131,17,0.12)', color: '#f58311', border: '1px solid rgba(245,131,17,0.26)' }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                <polyline points="17 8 12 3 7 8" />
+                                <line x1="12" y1="3" x2="12" y2="15" />
+                              </svg>
+                              Migrated
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="py-3 px-3">

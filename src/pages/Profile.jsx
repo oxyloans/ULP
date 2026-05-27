@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import { get, patch, getUserId, getToken } from '../api/client';
 import { BASE_URL } from '../api/client';
+import { useProfile as useProfileContext } from '../context/ProfileContext';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const EditIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
@@ -231,6 +232,8 @@ function EditPersonalInfo({ profile, onBack, onSaved }) {
   const userId = getUserId();
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState({});
+  const today = new Date().toISOString().slice(0, 10);
+  const hasExistingMobileNumber = !!(profile.mobileNumber ?? '').trim();
 
   const [form, setForm] = useState({
     firstName:    (profile.firstName    ?? '').trim(),
@@ -252,20 +255,43 @@ function EditPersonalInfo({ profile, onBack, onSaved }) {
     const e = {};
     if (!form.firstName) e.firstName = 'Required';
     if (!form.lastName)  e.lastName  = 'Required';
-    if (!form.dob)       e.dob       = 'Required';
+    if (!form.dob) {
+      e.dob = 'Required';
+    } else {
+      const dobDate = new Date(form.dob);
+      if (Number.isNaN(dobDate.getTime())) {
+        e.dob = 'Enter a valid date';
+      } else if (form.dob > today) {
+        e.dob = 'Date of birth cannot be in the future';
+      }
+    }
     if (!form.gender)    e.gender    = 'Required';
-    if (!form.address)   e.address   = 'Required';
+    if (!form.address?.trim()) {
+      e.address = 'Required';
+    } else if (form.address.trim().length < 5) {
+      e.address = 'Address is too short';
+    }
     if (!form.city)      e.city      = 'Required';
     if (!form.state)     e.state     = 'Required';
     if (!form.pinCode)   e.pinCode   = 'Required';
     if (!form.country)   e.country   = 'Required';
+    const normalizedMobile = (form.mobileNumber ?? '').replace(/\D/g, '');
+    if (!form.mobileNumber?.trim()) {
+      e.mobileNumber = 'Mobile number is missing';
+    } else if (normalizedMobile.length < 7 || normalizedMobile.length > 15) {
+      e.mobileNumber = 'Enter a valid mobile number';
+    }
     return e;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     const errs = validate();
-    if (Object.keys(errs).length) { setErrors(errs); return; }
+    if (Object.keys(errs).length) {
+      setErrors(errs);
+      toast.error('Please fill all required details');
+      return;
+    }
     setSaving(true);
     try {
       await patch('/student-service/user/profile/update', {
@@ -310,7 +336,13 @@ function EditPersonalInfo({ profile, onBack, onSaved }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Field label="Date of Birth" error={errors.dob}>
-              <input type="date" value={form.dob} onChange={e => set('dob', e.target.value)} style={inputStyle(errors.dob)} />
+              <input
+                type="date"
+                value={form.dob}
+                max={today}
+                onChange={e => set('dob', e.target.value)}
+                style={inputStyle(errors.dob)}
+              />
             </Field>
             <Field label="Gender" error={errors.gender}>
               <select value={form.gender} onChange={e => set('gender', e.target.value)} style={inputStyle(errors.gender)}>
@@ -349,8 +381,18 @@ function EditPersonalInfo({ profile, onBack, onSaved }) {
             <Field label="Email (read-only)">
               <input value={form.email} readOnly style={{ ...inputStyle(false), opacity: 0.5, cursor: 'not-allowed' }} />
             </Field>
-            <Field label="Mobile (read-only)">
-              <input value={form.mobileNumber} readOnly style={{ ...inputStyle(false), opacity: 0.5, cursor: 'not-allowed' }} />
+            <Field label={hasExistingMobileNumber ? 'Mobile (read-only)' : 'Mobile'} error={errors.mobileNumber}>
+              <input
+                type="tel"
+                value={form.mobileNumber}
+                readOnly={hasExistingMobileNumber}
+                onChange={e => !hasExistingMobileNumber && set('mobileNumber', e.target.value.slice(0, 20))}
+                style={{
+                  ...inputStyle(errors.mobileNumber),
+                  opacity: hasExistingMobileNumber ? 0.5 : 1,
+                  cursor: hasExistingMobileNumber ? 'not-allowed' : 'text',
+                }}
+              />
             </Field>
           </div>
 
@@ -888,6 +930,7 @@ function EditPanCard({ profile, onBack, onSaved }) {
 // ══════════════════════════════════════════════════════════════════════════════
 export default function Profile() {
   const userId = getUserId();
+  const profileCtx = useProfileContext();
   const [profile,  setProfile]  = useState(null);
   const [loading,  setLoading]  = useState(true);
   // view | edit-personal | edit-bank | edit-pan
@@ -937,7 +980,7 @@ export default function Profile() {
         <EditPersonalInfo
           profile={profile}
           onBack={() => setScreen('view')}
-          onSaved={(updated) => { setProfile(updated); setScreen('view'); }}
+          onSaved={(updated) => { setProfile(updated); profileCtx?.refresh?.(); setScreen('view'); }}
         />
       )}
 
@@ -947,7 +990,7 @@ export default function Profile() {
             <EditBankDetails
               profile={profile}
               onBack={() => setScreen('view')}
-              onSaved={(updated) => { setProfile(updated); setScreen('view'); }}
+              onSaved={(updated) => { setProfile(updated); profileCtx?.refresh?.(); setScreen('view'); }}
             />
           </div>
         </div>
@@ -959,7 +1002,7 @@ export default function Profile() {
             <EditPanCard
               profile={profile}
               onBack={() => setScreen('view')}
-              onSaved={(updated) => { setProfile(updated); setScreen('view'); }}
+              onSaved={(updated) => { setProfile(updated); profileCtx?.refresh?.(); setScreen('view'); }}
             />
           </div>
         </div>

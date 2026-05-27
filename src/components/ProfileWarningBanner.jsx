@@ -13,22 +13,22 @@ const CheckIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 const ArrowIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>;
 
 const STEPS = [
-  { key: 'name',    label: 'Personal Info',  path: '/profile',          desc: 'Add your name & address'    },
+  { key: 'personal',label: 'Personal Info',  path: '/profile',          desc: 'Add name, DOB, address & mobile' },
   { key: 'pan',     label: 'PAN Card',       path: '/profile?tab=pan',  desc: 'Verify your PAN'            },
   { key: 'bank',    label: 'Bank Account',   path: '/profile?tab=bank', desc: 'Link a bank account'        },
 ];
 
 export default function ProfileWarningBanner() {
-  const { incomplete, isKycComplete, loading, fetched, hasName, panVerified, bankVerified } = useProfile();
+  const { incomplete, loading, fetched, isPersonalInfoComplete, panVerified, bankVerified } = useProfile();
   const navigate  = useNavigate();
   const [dismissed, setDismissed] = useState(false);
 
   // Don't show if: loading, not fetched yet, all complete, or dismissed
-  if (loading || !fetched || isKycComplete || dismissed) return null;
+  if (loading || !fetched || dismissed) return null;
   if (incomplete.length === 0) return null;
 
   const done  = STEPS.filter(s => {
-    if (s.key === 'name')  return hasName;
+    if (s.key === 'personal') return isPersonalInfoComplete;
     if (s.key === 'pan')   return panVerified;
     if (s.key === 'bank')  return bankVerified;
     return false;
