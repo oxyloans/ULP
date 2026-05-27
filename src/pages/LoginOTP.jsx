@@ -3,7 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { sendLoginOtp } from '../api/beforelogin';
-import logo from '../assets/ulp.png';
+import logo from '../assets/ULP12.png';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const MoonIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>;
@@ -500,7 +500,7 @@ export default function LoginOTP() {
                 <img src={logo} alt="Oxy Portfolio" className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                   style={{ background: '#fff', boxShadow: '0 0 12px rgba(255,255,255,0.25)' }} />
                 <div>
-                  <p className="text-white font-black text-base tracking-wide leading-none">Oxy Portfolio</p>
+                  <p className="text-white font-black text-base tracking-wide leading-none letter-spacing-[0.3em]">ULP</p>
                   <p className="text-blue-300 text-xs font-medium mt-0.5 opacity-80">Financial Intelligence Platform</p>
                 </div>
               </div>

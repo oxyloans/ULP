@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
-import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getAllParticipationByUser } from '../api/afterlogin-user';
+import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings } from '../api/afterlogin-user';
 import ProfileWarningBanner from '../components/ProfileWarningBanner';
 
 //  SVG Icons 
@@ -1241,7 +1241,6 @@ function OfflineSection({ fin, memberColor }) {
   const [participationData, setParticipationData] = useState(null);
   const [migratedDeals, setMigratedDeals] = useState([]);
   const [goldEarningsData, setGoldEarningsData] = useState(null);
-  const [goldParticipationData, setGoldParticipationData] = useState(null);
   const PAYOUT_LABELS = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
   const PAYOUT_COLORS = { MONTHLY: '#35a13e', QUARTELY: '#2673bb', HALFLY: '#f58311', YEARLY: '#e95330', ENDOFTHEDEAL: '#6366f1' };
 
@@ -1250,8 +1249,7 @@ function OfflineSection({ fin, memberColor }) {
       getRunningDeals(),
       getUserOfflineParticipationDealsInfo(),
       getGoldDealsEarnings(),
-      getAllParticipationByUser(),
-    ]).then(([runningRes, migratedRes, goldRes, goldParticipationRes]) => {
+    ]).then(([runningRes, migratedRes, goldRes]) => {
       if (runningRes.status === 'fulfilled' && runningRes.value) {
         setParticipationData(runningRes.value);
       }
@@ -1264,11 +1262,6 @@ function OfflineSection({ fin, memberColor }) {
         setGoldEarningsData(goldRes.value);
       } else {
         setGoldEarningsData(null);
-      }
-      if (goldParticipationRes.status === 'fulfilled' && goldParticipationRes.value) {
-        setGoldParticipationData(goldParticipationRes.value);
-      } else {
-        setGoldParticipationData(null);
       }
     }).catch(() => {});
   }, []);
@@ -1379,28 +1372,12 @@ function OfflineSection({ fin, memberColor }) {
   const participations = participationData?.participationInfo ?? [];
   const mergedMigrated = mergeMigratedByRoi(migratedDeals);
   const dedupedGoldDeals = dedupeGoldDeals(goldEarningsData?.userEarenInfoResponse ?? []);
-  const processedGoldDeals = (() => {
-    const source = (goldParticipationData?.userParticipatedList ?? []).filter(d => d?.propertyType === 'GOLDLOT');
-    const byPropertyId = new Map();
-    source.forEach((item) => {
-      const key = String(item?.propertyId ?? '');
-      if (!key) return;
-      if (!byPropertyId.has(key)) byPropertyId.set(key, item);
-    });
-    return Array.from(byPropertyId.values());
-  })();
-  const combinedGoldIds = new Set([
-    ...dedupedGoldDeals.map(d => String(d?.dealId ?? '')).filter(Boolean),
-    ...processedGoldDeals.map(d => String(d?.propertyId ?? '')).filter(Boolean),
-  ]);
   const migratedInvested = mergedMigrated.reduce((s, d) => s + Number(d?.participationAmount ?? 0), 0);
   const migratedMonthlyInterest = mergedMigrated.reduce((s, d) => s + Number(d?.monthlyInterest ?? 0), 0);
   const migratedDealCount = mergedMigrated.length;
   const migratedEntryCount = mergedMigrated.reduce((s, d) => s + Number(d?.entryCount ?? 0), 0);
-  const goldDealsInvestedFromProcessed = processedGoldDeals.reduce((s, d) => s + Number(d?.participatedAmount ?? 0), 0);
-  const goldDealsInvestedFromRunning = dedupedGoldDeals.reduce((s, d) => s + Number(d?.participatedAmount ?? 0), 0);
-  const goldDealsInvested = goldDealsInvestedFromProcessed > 0 ? goldDealsInvestedFromProcessed : goldDealsInvestedFromRunning;
-  const goldDealsCount = combinedGoldIds.size;
+  const goldDealsInvested = dedupedGoldDeals.reduce((s, d) => s + Number(d?.participatedAmount ?? 0), 0);
+  const goldDealsCount = dedupedGoldDeals.length;
   const monthlyInvested    = Array(12).fill(0);
   const monthlyInterestArr = Array(12).fill(0);
 
@@ -1445,7 +1422,7 @@ function OfflineSection({ fin, memberColor }) {
       }
     }
   });
-  const goldTimelineSource = processedGoldDeals.length > 0 ? processedGoldDeals : dedupedGoldDeals;
+  const goldTimelineSource = dedupedGoldDeals;
   goldTimelineSource.forEach((d) => {
     const month = parseMonth(d?.participatedDate ?? d?.participationDate ?? d?.createdDate ?? d?.updatedDate);
     const amount = Number(d?.participatedAmount ?? 0);
@@ -1604,40 +1581,11 @@ function OfflineSection({ fin, memberColor }) {
     status: 'Active',
   }));
   const goldById = new Map();
-  processedGoldDeals.forEach((d, idx) => {
-    const id = String(d?.propertyId ?? '');
-    if (!id) return;
-    goldById.set(id, {
-      key: `gold-${id}-${idx}`,
-      source: 'gold',
-      dealName: d?.propertyName ?? 'Gold Deal',
-      payoutType: null,
-      baseAmount: Number(d?.participatedAmount ?? 0),
-      updatesAmount: 0,
-      totalInvested: Number(d?.participatedAmount ?? 0),
-      roi: null,
-      monthlyInterest: 0,
-      participatedDate: d?.participatedDate ?? d?.createdDate ?? '—',
-      status: 'Active',
-    });
-  });
   dedupedGoldDeals.forEach((d, idx) => {
     const id = String(d?.dealId ?? '');
     if (!id) return;
     const payoutType = normalizePayoutType(d?.participationType);
     const amount = Number(d?.participatedAmount ?? 0);
-    const prev = goldById.get(id);
-    if (prev) {
-      prev.payoutType = prev.payoutType ?? payoutType;
-      if (!prev.totalInvested && amount > 0) {
-        prev.baseAmount = amount;
-        prev.totalInvested = amount;
-      }
-      if (!prev.participatedDate || prev.participatedDate === '—') {
-        prev.participatedDate = d?.participatedDate ?? d?.participationDate ?? '—';
-      }
-      return;
-    }
     goldById.set(id, {
       key: `gold-running-${id}-${idx}`,
       source: 'gold',
@@ -2315,23 +2263,68 @@ function MigrateConfirmModal({ onConfirm, onCancel }) {
   );
 }
 
+function MigrateSuccessModal({ onClose }) {
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+      onClick={onClose}>
+      <div className="rounded-2xl overflow-hidden w-full max-w-sm"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.35)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="px-6 pt-6 pb-4 flex flex-col items-center text-center gap-3">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ background: 'rgba(53,161,62,0.1)', border: '1px solid rgba(53,161,62,0.25)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#35a13e" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migration Request Submitted</h3>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              Your migration request was submitted successfully.
+              <br />
+              You can view migrated data once admin approval is completed.
+            </p>
+          </div>
+        </div>
+        <div className="px-6 pb-6">
+          <button onClick={onClose}
+            className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+            style={{ background: 'linear-gradient(135deg,#35a13e,#2c8a33)', color: '#fff', boxShadow: '0 4px 14px rgba(53,161,62,0.35)' }}>
+            OK
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MigrateDataModal({ displayName,onClose }) {
-  const [form, setForm] = useState({ id: '', passcode: '', mobile: '' });
+  const [form, setForm] = useState({ id: '', passcode: '', mobile: '', registerNumber: '' });
   const [errors, setErrors] = useState({});
   const [showConfirm, setShowConfirm] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [apiError, setApiError] = useState('');
+  const [registerNumber, setRegisterNumber] = useState('');
   const { user } = useAuth();
-  console.log(user)
 
   const validate = () => {
     const e = {};
     if (!form.id.trim())       e.id       = 'ID is required';
     if (!form.passcode.trim()) e.passcode = 'Passcode is required';
     if (!form.mobile.trim())   e.mobile   = 'Mobile number is required';
-    else if (!/^\d{10}$/.test(form.mobile.trim())) e.mobile = 'Enter a valid 10-digit mobile number';
+    // else if (!/^\d{15}$/.test(form.mobile.trim())) e.mobile = 'Enter a valid mobile number';
     return e;
   };
+
+  useEffect(() => {
+     getUserProfile()
+      .then(profile => {
+        if (profile?.mobileNumber) setForm(f => ({ ...f, registerNumber: profile.mobileNumber }));
+      })
+      .catch(() => {});
+    },[]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -2352,8 +2345,9 @@ function MigrateDataModal({ displayName,onClose }) {
         password:         form.passcode.trim(),
         userName:         displayName || '',
         migrationConsent: 'yes',
+        registeredMobile: form.registerNumber?.trim() || '',
       });
-      onClose();
+      setShowSuccess(true);
     } catch (err) {
       setApiError(err.message ?? 'Migration failed. Please try again.');
     } finally {
@@ -2369,6 +2363,7 @@ function MigrateDataModal({ displayName,onClose }) {
         value={form[key]}
         onChange={e => { setForm(f => ({ ...f, [key]: e.target.value })); setErrors(er => ({ ...er, [key]: '' })); }}
         placeholder={placeholder}
+        readOnly={key === 'registerNumber' && Boolean(form.registerNumber)}
         className="w-full px-4 py-2.5 rounded-xl text-sm outline-none transition-all"
         style={{
           background: 'var(--input-bg)',
@@ -2421,7 +2416,8 @@ function MigrateDataModal({ displayName,onClose }) {
         <form onSubmit={handleSubmit} className="px-6 py-5 grid gap-4">
           {field('id',       'Given Lender ID', 'text',     'Enter your Lender ID')}
           {field('passcode', 'Given Passcode',  'text', 'Enter your given passcode')}
-          {field('mobile',   'Mobile Number',   'tel',      'Enter 10-digit mobile number')}
+          {field('mobile',   'Communication Mobile Number',   'tel',      'Enter communication mobile number')}
+          {field('registerNumber', 'Registered Mobile Number', 'tel', 'Enter registered mobile number')}
 
           {/* API error */}
           {apiError && (
@@ -2430,6 +2426,12 @@ function MigrateDataModal({ displayName,onClose }) {
               {apiError}
             </div>
           )}
+
+          <div>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
+            <strong className='text-color-red' style={{color:"#e95330"}}>Note:</strong> If you do not remember your credentials or if they are not available, please contact our support team through the <a href="/contact" className="text-blue-500 hover:underline font-bold">Contact Us</a> page.
+            </p>
+          </div>
 
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose} disabled={submitting}
@@ -2451,6 +2453,7 @@ function MigrateDataModal({ displayName,onClose }) {
       </div>
     </div>
     {showConfirm && <MigrateConfirmModal onConfirm={()=>handleConfirm()} onCancel={() => setShowConfirm(false)} />}
+    {showSuccess && <MigrateSuccessModal onClose={onClose} />}
     </>
   );
 }

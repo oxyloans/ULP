@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { sendMobileOtp, signUp } from '../api/beforelogin';
-import logo from '../assets/ulp.png';
+import logo from '../assets/ULP12.png';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const UserIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
@@ -154,7 +154,7 @@ function LeftPanel() {
         <img src={logo} alt="Oxy Portfolio" className="w-10 h-10 rounded-full object-cover flex-shrink-0"
           style={{ background: '#fff', boxShadow: '0 0 12px rgba(255,255,255,0.25)' }} />
         <div>
-          <p className="text-white font-black text-base tracking-wide leading-none">Oxy Portfolio</p>
+          <p className="text-white font-black text-base tracking-wide leading-none letter-spacing-[0.3em]">ULP</p>
           <p className="text-blue-300 text-xs font-medium mt-0.5 opacity-80">Financial Intelligence Platform</p>
         </div>
       </div>
@@ -367,7 +367,7 @@ export default function Register() {
         </div>
         <h2 className="text-2xl font-extrabold mb-2" style={{ color: headingC }}>Account Created!</h2>
         <p className="text-sm mb-6" style={{ color: subC }}>
-          Welcome to Oxy Portfolio. Your account is ready — log in to get started.
+          Welcome to ULP. Your account is ready — log in to get started.
         </p>
         <button onClick={() => navigate('/login')}
           className="w-full py-3.5 rounded-2xl font-extrabold text-sm text-white"
