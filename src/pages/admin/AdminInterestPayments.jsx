@@ -1,4 +1,5 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { getAllLoanActiveDeals } from '../../api/afterlogin-user';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
@@ -23,13 +24,13 @@ export function fmtINR(n) {
 export const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 export const STATUS_CFG = {
-  PENDING:    { bg: '#fef3c7', text: '#d97706', border: '#fde68a', label: 'Pending',    pulse: true  },
+  INITIATED:  { bg: '#fef3c7', text: '#d97706', border: '#fde68a', label: 'Initiated',  pulse: true  },
   PAID:       { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Paid',       pulse: false },
   PROCESSING: { bg: '#eff6ff', text: '#3b82f6', border: '#bfdbfe', label: 'Processing', pulse: true  },
 };
 
 export function StatusChip({ status }) {
-  const cfg = STATUS_CFG[status] ?? STATUS_CFG.PENDING;
+  const cfg = STATUS_CFG[status] ?? STATUS_CFG.INITIATED;
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold whitespace-nowrap"
       style={{ background: cfg.bg, color: cfg.text, border: `1px solid ${cfg.border}` }}>
@@ -39,6 +40,29 @@ export function StatusChip({ status }) {
       {cfg.label}
     </span>
   );
+}
+
+function mapPaymentStatus(status) {
+  const s = String(status ?? '').trim().toUpperCase();
+  if (!s) return 'INITIATED';
+  if (s === 'INITIATED') return 'INITIATED';
+  if (['PAID', 'COMPLETED', 'SUCCESS'].includes(s)) return 'PAID';
+  if (['PROCESSING', 'IN_PROGRESS'].includes(s)) return 'PROCESSING';
+  return 'INITIATED';
+}
+
+function mapApiDealToRow(item, index) {
+  const id = item?.dealId ?? `deal-${index + 1}`;
+  const fallbackName = typeof id === 'string' ? `Deal ${id.slice(0, 8)}` : `Deal ${index + 1}`;
+  return {
+    id,
+    dealName: item?.dealName ?? fallbackName,
+    roi: Number(item?.roi ?? 0),
+    lenders: item?.lenders ?? '—',
+    amount: Number(item?.totalPrincipalParticipationAmount ?? item?.currentPrincipalAmount ?? item?.dealAmount ?? 0),
+    status: mapPaymentStatus(item?.paymentStatus),
+    paymentDate: item?.actualInterestDate ?? null,
+  };
 }
 
 export function downloadCSV(rows, filename) {
@@ -132,103 +156,182 @@ export function DateSelectScreen({ title, subtitle, onProceed }) {
   const now  = new Date();
   const [month, setMonth] = useState(now.getMonth());
   const [year,  setYear]  = useState(now.getFullYear());
-  const [day,   setDay]   = useState(now.getDate());
+  const [startDay, setStartDay] = useState(now.getDate());
+  const [endDay, setEndDay] = useState(now.getDate());
   const years = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
 
   // clamp day when month/year changes (e.g. Feb 31 → Feb 28)
   const maxDay = daysInMonth(month, year);
-  const safeDay = Math.min(day, maxDay);
+  const safeStartDay = Math.min(startDay, maxDay);
+  const safeEndDay = Math.min(endDay, maxDay);
   const days = Array.from({ length: maxDay }, (_, i) => i + 1);
 
-  const label = `${String(safeDay).padStart(2,'0')} ${MONTHS[month]} ${year}`;
+  const startDate = `${String(safeStartDay).padStart(2,'0')}-${String(month + 1).padStart(2,'0')}-${year}`;
+  const endDate = `${String(safeEndDay).padStart(2,'0')}-${String(month + 1).padStart(2,'0')}-${year}`;
+  const label = safeStartDay === safeEndDay ? startDate : `${startDate} to ${endDate}`;
 
   return (
     <div className="grid gap-6">
       <div>
-        <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>{title}</h1>
-        <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>{subtitle}</p>
+        <h1
+          className="text-2xl font-black"
+          style={{ color: "var(--text-primary)" }}
+        >
+          {title}
+        </h1>
+        <p className="text-sm mt-0.5" style={{ color: "var(--text-muted)" }}>
+          {subtitle}
+        </p>
       </div>
-      <div className="max-w-lg mx-auto w-full rounded-2xl overflow-hidden"
-        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 8px 40px rgba(168,85,247,0.12)' }}>
-
-        {/* Card header */}
-        <div className="px-6 py-5 flex items-center gap-3"
-          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(168,85,247,0.05)' }}>
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-            style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>
-            <CalendarIcon />
+      <div
+        className="w-full rounded-2xl overflow-hidden"
+        style={{
+          background: "#f3f5f9",
+          border: "1px solid #d7deea",
+          boxShadow: "0 8px 24px rgba(15,23,42,0.08)",
+        }}
+      >
+        <div
+          className="px-5 py-4 flex items-center gap-3"
+          style={{ borderBottom: "1px solid #dde4ef" }}
+        >
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ background: "#e7eefb", color: "#6b83b6" }}
+          >
+            <SearchIcon />
           </div>
-          <div>
-            <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Select Payment Date</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>Choose the exact date for which interest is being paid</p>
-          </div>
+          <p className="text-base font-extrabold" style={{ color: "#21324f" }}>
+            Search Filters
+          </p>
         </div>
 
-        <div className="px-6 py-6 grid gap-6">
-
-          {/* ── Month ── */}
+        <div className="px-5 py-4 grid lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] md:grid-cols-3 sm:grid-cols-2 gap-3 items-end">
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Month</label>
-            <div className="grid grid-cols-4 gap-2">
-              {MONTHS.map((m, i) => (
-                <button key={m} onClick={() => setMonth(i)}
-                  className="py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
-                  style={month === i
-                    ? { background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 12px rgba(168,85,247,0.4)' }
-                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  {m.slice(0, 3)}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* ── Day ── */}
-          <div>
-            <label className="block text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>
-              Day <span style={{ color: 'var(--text-muted)', fontWeight: 400, textTransform: 'none' }}>({maxDay} days in {MONTHS[month]})</span>
+            <label
+              className="block text-[11px] font-bold uppercase tracking-widest mb-2"
+              style={{ color: "#577096" }}
+            >
+              Month Name
             </label>
-            <div className="grid grid-cols-7 gap-1.5">
-              {days.map(d => (
-                <button key={d} onClick={() => setDay(d)}
-                  className="py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                  style={safeDay === d
-                    ? { background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 3px 8px rgba(168,85,247,0.4)' }
-                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  {d}
-                </button>
+            <select
+              value={month}
+              onChange={(e) => setMonth(Number(e.target.value))}
+              className="w-full rounded-lg text-sm outline-none"
+              style={{
+                padding: "10px 12px",
+                background: "#ebeff5",
+                border: "1px solid #c9d3e2",
+                color: "#1f2a44",
+              }}
+            >
+              {MONTHS.map((m, i) => (
+                <option key={m} value={i}>
+                  {m}
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
-          {/* ── Year ── */}
           <div>
-            <label className="block text-xs font-bold uppercase tracking-wider mb-3" style={{ color: 'var(--text-muted)' }}>Year</label>
-            <div className="flex gap-2 flex-wrap">
-              {years.map(y => (
-                <button key={y} onClick={() => setYear(y)}
-                  className="px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
-                  style={year === y
-                    ? { background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 12px rgba(168,85,247,0.4)' }
-                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            <label
+              className="block text-[11px] font-bold uppercase tracking-widest mb-2"
+              style={{ color: "#577096" }}
+            >
+              Year
+            </label>
+            <select
+              value={year}
+              onChange={(e) => setYear(Number(e.target.value))}
+              className="w-full rounded-lg text-sm outline-none"
+              style={{
+                padding: "10px 12px",
+                background: "#ebeff5",
+                border: "1px solid #c9d3e2",
+                color: "#1f2a44",
+              }}
+            >
+              {years.map((y) => (
+                <option key={y} value={y}>
                   {y}
-                </button>
+                </option>
               ))}
-            </div>
+            </select>
           </div>
 
-          {/* ── Selected date preview ── */}
-          <div className="px-4 py-3 rounded-xl flex items-center gap-3"
-            style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <CalendarIcon />
-            <span className="text-sm font-bold" style={{ color: '#c084fc' }}>{label}</span>
+          <div>
+            <label
+              className="block text-[11px] font-bold uppercase tracking-widest mb-2"
+              style={{ color: "#577096" }}
+            >
+              Start Date
+            </label>
+            <select
+              value={safeStartDay}
+              onChange={(e) => setStartDay(Number(e.target.value))}
+              className="w-full rounded-lg text-sm outline-none"
+              style={{
+                padding: "10px 12px",
+                background: "#ebeff5",
+                border: "1px solid #c9d3e2",
+                color: "#1f2a44",
+              }}
+            >
+              {days.map((d) => (
+                <option key={d} value={d}>
+                  {String(d).padStart(2, "0")}
+                </option>
+              ))}
+            </select>
           </div>
-        </div>
 
-        <div className="px-6 pb-6">
-          <button onClick={() => onProceed({ month, year, day: safeDay, label })}
-            className="w-full py-3 rounded-xl text-sm font-black transition-all hover:scale-[1.02] flex items-center justify-center gap-2"
-            style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 6px 20px rgba(168,85,247,0.4)' }}>
-            <SearchIcon /> View Deals for {label}
+          <div>
+            <label
+              className="block text-[11px] font-bold uppercase tracking-widest mb-2"
+              style={{ color: "#577096" }}
+            >
+              End Date
+            </label>
+            <select
+              value={safeEndDay}
+              onChange={(e) => setEndDay(Number(e.target.value))}
+              className="w-full rounded-lg text-sm outline-none"
+              style={{
+                padding: "10px 12px",
+                background: "#ebeff5",
+                border: "1px solid #c9d3e2",
+                color: "#1f2a44",
+              }}
+            >
+              {days.map((d) => (
+                <option key={d} value={d}>
+                  {String(d).padStart(2, "0")}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <button
+            onClick={() =>
+              onProceed({
+                month,
+                year,
+                startDay: safeStartDay,
+                endDay: safeEndDay,
+                startDate,
+                endDate,
+                label,
+              })
+            }
+            className="px-6 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-[1.02] flex items-center justify-center gap-2 whitespace-nowrap"
+            style={{
+              background: "linear-gradient(135deg, #6C63FF, #4F46E5)",
+              color: "#fff",
+              boxShadow: "0 4px 14px rgba(79, 70, 229, 0.45)",
+            }}
+          >
+            <SearchIcon />
+            Fetch Details
           </button>
         </div>
       </div>
@@ -237,34 +340,50 @@ export function DateSelectScreen({ title, subtitle, onProceed }) {
 }
 
 // ─── Deals Table (shared) ─────────────────────────────────────────────────────
-export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
+export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetchDeals }) {
   const [deals, setDeals]       = useState([]);
   const [loading, setLoading]   = useState(true);
+  const [error, setError]       = useState('');
   const [selected, setSelected] = useState(new Set());
   const [paidMap, setPaidMap]   = useState({});   // id → { date }
-  const [tab, setTab]           = useState('PENDING');
+  const [tab, setTab]           = useState('INITIATED');
   const [paidModal, setPaidModal]   = useState(false);
   const [payLoading, setPayLoading] = useState(false);
 
-  useEffect(() => {
+  const loadDeals = useCallback(async () => {
     setLoading(true);
-    setTimeout(() => { setDeals(mockDeals); setLoading(false); }, 600);
-  }, [mockDeals]);
+    setError('');
+    try {
+      if (typeof fetchDeals === 'function') {
+        const rows = await fetchDeals(period);
+        setDeals(Array.isArray(rows) ? rows : []);
+      } else {
+        setDeals(Array.isArray(mockDeals) ? mockDeals : []);
+      }
+    } catch (e) {
+      setDeals([]);
+      setError(e?.message ?? 'Failed to load deals');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchDeals, mockDeals, period]);
 
-  const getStatus = (d) => (paidMap[d.id] ? 'PAID' : d.status);
+  useEffect(() => { loadDeals(); }, [loadDeals]);
+
+  const getStatus = (d) => (paidMap[d.id] ? 'PAID' : (d.status ?? mapPaymentStatus(d.paymentStatus)));
   const getPaidDate = (d) => paidMap[d.id]?.date ?? null;
 
-  const pendingDeals = deals.filter(d => getStatus(d) === 'PENDING');
+  const pendingDeals = deals.filter(d => getStatus(d) === 'INITIATED');
   const paidDeals    = deals.filter(d => getStatus(d) === 'PAID');
 
   const TABS = [
-    { key: 'PENDING', label: 'Pending', color: '#d97706', count: pendingDeals.length },
+    { key: 'INITIATED', label: 'Initiated', color: '#d97706', count: pendingDeals.length },
     { key: 'PAID',    label: 'Paid',    color: '#059669', count: paidDeals.length    },
     { key: 'ALL',     label: 'All',     color: '#6366f1', count: deals.length        },
   ];
 
-  const filtered = tab === 'ALL' ? deals : tab === 'PENDING' ? pendingDeals : paidDeals;
-  const pendingFiltered = filtered.filter(d => getStatus(d) === 'PENDING');
+  const filtered = tab === 'ALL' ? deals : tab === 'INITIATED' ? pendingDeals : paidDeals;
+  const pendingFiltered = filtered.filter(d => getStatus(d) === 'INITIATED');
   const allPendingSelected = pendingFiltered.length > 0 && pendingFiltered.every(d => selected.has(d.id));
 
   const toggleAll = () => {
@@ -334,7 +453,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
               <>
                 <button
                   onClick={() => downloadCSV(
-                    selectedDeals.map(d => ({ ...d, paymentDate: getPaidDate(d) ?? '' })),
+                    selectedDeals.map(d => ({ ...d, paymentDate: getPaidDate(d) ?? d.paymentDate ?? '' })),
                     `interest-${period.label.replace(' ','-')}-selected.csv`
                   )}
                   className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
@@ -349,7 +468,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
               </>
             )}
             <button
-              onClick={() => { setLoading(true); setTimeout(() => { setDeals(mockDeals); setLoading(false); }, 500); }}
+              onClick={loadDeals}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
               style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
               <RefreshIcon />
@@ -397,17 +516,23 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
         </div>
 
         {/* Table card */}
+        {error && (
+          <div className="rounded-xl px-4 py-3 text-sm font-semibold"
+            style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+            {error}
+          </div>
+        )}
         <div className="rounded-2xl overflow-hidden"
           style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 4px 24px rgba(0,0,0,0.07)' }}>
           <div className="px-5 py-3.5 flex items-center gap-3 flex-wrap"
             style={{ borderBottom: '1px solid var(--border)', background: 'rgba(168,85,247,0.04)' }}>
             <div className="w-2 h-2 rounded-full" style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              {tab === 'ALL' ? 'All Deals' : tab === 'PENDING' ? 'Pending Payouts' : 'Paid Deals'} — {period.label}
+              {tab === 'ALL' ? 'All Deals' : tab === 'INITIATED' ? 'Pending Payouts' : 'Paid Deals'} — {period.label}
             </h2>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
               style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc' }}>{filtered.length}</span>
-            {tab === 'PENDING' && !loading && (
+            {tab === 'INITIATED' && !loading && (
               <div className="ml-auto flex items-center gap-2 px-3 py-1.5 rounded-xl"
                 style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <CoinIcon />
@@ -443,7 +568,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
                           }}>
                           {allPendingSelected && <CheckIcon />}
                         </button>
-                        <span>Payment</span>
+                        {/* <span>Payment</span> */}
                       </div>
                     </th>
                     {['#', 'Deal Name', 'ROI', 'Lenders', 'Amount', 'Payment Date', 'Status', 'Download'].map(h => (
@@ -508,10 +633,12 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
 
                         {/* Payment Date */}
                         <td className="py-3.5 px-4">
-                          {paidDate ? (
+                          {paidDate || deal.paymentDate ? (
                             <div className="flex items-center gap-1.5">
                               <CalendarIcon />
-                              <span className="text-xs font-semibold whitespace-nowrap" style={{ color: '#059669' }}>{paidDate}</span>
+                              <span className="text-xs font-semibold whitespace-nowrap" style={{ color: paidDate ? '#059669' : 'var(--text-muted)' }}>
+                                {paidDate ?? deal.paymentDate}
+                              </span>
                             </div>
                           ) : (
                             <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
@@ -524,7 +651,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
                         <td className="py-3.5 px-4">
                           <button
                             onClick={() => downloadCSV(
-                              [{ ...deal, paymentDate: paidDate ?? '' }],
+                              [{ ...deal, paymentDate: paidDate ?? deal.paymentDate ?? '' }],
                               `${deal.dealName.replace(/\s+/g,'-')}-${period.label.replace(' ','-')}.csv`
                             )}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
@@ -559,19 +686,30 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals }) {
   );
 }
 
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const SD_LOT_DEALS = [
-  { id: 1, dealName: 'SD Lot Alpha',  roi: 2, lenders: 14, amount: 280000, status: 'PENDING' },
-  { id: 2, dealName: 'SD Lot Beta',   roi: 3, lenders: 20, amount: 450000, status: 'PENDING' },
-  { id: 3, dealName: 'SD Lot Gamma',  roi: 2, lenders: 8,  amount: 160000, status: 'PAID'    },
-  { id: 4, dealName: 'SD Lot Delta',  roi: 2, lenders: 30, amount: 600000, status: 'PENDING' },
-  { id: 5, dealName: 'SD Lot Eta',    roi: 2, lenders: 25, amount: 500000, status: 'PENDING' },
-  { id: 6, dealName: 'SD Lot Zeta',   roi: 3, lenders: 18, amount: 360000, status: 'PAID'    },
-];
-
 // ─── SD Lot Interest Payout page ──────────────────────────────────────────────
 export default function AdminInterestPayments() {
   const [period, setPeriod] = useState(null);
+
+  const fetchSdLotDeals = useCallback(async (selectedPeriod) => {
+    if (!selectedPeriod) return [];
+    const startDay = String(selectedPeriod.startDay ?? selectedPeriod.day).padStart(2, '0');
+    const endDay = String(selectedPeriod.endDay ?? selectedPeriod.day).padStart(2, '0');
+    const monthNo = String(selectedPeriod.month + 1).padStart(2, '0');
+    const year = String(selectedPeriod.year);
+    const startDate = `${startDay}`;
+    const endDate = `${endDay}`;
+    const monthName = MONTHS[selectedPeriod.month];
+
+    const response = await getAllLoanActiveDeals({
+      monthName,
+      year,
+      startDate,
+      endDate,
+    });
+
+    return (Array.isArray(response) ? response : []).map(mapApiDealToRow);
+  }, []);
+
   if (!period) {
     return (
       <DateSelectScreen
@@ -586,7 +724,7 @@ export default function AdminInterestPayments() {
       period={period}
       onBack={() => setPeriod(null)}
       pageTitle="SD Lot Interest Payout"
-      mockDeals={SD_LOT_DEALS}
+      fetchDeals={fetchSdLotDeals}
     />
   );
 }

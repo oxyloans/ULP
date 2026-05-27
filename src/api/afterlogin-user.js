@@ -103,6 +103,19 @@ export async function participateInDeal({ dealId, lenderReturnsType, participate
   });
 }
 
+/**
+ * GET /oxybrick-service/allLoanActiveDeals/{month}/{year}/{startDate}/{endDate}
+ * Example:
+ * /oxybrick-service/allLoanActiveDeals/May/2026/30-05-2026/30-05-2026
+ */
+export async function getAllLoanActiveDeals({ monthName, year, startDate, endDate }) {
+  const month = encodeURIComponent(String(monthName ?? '').trim());
+  const y = encodeURIComponent(String(year ?? '').trim());
+  const from = encodeURIComponent(String(startDate ?? '').trim());
+  const to = encodeURIComponent(String(endDate ?? '').trim());
+  return get(`/oxybrick-service/allLoanActiveDeals/${month}/${y}/${from}/${to}`);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // FAMILY
 // ══════════════════════════════════════════════════════════════════════════════

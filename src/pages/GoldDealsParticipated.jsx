@@ -558,35 +558,33 @@ function DealCard({ deal, onOpenDetails, onDownloadMou, onRealizationPayout }) {
       </div>
 
       {/* Expand button */}
-      {hasGoldGrowth && (
-        <button
-          onClick={() => setExpanded(o => !o)}
-          style={{
-            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '10px 20px',
-            borderTop: `1px solid ${GOLD}18`,
-            borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
-            background: expanded ? `${GOLD}0e` : `${GOLD}07`,
-            color: GOLD, fontSize: 12, fontWeight: 600,
-            cursor: 'pointer', outline: 'none',
-            transition: 'background 0.18s ease',
-          }}
-          onMouseEnter={e => e.currentTarget.style.background = `${GOLD}14`}
-          onMouseLeave={e => e.currentTarget.style.background = expanded ? `${GOLD}0e` : `${GOLD}07`}
-        >
-          <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-            <CoinsIcon />
-            View Gold Growth Details
-          </span>
-          <span style={{
-            display: 'inline-flex',
-            transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
-            transition: 'transform 0.22s ease',
-          }}>
-            <ChevronDown />
-          </span>
-        </button>
-      )}
+      <button
+        onClick={() => setExpanded(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 20px',
+          borderTop: `1px solid ${GOLD}18`,
+          borderLeft: 'none', borderRight: 'none', borderBottom: 'none',
+          background: expanded ? `${GOLD}0e` : `${GOLD}07`,
+          color: GOLD, fontSize: 12, fontWeight: 600,
+          cursor: 'pointer', outline: 'none',
+          transition: 'background 0.18s ease',
+        }}
+        onMouseEnter={e => e.currentTarget.style.background = `${GOLD}14`}
+        onMouseLeave={e => e.currentTarget.style.background = expanded ? `${GOLD}0e` : `${GOLD}07`}
+      >
+        <span style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <CoinsIcon />
+          View Gold Growth Details
+        </span>
+        <span style={{
+          display: 'inline-flex',
+          transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
+          transition: 'transform 0.22s ease',
+        }}>
+          <ChevronDown />
+        </span>
+      </button>
 
       {/* Expanded panel */}
       {expanded && <GoldGrowthPanel dealId={deal.dealId} dealName={deal.dealName} />}

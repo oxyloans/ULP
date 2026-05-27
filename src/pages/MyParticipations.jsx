@@ -75,6 +75,8 @@ function parseDdMmYyyy(value) {
 function mergeMigratedByRoi(items) {
   const groups = new Map();
   for (const item of items ?? []) {
+    const currentPrincipal = Number(item?.currentPrincipalAmount ?? 0);
+    if (!(currentPrincipal > 0)) continue;
     const key = `${item?.dealName ?? "Unknown"}|${item?.roi ?? 0}`;
     if (!groups.has(key)) {
       groups.set(key, {

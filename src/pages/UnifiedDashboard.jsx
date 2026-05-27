@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
-import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData } from '../api/afterlogin-user';
+import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getAllParticipationByUser } from '../api/afterlogin-user';
 import ProfileWarningBanner from '../components/ProfileWarningBanner';
 
 //  SVG Icons 
@@ -1239,13 +1239,38 @@ function OfflineSection({ fin, memberColor }) {
   const [dealSummaryOpen, setDealSummaryOpen] = useState(false);
   const [interestPayment, setInterestPayment] = useState(null);
   const [participationData, setParticipationData] = useState(null);
+  const [migratedDeals, setMigratedDeals] = useState([]);
+  const [goldEarningsData, setGoldEarningsData] = useState(null);
+  const [goldParticipationData, setGoldParticipationData] = useState(null);
   const PAYOUT_LABELS = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
   const PAYOUT_COLORS = { MONTHLY: '#35a13e', QUARTELY: '#2673bb', HALFLY: '#f58311', YEARLY: '#e95330', ENDOFTHEDEAL: '#6366f1' };
 
   useEffect(() => {
-    getRunningDeals()
-      .then(d => { if (d) setParticipationData(d); })
-      .catch(() => {});
+    Promise.allSettled([
+      getRunningDeals(),
+      getUserOfflineParticipationDealsInfo(),
+      getGoldDealsEarnings(),
+      getAllParticipationByUser(),
+    ]).then(([runningRes, migratedRes, goldRes, goldParticipationRes]) => {
+      if (runningRes.status === 'fulfilled' && runningRes.value) {
+        setParticipationData(runningRes.value);
+      }
+      if (migratedRes.status === 'fulfilled') {
+        setMigratedDeals(Array.isArray(migratedRes.value) ? migratedRes.value : []);
+      } else {
+        setMigratedDeals([]);
+      }
+      if (goldRes.status === 'fulfilled' && goldRes.value) {
+        setGoldEarningsData(goldRes.value);
+      } else {
+        setGoldEarningsData(null);
+      }
+      if (goldParticipationRes.status === 'fulfilled' && goldParticipationRes.value) {
+        setGoldParticipationData(goldParticipationRes.value);
+      } else {
+        setGoldParticipationData(null);
+      }
+    }).catch(() => {});
   }, []);
 
   //  Helpers 
@@ -1261,13 +1286,121 @@ function OfflineSection({ fin, memberColor }) {
 
   // Parse "DD/MM/YYYY"  0-based month index
   const parseMonth = (dateStr) => {
-    if (!dateStr) return -1;
-    const parts = dateStr.split('/');
-    return parts.length === 3 ? parseInt(parts[1], 10) - 1 : -1;
+    if (!dateStr || typeof dateStr !== 'string') return -1;
+    const value = dateStr.trim();
+    if (!value) return -1;
+    if (value.includes('/')) {
+      const parts = value.split('/');
+      return parts.length === 3 ? parseInt(parts[1], 10) - 1 : -1;
+    }
+    if (value.includes('-')) {
+      const parts = value.split('-');
+      if (parts.length !== 3) return -1;
+      if (parts[0].length === 4) return parseInt(parts[1], 10) - 1; // YYYY-MM-DD
+      return parseInt(parts[1], 10) - 1; // DD-MM-YYYY
+    }
+    return -1;
+  };
+  const parseDdMmYyyy = (value) => {
+    if (!value || typeof value !== 'string') return null;
+    const [dd, mm, yyyy] = value.split('/');
+    const d = Number(dd);
+    const m = Number(mm);
+    const y = Number(yyyy);
+    if (!d || !m || !y) return null;
+    const dt = new Date(y, m - 1, d);
+    return Number.isNaN(dt.getTime()) ? null : dt;
+  };
+  const dedupeGoldDeals = (rows) => {
+    const map = new Map();
+    (rows ?? []).forEach((item) => {
+      const key = `${item?.dealId ?? ''}-${item?.participationType ?? ''}`;
+      if (!key || key === '-') return;
+      if (!map.has(key)) {
+        map.set(key, item);
+        return;
+      }
+      const prev = map.get(key);
+      if (Number(item?.totalUserEarnedPercentage ?? 0) > Number(prev?.totalUserEarnedPercentage ?? 0)) {
+        map.set(key, item);
+      }
+    });
+    return Array.from(map.values());
+  };
+  const mergeMigratedByRoi = (items) => {
+    const groups = new Map();
+    for (const item of items ?? []) {
+      const currentPrincipal = Number(item?.currentPrincipalAmount ?? 0);
+      if (!(currentPrincipal > 0)) continue;
+      const key = `${item?.dealName ?? 'Unknown'}|${item?.roi ?? 0}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          dealName: item?.dealName ?? 'Unknown',
+          roi: Number(item?.roi ?? 0),
+          payOutType: item?.payOutType ?? null,
+          earliestDate: item?.participationDate ?? null,
+          entries: [],
+        });
+      }
+      const g = groups.get(key);
+      g.entries.push(item);
+      g.payOutType = g.payOutType ?? item?.payOutType ?? null;
+      const oldDate = parseDdMmYyyy(g.earliestDate);
+      const nextDate = parseDdMmYyyy(item?.participationDate);
+      if (!oldDate || (nextDate && nextDate < oldDate)) {
+        g.earliestDate = item?.participationDate ?? g.earliestDate;
+      }
+    }
+    return Array.from(groups.values()).map(g => {
+      const currentPrincipalTotal = g.entries.reduce((s, e) => s + Number(e?.currentPrincipalAmount ?? 0), 0);
+      const monthlyInterestTotal = g.entries.reduce(
+        (s, e) => s + monthlyEquivalent(Number(e?.currentPrincipalAmount ?? 0), 'MONTHLY', Number(e?.roi ?? g.roi ?? 0)),
+        0
+      );
+      const sortedEntries = [...g.entries].sort((a, b) => {
+        const ad = parseDdMmYyyy(a?.participationDate);
+        const bd = parseDdMmYyyy(b?.participationDate);
+        if (!ad && !bd) return 0;
+        if (!ad) return 1;
+        if (!bd) return -1;
+        return ad - bd;
+      });
+      return {
+        ...g,
+        participationAmount: currentPrincipalTotal,
+        monthlyInterest: monthlyInterestTotal,
+        entryCount: sortedEntries.length,
+        entries: sortedEntries,
+      };
+    });
   };
 
   //  Build 12-month arrays from real participation data 
   const participations = participationData?.participationInfo ?? [];
+  const mergedMigrated = mergeMigratedByRoi(migratedDeals);
+  const dedupedGoldDeals = dedupeGoldDeals(goldEarningsData?.userEarenInfoResponse ?? []);
+  const processedGoldDeals = (() => {
+    const source = (goldParticipationData?.userParticipatedList ?? []).filter(d => d?.propertyType === 'GOLDLOT');
+    const byPropertyId = new Map();
+    source.forEach((item) => {
+      const key = String(item?.propertyId ?? '');
+      if (!key) return;
+      if (!byPropertyId.has(key)) byPropertyId.set(key, item);
+    });
+    return Array.from(byPropertyId.values());
+  })();
+  const combinedGoldIds = new Set([
+    ...dedupedGoldDeals.map(d => String(d?.dealId ?? '')).filter(Boolean),
+    ...processedGoldDeals.map(d => String(d?.propertyId ?? '')).filter(Boolean),
+  ]);
+  const migratedInvested = mergedMigrated.reduce((s, d) => s + Number(d?.participationAmount ?? 0), 0);
+  const migratedMonthlyInterest = mergedMigrated.reduce((s, d) => s + Number(d?.monthlyInterest ?? 0), 0);
+  const migratedDealCount = mergedMigrated.length;
+  const migratedEntryCount = mergedMigrated.reduce((s, d) => s + Number(d?.entryCount ?? 0), 0);
+  const goldDealsInvestedFromProcessed = processedGoldDeals.reduce((s, d) => s + Number(d?.participatedAmount ?? 0), 0);
+  const goldDealsInvestedFromRunning = dedupedGoldDeals.reduce((s, d) => s + Number(d?.participatedAmount ?? 0), 0);
+  const goldDealsInvested = goldDealsInvestedFromProcessed > 0 ? goldDealsInvestedFromProcessed : goldDealsInvestedFromRunning;
+  const goldDealsCount = combinedGoldIds.size;
   const monthlyInvested    = Array(12).fill(0);
   const monthlyInterestArr = Array(12).fill(0);
 
@@ -1301,22 +1434,40 @@ function OfflineSection({ fin, memberColor }) {
     });
   });
 
+  mergedMigrated.forEach((d) => {
+    const month = parseMonth(d?.earliestDate);
+    const amount = Number(d?.participationAmount ?? 0);
+    const monthly = Number(d?.monthlyInterest ?? 0);
+    if (month >= 0 && month < 12) {
+      monthlyInvested[month] += amount;
+      if (monthly > 0) {
+        for (let m = month; m < 12; m++) monthlyInterestArr[m] += monthly;
+      }
+    }
+  });
+  const goldTimelineSource = processedGoldDeals.length > 0 ? processedGoldDeals : dedupedGoldDeals;
+  goldTimelineSource.forEach((d) => {
+    const month = parseMonth(d?.participatedDate ?? d?.participationDate ?? d?.createdDate ?? d?.updatedDate);
+    const amount = Number(d?.participatedAmount ?? 0);
+    if (month >= 0 && month < 12 && amount > 0) {
+      monthlyInvested[month] += amount;
+    }
+  });
+
   // Keep raw ₹ — no division, no rounding
   const investedChart = monthlyInvested.map(v => Math.round(v));
   const interestChart = monthlyInterestArr.map(v => Math.round(v));
 
   //  KPI values 
-  const activeDeals   = participations.filter(p => p.dealStatus !== 'CLOSED' && p.dealStatus !== 'ACHIEVED').length;
-  const closedDeals   = participations.filter(p => p.dealStatus === 'CLOSED' || p.dealStatus === 'ACHIEVED').length;
-  const totalInvested = participations.reduce((s, p) => {
+  const runningTotalInvested = participations.reduce((s, p) => {
     const updates = (p.updatedParticipation ?? []).reduce((ss, u) => ss + (u.updationParticipation ?? 0), 0);
     return s + (p.participatedAmount ?? 0) + updates;
   }, 0);
+  const totalInvested = runningTotalInvested + migratedInvested + goldDealsInvested;
   const currentMonth  = new Date().getMonth();
-  const thisMonthInterest = interestChart[currentMonth] * 1000;
 
   // Also compute total monthly interest the same way as MyParticipations (sum all entries)
-  const totalMonthlyInterest = participations.reduce((sum, p) => {
+  const runningMonthlyInterest = participations.reduce((sum, p) => {
     const roi = p.rateOfInterest ?? 0;
     const entries = [
       { amount: p.participatedAmount ?? 0, payout: p.amountTye },
@@ -1332,8 +1483,9 @@ function OfflineSection({ fin, memberColor }) {
       return s + Math.round(e.amount * mr);
     }, 0);
   }, 0);
+  const totalMonthlyInterest = runningMonthlyInterest + migratedMonthlyInterest;
 
-  const monthlyEquivalent = (amount, payout, roi) => {
+  function monthlyEquivalent(amount, payout, roi) {
     if (!amount) return 0;
     let mr = 0;
     if      (payout === 'MONTHLY')      mr = roi / 100;
@@ -1341,7 +1493,7 @@ function OfflineSection({ fin, memberColor }) {
     else if (payout === 'HALFLY')       mr = (roi / 100) / 6;
     else if (payout === 'YEARLY')       mr = (roi / 100) / 12;
     return Math.round(amount * mr);
-  };
+  }
 
   const getDealBucket = (p) => {
     const text = `${p?.dealName ?? ''} ${p?.dealType ?? ''} ${p?.category ?? ''}`.toLowerCase();
@@ -1383,6 +1535,20 @@ function OfflineSection({ fin, memberColor }) {
     if (isClosed) row.closedDeals += 1;
     else row.activeDeals += 1;
   });
+  mergedMigrated.forEach((d) => {
+    const bucket = getDealBucket(d);
+    const row = summaryMap[bucket];
+    if (!row) return;
+    row.deals += 1;
+    row.activeDeals += 1;
+    row.totalInvested += Number(d?.participationAmount ?? 0);
+    row.monthlyInterest += Number(d?.monthlyInterest ?? 0);
+  });
+  if (summaryMap.gold) {
+    summaryMap.gold.deals += goldDealsCount;
+    summaryMap.gold.activeDeals += goldDealsCount;
+    summaryMap.gold.totalInvested += goldDealsInvested;
+  }
 
   const totalSummary = summaryRows.reduce((acc, r) => ({
     key: 'total',
@@ -1394,12 +1560,111 @@ function OfflineSection({ fin, memberColor }) {
     totalInvested: acc.totalInvested + r.totalInvested,
   }), { deals: 0, monthlyInterest: 0, activeDeals: 0, closedDeals: 0, totalInvested: 0 });
 
+  const normalizePayoutType = (type) => {
+    const t = String(type ?? '').trim().toUpperCase();
+    if (t === 'MONTHLY') return 'MONTHLY';
+    if (t === 'QUARTELY' || t === 'QUARTERLY') return 'QUARTELY';
+    if (t === 'HALFLY' || t === 'HALFYEARLY' || t === 'HALF-YEARLY') return 'HALFLY';
+    if (t === 'YEARLY') return 'YEARLY';
+    if (t === 'ENDOFTHEDEAL' || t === 'END OF DEAL') return 'ENDOFTHEDEAL';
+    return null;
+  };
+  const runningTableDeals = participations.map((p, idx) => {
+    const updatesAmount = (p.updatedParticipation ?? []).reduce((s, u) => s + Number(u?.updationParticipation ?? 0), 0);
+    const baseAmount = Number(p?.participatedAmount ?? 0);
+    const totalAmount = baseAmount + updatesAmount;
+    const payout = normalizePayoutType(p?.amountTye);
+    const roi = Number(p?.rateOfInterest ?? 0);
+    const isClosed = p?.dealStatus === 'CLOSED' || p?.dealStatus === 'ACHIEVED';
+    return {
+      key: p?.dealId ?? `running-${idx}`,
+      dealName: p?.dealName ?? '—',
+      payoutType: payout,
+      baseAmount,
+      updatesAmount,
+      totalInvested: totalAmount,
+      roi,
+      monthlyInterest: monthlyEquivalent(totalAmount, payout, roi),
+      participatedDate: p?.participatedDate ?? '—',
+      status: isClosed ? 'Closed' : 'Active',
+    };
+  });
+  const migratedTableDeals = mergedMigrated.map((d, idx) => ({
+    key: `migrated-${d?.dealName ?? 'deal'}-${idx}`,
+    dealName: d?.dealName ?? 'Migrated',
+    payoutType: normalizePayoutType(d?.payOutType),
+    baseAmount: Number(d?.participationAmount ?? 0),
+    updatesAmount: 0,
+    totalInvested: Number(d?.participationAmount ?? 0),
+    roi: Number(d?.roi ?? 0),
+    monthlyInterest: Number(d?.monthlyInterest ?? 0),
+    participatedDate: d?.earliestDate ?? '—',
+    status: 'Active',
+  }));
+  const goldById = new Map();
+  processedGoldDeals.forEach((d, idx) => {
+    const id = String(d?.propertyId ?? '');
+    if (!id) return;
+    goldById.set(id, {
+      key: `gold-${id}-${idx}`,
+      dealName: d?.propertyName ?? 'Gold Deal',
+      payoutType: null,
+      baseAmount: Number(d?.participatedAmount ?? 0),
+      updatesAmount: 0,
+      totalInvested: Number(d?.participatedAmount ?? 0),
+      roi: null,
+      monthlyInterest: 0,
+      participatedDate: d?.participatedDate ?? d?.createdDate ?? '—',
+      status: 'Active',
+    });
+  });
+  dedupedGoldDeals.forEach((d, idx) => {
+    const id = String(d?.dealId ?? '');
+    if (!id) return;
+    const payoutType = normalizePayoutType(d?.participationType);
+    const amount = Number(d?.participatedAmount ?? 0);
+    const prev = goldById.get(id);
+    if (prev) {
+      prev.payoutType = prev.payoutType ?? payoutType;
+      if (!prev.totalInvested && amount > 0) {
+        prev.baseAmount = amount;
+        prev.totalInvested = amount;
+      }
+      if (!prev.participatedDate || prev.participatedDate === '—') {
+        prev.participatedDate = d?.participatedDate ?? d?.participationDate ?? '—';
+      }
+      return;
+    }
+    goldById.set(id, {
+      key: `gold-running-${id}-${idx}`,
+      dealName: d?.dealName ?? 'Gold Deal',
+      payoutType,
+      baseAmount: amount,
+      updatesAmount: 0,
+      totalInvested: amount,
+      roi: null,
+      monthlyInterest: 0,
+      participatedDate: d?.participatedDate ?? d?.participationDate ?? '—',
+      status: 'Active',
+    });
+  });
+  const allTableDeals = [...runningTableDeals, ...migratedTableDeals, ...Array.from(goldById.values())];
+  const activeDeals = allTableDeals.filter(d => d.status === 'Active').length;
+  const closedDeals = allTableDeals.filter(d => d.status === 'Closed').length;
+  const totalParticipationCount = allTableDeals.length;
+
   //  Payout type donut 
-  const payoutCount = {};
-  participations.forEach(p => { payoutCount[p.amountTye] = (payoutCount[p.amountTye] || 0) + 1; });
-  const payoutSegments = Object.entries(payoutCount)
-    .map(([k, v]) => ({ label: PAYOUT_LABELS[k] ?? k, value: v, color: PAYOUT_COLORS[k] ?? '#888' }))
-    .filter(s => s.value > 0);
+  const payoutKeys = ['MONTHLY', 'QUARTELY', 'HALFLY', 'YEARLY'];
+  const payoutCount = Object.fromEntries(payoutKeys.map(k => [k, 0]));
+  allTableDeals.forEach((d) => {
+    const key = normalizePayoutType(d?.payoutType);
+    if (key && key !== 'ENDOFTHEDEAL') payoutCount[key] += 1;
+  });
+  const payoutSegments = payoutKeys.map((k) => ({
+    label: PAYOUT_LABELS[k] ?? k,
+    value: payoutCount[k] ?? 0,
+    color: PAYOUT_COLORS[k] ?? '#888',
+  }));
 
   const statusGroups = {
     Active: { count: activeDeals,  color: '#35a13e', glow: 'rgba(53,161,62,0.4)'  },
@@ -1411,15 +1676,17 @@ function OfflineSection({ fin, memberColor }) {
     { label: 'Monthly Interest', Icon: I.Percent,     value: fmtAmt(totalMonthlyInterest), sub: `${MONTHS[currentMonth]} earnings`,       trend: null, trendUp: true, color: '#f58311', badge: 'This month'                    },
     { label: 'Active Deals',     Icon: I.Activity,    value: String(activeDeals),         sub: `${fmtAmt(totalInvested)} total invested`, trend: null, trendUp: true, color: '#35a13e', badge: activeDeals > 0 ? 'Live' : null },
     { label: 'Closed Deals',     Icon: I.CheckCircle, value: String(closedDeals),         sub: 'Completed deals',                        trend: null, trendUp: true, color: '#2673bb', badge: null                            },
-    { label: 'Total Invested',   Icon: I.Wallet,      value: fmtAmt(totalInvested),       sub: `${participations.length} participations`, trend: null, trendUp: true, color: '#6366f1', badge: null                            },
+    { label: 'Total Invested',   Icon: I.Wallet,      value: fmtAmt(totalInvested),       sub: `${totalParticipationCount} participations`, trend: null, trendUp: true, color: '#6366f1', badge: null                            },
   ];
 
   const modes = ['All', 'MONTHLY', 'QUARTELY', 'HALFLY', 'YEARLY', 'ENDOFTHEDEAL'];
   const modeColors = { All: '#f58311', MONTHLY: '#35a13e', QUARTELY: '#2673bb', HALFLY: '#f58311', YEARLY: '#e95330', ENDOFTHEDEAL: '#6366f1' };
   const baseDeals = dealTab === 'Active'
-    ? participations.filter(p => p.dealStatus !== 'CLOSED' && p.dealStatus !== 'ACHIEVED')
-    : participations.filter(p => p.dealStatus === 'CLOSED' || p.dealStatus === 'ACHIEVED');
-  const filteredDeals = modeFilter === 'All' ? baseDeals : baseDeals.filter(p => p.amountTye === modeFilter);
+    ? allTableDeals.filter(d => d.status === 'Active')
+    : allTableDeals.filter(d => d.status === 'Closed');
+  const filteredDeals = modeFilter === 'All'
+    ? baseDeals
+    : baseDeals.filter(d => normalizePayoutType(d?.payoutType) === modeFilter);
 
   return (
     <>
@@ -1520,7 +1787,7 @@ function OfflineSection({ fin, memberColor }) {
             </div>
             <div className="mt-3 pt-3 flex items-center justify-between" style={{ borderTop: '1px solid var(--border)' }}>
               <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Total Deals</span>
-              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{participations.length}</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{activeDeals + closedDeals}</span>
             </div>
           </GlassPanel>
         </div>
@@ -1532,7 +1799,7 @@ function OfflineSection({ fin, memberColor }) {
               <I.FileText />
               <div className="flex gap-1 ml-1 p-0.5 rounded-xl" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
                 {[
-                  { label: 'Active', count: participations.filter(p => p.dealStatus !== 'CLOSED' && p.dealStatus !== 'ACHIEVED').length, color: '#35a13e' },
+                  { label: 'Active', count: activeDeals, color: '#35a13e' },
                   { label: 'Closed', count: closedDeals, color: '#2673bb' },
                 ].map(t => (
                   <button key={t.label} onClick={() => { setDealTab(t.label); setModeFilter('All'); }}
@@ -1547,7 +1814,7 @@ function OfflineSection({ fin, memberColor }) {
               {modes.map(m => {
                 const mc = modeColors[m];
                 const isActive = modeFilter === m;
-                const cnt = m === 'All' ? baseDeals.length : baseDeals.filter(p => p.amountTye === m).length;
+                const cnt = m === 'All' ? baseDeals.length : baseDeals.filter(d => normalizePayoutType(d?.payoutType) === m).length;
                 return (
                   <button key={m} onClick={() => setModeFilter(m)}
                     className="text-xs px-2.5 py-1 rounded-full font-semibold transition-all"
@@ -1571,23 +1838,16 @@ function OfflineSection({ fin, memberColor }) {
                 {filteredDeals.length === 0 ? (
                   <tr><td colSpan={9} className="py-8 text-center text-xs" style={{ color: 'var(--text-muted)' }}>No {dealTab.toLowerCase()} deals found</td></tr>
                 ) : filteredDeals.map((p, idx) => {
-                  const roi    = p.rateOfInterest ?? 0;
-                  const amount = p.participatedAmount ?? 0;
-                  // Total invested = initial + all top-ups
-                  const updatesTotal2 = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
-                  const totalAmt = amount + updatesTotal2;
-                  // roi is per payout period — convert to monthly equivalent for display
-                  let monthlyRate = 0;
-                  if      (p.amountTye === 'MONTHLY')      monthlyRate = roi / 100;
-                  else if (p.amountTye === 'QUARTELY')     monthlyRate = (roi / 100) / 3;
-                  else if (p.amountTye === 'HALFLY')       monthlyRate = (roi / 100) / 6;
-                  else if (p.amountTye === 'YEARLY')       monthlyRate = (roi / 100) / 12;
-                  const monthlyEarning = Math.round(totalAmt * monthlyRate);
-                  const pc = PAYOUT_COLORS[p.amountTye] ?? '#888';
-                  const updatesTotal = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
-                  const totalInvested = amount + updatesTotal;
+                  const payoutType = normalizePayoutType(p?.payoutType);
+                  const pc = PAYOUT_COLORS[payoutType] ?? '#888';
+                  const roi = p?.roi;
+                  const amount = Number(p?.baseAmount ?? 0);
+                  const updatesTotal = Number(p?.updatesAmount ?? 0);
+                  const totalInvested = Number(p?.totalInvested ?? 0);
+                  const monthlyEarning = Number(p?.monthlyInterest ?? 0);
+                  const isClosed = p?.status === 'Closed';
                   return (
-                    <tr key={p.dealId ?? idx} className="transition-colors" style={{ borderBottom: '1px solid var(--table-row-border)' }}
+                    <tr key={p.key ?? idx} className="transition-colors" style={{ borderBottom: '1px solid var(--table-row-border)' }}
                       onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
                       onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                       <td className="py-3 px-3 font-bold" style={{ color: 'var(--text-primary)' }}>{idx + 1}</td>
@@ -1597,13 +1857,13 @@ function OfflineSection({ fin, memberColor }) {
                             style={{ background: `${pc}15`, border: `1px solid ${pc}30`, color: pc }}>
                             <I.Activity />
                           </div>
-                          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{p.dealName}</span>
+                          <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{p.dealName ?? '—'}</span>
                         </div>
                       </td>
                       <td className="py-3 px-3">
                         <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                           style={{ background: `${pc}12`, color: pc, border: `1px solid ${pc}25` }}>
-                          {PAYOUT_LABELS[p.amountTye] ?? p.amountTye}
+                          {PAYOUT_LABELS[payoutType] ?? '—'}
                         </span>
                       </td>
                       <td className="py-3 px-3">
@@ -1614,15 +1874,15 @@ function OfflineSection({ fin, memberColor }) {
                           </p>
                         )}
                       </td>
-                      <td className="py-3 px-3 font-bold" style={{ color: '#f58311' }}>{roi}%</td>
+                      <td className="py-3 px-3 font-bold" style={{ color: '#f58311' }}>{Number.isFinite(roi) ? `${roi}%` : '—'}</td>
                       <td className="py-3 px-3 font-bold tabular-nums" style={{ color: '#35a13e' }}>
-                        {monthlyEarning > 0 ? fmtAmt(monthlyEarning) : ''}
+                        {monthlyEarning > 0 ? fmtAmt(monthlyEarning) : '—'}
                       </td>
-                      <td className="py-3 px-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{p.participatedDate}</td>
+                      <td className="py-3 px-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{p.participatedDate ?? '—'}</td>
                       <td className="py-3 px-3">
                         <span className="text-xs px-2 py-0.5 rounded-full font-bold"
-                          style={{ background: 'rgba(53,161,62,0.12)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.25)' }}>
-                          Active
+                          style={{ background: isClosed ? 'rgba(38,115,187,0.12)' : 'rgba(53,161,62,0.12)', color: isClosed ? '#2673bb' : '#35a13e', border: isClosed ? '1px solid rgba(38,115,187,0.25)' : '1px solid rgba(53,161,62,0.25)' }}>
+                          {isClosed ? 'Closed' : 'Active'}
                         </span>
                       </td>
                     </tr>
