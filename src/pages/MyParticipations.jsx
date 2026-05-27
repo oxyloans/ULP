@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getRunningDeals, getUserOfflineParticipationDealsInfo } from "../api/afterlogin-user";
+import { formatINR } from "../utils/currency";
 
 const INDIGO = '#6366f1';
 const PURPLE = '#818cf8';
@@ -51,10 +52,7 @@ const LayersIcon = () => (
 );
 
 function fmtINR(n) {
-  const v = n ?? 0;
-  if (v >= 10000000) return `${(v / 10000000).toFixed(2)}Cr`;
-  if (v >= 100000)   return `${(v / 100000).toFixed(2)}L`;
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(v);
+  return formatINR(n ?? 0);
 }
 
 function fmtNullable(v, fallback = "-") {
@@ -133,14 +131,14 @@ function monthlyEquiv(amount, roi, type) {
   if (!amount || !roi) return 0;
   const m = PAYOUT[type]?.months ?? 1;
   if (m === 0) return 0;
-  return Math.round(amount * (roi / 100) / m);
+  return amount * (roi / 100) / m;
 }
 
 function payoutInterest(amount, roi, type) {
   if (!amount || !roi) return 0;
   const m = PAYOUT[type]?.months ?? 1;
-  if (m === 0) return Math.round(amount * roi / 100);
-  return Math.round(amount * (roi / 100));
+  if (m === 0) return amount * roi / 100;
+  return amount * (roi / 100);
 }
 
 function DealRow({ p, index, navigate }) {
@@ -370,7 +368,7 @@ function DealRow({ p, index, navigate }) {
                   })}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: `2px solid var(--border)`, background: `${INDIGO}05` }}>
+                  <tr style={{ borderTop: `2px solid var(--border)`, background: `${INDIGO}35` }}>
                     <td colSpan={3} className="py-3 px-3 text-xs font-black uppercase tracking-wider" style={{ color: INDIGO }}>Total</td>
                     <td className="py-3 px-3 font-black tabular-nums" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalInvested)}</td>
                     <td className="py-3 px-3" />
@@ -543,7 +541,7 @@ function MigratedDealRow({ d, index }) {
                   ))}
                 </tbody>
                 <tfoot>
-                  <tr style={{ borderTop: "2px solid var(--border)", background: `${AMBER}08` }}>
+                  <tr style={{ borderTop: "2px solid var(--border)", background: `${AMBER}35` }}>
                     <td colSpan={2} className="py-2 px-2 text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total</td>
                     <td className="py-2 px-2 font-black tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(d.entries.reduce((s, e) => s + (e?.participationAmount ?? 0), 0))}</td>
                     <td className="py-2 px-2 font-black tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(participation)}</td>

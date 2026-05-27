@@ -1,14 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getGoldLotDeals } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtINR(n) {
   if (!n && n !== 0) return '—';
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
-  if (n >= 100000)   return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000)     return `₹${(n / 1000).toFixed(0)}K`;
-  return `₹${n}`;
+  return formatINR(n);
 }
 
 // ─── Icons ────────────────────────────────────────────────────────────────────

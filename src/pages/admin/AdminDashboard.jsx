@@ -1,6 +1,7 @@
 ﻿import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPlatformStats, getAdminDeals, getPendingApprovals, getAllUsers, getAdminOfflinePayments, getAdminOxyLoansDeals, getAdminProperties } from "../../api/afterlogin-admin";
+import { formatINR } from "../../utils/currency";
 
 
 const I = {
@@ -167,7 +168,7 @@ export default function AdminDashboard() {
   const openLots    = deals.filter(l => l.dealStatus !== 'ACHIEVED');
   const closedLots  = deals.filter(l => l.dealStatus === 'ACHIEVED');
   const totalRaised = 0; // not in API response
-  const fmtINR = (n) => n >= 10000000 ? `₹${(n/10000000).toFixed(1)}Cr` : n >= 100000 ? `₹${(n/100000).toFixed(1)}L` : `₹${(n/1000).toFixed(0)}K`;
+  const fmtINR = (n) => formatINR(n ?? 0);
 
   const olChart   = [0,0,0,0,0,0,0,0,0,0,0, olDeals.length];
   const offChart  = [0,0,0,0,0,0,0,0,0,0,0, offPay.length];

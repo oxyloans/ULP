@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useFamily } from '../context/FamilyContext';
 import { getMemberFinancials, getFamilyAggregate } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 
 const MEMBER_COLORS = { 'FM-001': '#6366f1', 'FM-002': '#ec4899', 'FM-003': '#10b981' };
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -15,9 +16,7 @@ const I = {
 };
 
 const fmt = (n) => {
-  if (!n && n !== 0) return '₹0';
-  if (n >= 100000) return `₹${(n / 100000).toFixed(1)}L`;
-  return `₹${(n / 1000).toFixed(0)}K`;
+  return formatINR(n ?? 0);
 };
 
 function AnimBar({ pct, color, delay = 0 }) {

@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
-import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings } from '../api/afterlogin-user';
+import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getGoldGrowthDetail } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 import ProfileWarningBanner from '../components/ProfileWarningBanner';
 
 //  SVG Icons 
@@ -159,7 +160,7 @@ function Divider() {
 }
 
 // ─── Animated bar chart ───────────────────────────────────────────────────────
-function AnimatedBarChart({ data, accent = '#2673bb', label = 'Monthly Interest', unit = '₹K' }) {
+function AnimatedBarChart({ data, accent = '#2673bb', label = 'Monthly Interest' }) {
   const [heights, setHeights] = useState(data.map(() => 0));
   const max = Math.max(...data);
   useEffect(() => {
@@ -175,7 +176,7 @@ function AnimatedBarChart({ data, accent = '#2673bb', label = 'Monthly Interest'
       <div className="flex items-center justify-between mb-3">
         <div>
           <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: accent }}>{label}</p>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{unit} — {(() => { const n = new Date(); const s = n.getMonth() < 3 ? n.getFullYear()-1 : n.getFullYear(); return `FY ${s}-${String(s+1).slice(2)}`; })()}</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>₹ — {(() => { const n = new Date(); const s = n.getMonth() < 3 ? n.getFullYear()-1 : n.getFullYear(); return `FY ${s}-${String(s+1).slice(2)}`; })()}</p>
         </div>
         <div className="flex items-center gap-1.5 text-xs px-2 py-1 rounded-full"
           style={{ background: `${accent}12`, color: accent, border: `1px solid ${accent}25` }}>
@@ -192,7 +193,7 @@ function AnimatedBarChart({ data, accent = '#2673bb', label = 'Monthly Interest'
                 <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10
                   text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
                   style={{ background: `${accent}ee`, color: '#fff', fontSize: 9 }}>
-                  {unit === '₹K' ? `₹${v}K` : `₹${v}L`}
+                  {formatINR(v)}
                 </div>
                 <div className="w-full rounded-t"
                   style={{
@@ -209,9 +210,9 @@ function AnimatedBarChart({ data, accent = '#2673bb', label = 'Monthly Interest'
       </div>
       <div className="flex items-center gap-5 mt-3 pt-3" style={{ borderTop: '1px solid var(--border)' }}>
         {[
-          { label: 'Latest',     value: `₹${data[data.length - 1]}K`, color: accent },
-          { label: 'Total',      value: `₹${(data.reduce((a, b) => a + b, 0) / 10).toFixed(1)}L`, color: 'var(--text-primary)' },
-          { label: 'Avg/Month',  value: `₹${Math.round(data.reduce((a, b) => a + b, 0) / data.length)}K`, color: '#35a13e' },
+          { label: 'Latest',     value: formatINR(data[data.length - 1]), color: accent },
+          { label: 'Total',      value: formatINR(data.reduce((a, b) => a + b, 0)), color: 'var(--text-primary)' },
+          { label: 'Avg/Month',  value: formatINR(data.reduce((a, b) => a + b, 0) / data.length), color: '#35a13e' },
         ].map(s => (
           <div key={s.label}>
             <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
@@ -380,7 +381,7 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
                 style={{ background: '#2673bbee', color: '#fff', fontSize: 9 }}>
-                {aggOl[i] >= 1000 ? `₹${(aggOl[i]/1000).toFixed(1)}K` : `₹${Math.round(aggOl[i])}`}
+                {formatINR(aggOl[i])}
               </div>
               <div className="w-full rounded-t"
                 style={{ height: `${heights[i]?.ol ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#5b9fd4,#2673bb)', boxShadow: (heights[i]?.ol ?? 0) > 60 ? '0 0 8px #2673bb55' : 'none' }} />
@@ -388,7 +389,7 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
             <div className="flex-1 flex flex-col justify-end relative" style={{ height: 80 }}>
               <div className="absolute -top-6 left-1/2 -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity z-10 text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none"
                 style={{ background: '#f58311ee', color: '#fff', fontSize: 9 }}>
-                {aggOff[i] >= 1000 ? `₹${(aggOff[i]/1000).toFixed(1)}K` : `₹${Math.round(aggOff[i])}`}
+                {formatINR(aggOff[i])}
               </div>
               <div className="w-full rounded-t"
                 style={{ height: `${heights[i]?.off ?? 0}%`, transition: 'height 0.65s cubic-bezier(0.34,1.56,0.64,1)', background: 'linear-gradient(180deg,#ffa040,#f58311)', boxShadow: (heights[i]?.off ?? 0) > 60 ? '0 0 8px #f5831155' : 'none' }} />
@@ -412,10 +413,7 @@ function DualBarChart({ olData, offData, memberColor, labels = { ol: 'OxyLoans',
           { label: 'Combined', value: aggOl.map((v,i) => v + aggOff[i]), color: memberColor },
         ].map(s => {
           const total = s.value.reduce((a,b) => a+b, 0); // raw ₹
-          const trim = (val) => val.replace(/\.?0+$/, '');
-          const display = total >= 10000000 ? `₹${trim((total/10000000).toFixed(2))}Cr`
-                        : total >= 100000   ? `₹${trim((total/100000).toFixed(2))}L`
-                        : `₹${Math.round(total).toLocaleString('en-IN')}`;
+          const display = formatINR(total);
           return (
             <div key={s.label}>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
@@ -501,7 +499,7 @@ function OxyLoansSection({ fin, memberColor }) {
     const n = parseFloat(d.amount.replace(/[₹,]/g, ''));
     return sum + (isNaN(n) ? 0 : n);
   }, 0);
-  const fmtAmt = (n) => n >= 100000 ? `₹${(n / 100000).toFixed(1)}L` : `₹${(n / 1000).toFixed(0)}K`;
+  const fmtAmt = (n) => formatINR(n ?? 0);
 
   const kpis = [
     { label: 'Monthly Interest', value: ol.monthlyInterest, sub: 'Earned this month',                    trend: '+8.3%', trendUp: true,  color: memberColor,  Icon: I.Percent,     badge: 'vs last month'              },
@@ -810,7 +808,7 @@ function RunningDealsSection() {
       .finally(() => setLoading(false));
   }, []);
 
-  const fmtINR = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n ?? 0);
+  const fmtINR = (n) => formatINR(n ?? 0);
 
   const participations = data?.participationInfo ?? [];
   
@@ -1241,15 +1239,20 @@ function OfflineSection({ fin, memberColor }) {
   const [participationData, setParticipationData] = useState(null);
   const [migratedDeals, setMigratedDeals] = useState([]);
   const [goldEarningsData, setGoldEarningsData] = useState(null);
+  const [goldInvestedByDealId, setGoldInvestedByDealId] = useState({});
   const PAYOUT_LABELS = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
   const PAYOUT_COLORS = { MONTHLY: '#35a13e', QUARTELY: '#2673bb', HALFLY: '#f58311', YEARLY: '#e95330', ENDOFTHEDEAL: '#6366f1' };
 
   useEffect(() => {
-    Promise.allSettled([
-      getRunningDeals(),
-      getUserOfflineParticipationDealsInfo(),
-      getGoldDealsEarnings(),
-    ]).then(([runningRes, migratedRes, goldRes]) => {
+    let ignore = false;
+    const load = async () => {
+      const [runningRes, migratedRes, goldRes] = await Promise.allSettled([
+        getRunningDeals(),
+        getUserOfflineParticipationDealsInfo(),
+        getGoldDealsEarnings(),
+      ]);
+      if (ignore) return;
+
       if (runningRes.status === 'fulfilled' && runningRes.value) {
         setParticipationData(runningRes.value);
       }
@@ -1260,21 +1263,49 @@ function OfflineSection({ fin, memberColor }) {
       }
       if (goldRes.status === 'fulfilled' && goldRes.value) {
         setGoldEarningsData(goldRes.value);
+        const runningGold = Array.isArray(goldRes.value?.userEarenInfoResponse) ? goldRes.value.userEarenInfoResponse : [];
+        const uniqueDealIds = Array.from(new Set(runningGold.map(d => String(d?.dealId ?? '')).filter(Boolean)));
+        if (uniqueDealIds.length === 0) {
+          setGoldInvestedByDealId({});
+          return;
+        }
+        const growthResults = await Promise.allSettled(uniqueDealIds.map(dealId => getGoldGrowthDetail(dealId)));
+        if (ignore) return;
+        const amountMap = {};
+        growthResults.forEach((res, idx) => {
+          const dealId = uniqueDealIds[idx];
+          if (res.status !== 'fulfilled') return;
+          const rows = Array.isArray(res.value) ? res.value : (res.value ? [res.value] : []);
+          const totalApproved = rows.reduce((sum, row) => (
+            sum + Number(
+              row?.approvedAmount
+              ?? row?.participatedAmount
+              ?? row?.participationAmount
+              ?? row?.amount
+              ?? 0
+            )
+          ), 0);
+          amountMap[dealId] = totalApproved;
+        });
+        setGoldInvestedByDealId(amountMap);
       } else {
         setGoldEarningsData(null);
+        setGoldInvestedByDealId({});
       }
-    }).catch(() => {});
+    };
+    load().catch(() => {});
+    return () => { ignore = true; };
   }, []);
 
   //  Helpers 
   const fmtAmt = (n) => {
-    if (!n && n !== 0) return '₹0';
-    const abs = Math.abs(n);
-    const trim = (val) => val.replace(/\.?0+$/, '');
-    if (abs >= 10000000) return `₹${trim((n / 10000000).toFixed(2))}Cr`;
-    if (abs >= 100000)   return `₹${trim((n / 100000).toFixed(2))}L`;
-    // Under 1L — show exact number
-    return `₹${Math.round(n).toLocaleString('en-IN')}`;
+    const value = Number(n ?? 0);
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    }).format(Number.isFinite(value) ? value : 0);
   };
 
   // Parse "DD/MM/YYYY"  0-based month index
@@ -1376,7 +1407,20 @@ function OfflineSection({ fin, memberColor }) {
   const migratedMonthlyInterest = mergedMigrated.reduce((s, d) => s + Number(d?.monthlyInterest ?? 0), 0);
   const migratedDealCount = mergedMigrated.length;
   const migratedEntryCount = mergedMigrated.reduce((s, d) => s + Number(d?.entryCount ?? 0), 0);
-  const goldDealsInvested = dedupedGoldDeals.reduce((s, d) => s + Number(d?.participatedAmount ?? 0), 0);
+  const getGoldInvestedAmount = (d) => Number(
+    d?.participatedAmount
+    ?? d?.participationAmount
+    ?? d?.investedAmount
+    ?? d?.totalInvestedAmount
+    ?? d?.approvedAmount
+    ?? d?.amount
+    ?? 0
+  );
+  const goldDealsInvested = dedupedGoldDeals.reduce((s, d) => {
+    const dealId = String(d?.dealId ?? '');
+    const resolved = Number(goldInvestedByDealId[dealId] ?? 0);
+    return s + (resolved > 0 ? resolved : getGoldInvestedAmount(d));
+  }, 0);
   const goldDealsCount = dedupedGoldDeals.length;
   const monthlyInvested    = Array(12).fill(0);
   const monthlyInterestArr = Array(12).fill(0);
@@ -1425,15 +1469,15 @@ function OfflineSection({ fin, memberColor }) {
   const goldTimelineSource = dedupedGoldDeals;
   goldTimelineSource.forEach((d) => {
     const month = parseMonth(d?.participatedDate ?? d?.participationDate ?? d?.createdDate ?? d?.updatedDate);
-    const amount = Number(d?.participatedAmount ?? 0);
+    const amount = getGoldInvestedAmount(d);
     if (month >= 0 && month < 12 && amount > 0) {
       monthlyInvested[month] += amount;
     }
   });
 
   // Keep raw ₹ — no division, no rounding
-  const investedChart = monthlyInvested.map(v => Math.round(v));
-  const interestChart = monthlyInterestArr.map(v => Math.round(v));
+  const investedChart = monthlyInvested.map(v => Number(v ?? 0));
+  const interestChart = monthlyInterestArr.map(v => Number(v ?? 0));
 
   //  KPI values 
   const runningTotalInvested = participations.reduce((s, p) => {
@@ -1457,7 +1501,7 @@ function OfflineSection({ fin, memberColor }) {
       else if (e.payout === 'QUARTELY')     mr = (roi / 100) / 3;
       else if (e.payout === 'HALFLY')       mr = (roi / 100) / 6;
       else if (e.payout === 'YEARLY')       mr = (roi / 100) / 12;
-      return s + Math.round(e.amount * mr);
+      return s + (e.amount * mr);
     }, 0);
   }, 0);
   const totalMonthlyInterest = runningMonthlyInterest + migratedMonthlyInterest;
@@ -1469,7 +1513,7 @@ function OfflineSection({ fin, memberColor }) {
     else if (payout === 'QUARTELY')     mr = (roi / 100) / 3;
     else if (payout === 'HALFLY')       mr = (roi / 100) / 6;
     else if (payout === 'YEARLY')       mr = (roi / 100) / 12;
-    return Math.round(amount * mr);
+    return amount * mr;
   }
 
   const getDealBucket = (p) => {
@@ -1486,11 +1530,22 @@ function OfflineSection({ fin, memberColor }) {
   ].map(row => ({
     ...row,
     deals: 0,
-    monthlyInterest: 0,
+    monthly: 0,
+    quarterly: 0,
+    halfYearly: 0,
+    yearly: 0,
     activeDeals: 0,
     closedDeals: 0,
     totalInvested: 0,
   }));
+
+  const addPayoutCount = (row, payoutType, weight = 1) => {
+    const t = normalizePayoutType(payoutType);
+    if (t === 'MONTHLY') row.monthly += weight;
+    else if (t === 'QUARTELY') row.quarterly += weight;
+    else if (t === 'HALFLY') row.halfYearly += weight;
+    else if (t === 'YEARLY') row.yearly += weight;
+  };
 
   const summaryMap = Object.fromEntries(summaryRows.map(r => [r.key, r]));
   participations.forEach((p) => {
@@ -1505,10 +1560,8 @@ function OfflineSection({ fin, memberColor }) {
 
     row.deals += 1;
     row.totalInvested += (p.participatedAmount ?? 0) + investedFromUpdates;
-    row.monthlyInterest += monthlyEquivalent(p.participatedAmount ?? 0, p.amountTye, roi);
-    row.monthlyInterest += updates.reduce((s, u) => (
-      s + monthlyEquivalent(u.updationParticipation ?? 0, u.amountTye ?? p.amountTye, roi)
-    ), 0);
+    addPayoutCount(row, p.amountTye, 1);
+    updates.forEach((u) => addPayoutCount(row, u.amountTye ?? p.amountTye, 1));
     if (isClosed) row.closedDeals += 1;
     else row.activeDeals += 1;
   });
@@ -1519,25 +1572,29 @@ function OfflineSection({ fin, memberColor }) {
     row.deals += 1;
     row.activeDeals += 1;
     row.totalInvested += Number(d?.participationAmount ?? 0);
-    row.monthlyInterest += Number(d?.monthlyInterest ?? 0);
+    addPayoutCount(row, d?.payOutType, Number(d?.entryCount ?? 1) || 1);
   });
   if (summaryMap.gold) {
     summaryMap.gold.deals += goldDealsCount;
     summaryMap.gold.activeDeals += goldDealsCount;
     summaryMap.gold.totalInvested += goldDealsInvested;
+    dedupedGoldDeals.forEach((d) => addPayoutCount(summaryMap.gold, d?.participationType, 1));
   }
 
   const totalSummary = summaryRows.reduce((acc, r) => ({
     key: 'total',
     label: 'Total',
     deals: acc.deals + r.deals,
-    monthlyInterest: acc.monthlyInterest + r.monthlyInterest,
+    monthly: acc.monthly + r.monthly,
+    quarterly: acc.quarterly + r.quarterly,
+    halfYearly: acc.halfYearly + r.halfYearly,
+    yearly: acc.yearly + r.yearly,
     activeDeals: acc.activeDeals + r.activeDeals,
     closedDeals: acc.closedDeals + r.closedDeals,
     totalInvested: acc.totalInvested + r.totalInvested,
-  }), { deals: 0, monthlyInterest: 0, activeDeals: 0, closedDeals: 0, totalInvested: 0 });
+  }), { deals: 0, monthly: 0, quarterly: 0, halfYearly: 0, yearly: 0, activeDeals: 0, closedDeals: 0, totalInvested: 0 });
 
-  const normalizePayoutType = (type) => {
+  function normalizePayoutType(type) {
     const t = String(type ?? '').trim().toUpperCase();
     if (t === 'MONTHLY') return 'MONTHLY';
     if (t === 'QUARTELY' || t === 'QUARTERLY') return 'QUARTELY';
@@ -1545,6 +1602,25 @@ function OfflineSection({ fin, memberColor }) {
     if (t === 'YEARLY') return 'YEARLY';
     if (t === 'ENDOFTHEDEAL' || t === 'END OF DEAL') return 'ENDOFTHEDEAL';
     return null;
+  }
+  const payoutAmountFromAnnualPct = (amount, payoutType, annualPct) => {
+    if (!amount || !annualPct) return 0;
+    const p = normalizePayoutType(payoutType);
+    const annualAmount = amount * (annualPct / 100);
+    if (p === 'MONTHLY') return annualAmount / 12;
+    if (p === 'QUARTELY') return annualAmount / 4;
+    if (p === 'HALFLY') return annualAmount / 2;
+    if (p === 'YEARLY') return annualAmount;
+    return 0;
+  };
+  const payoutRoiFromAnnualPct = (payoutType, annualPct) => {
+    if (!annualPct) return 0;
+    const p = normalizePayoutType(payoutType);
+    if (p === 'MONTHLY') return Number((annualPct / 12).toFixed(2));
+    if (p === 'QUARTELY') return Number((annualPct / 4).toFixed(2));
+    if (p === 'HALFLY') return Number((annualPct / 2).toFixed(2));
+    if (p === 'YEARLY') return Number(annualPct.toFixed(2));
+    return 0;
   };
   const runningTableDeals = participations.map((p, idx) => {
     const updatesAmount = (p.updatedParticipation ?? []).reduce((s, u) => s + Number(u?.updationParticipation ?? 0), 0);
@@ -1562,6 +1638,8 @@ function OfflineSection({ fin, memberColor }) {
       updatesAmount,
       totalInvested: totalAmount,
       roi,
+      roiDisplay: roi,
+      payoutAmount: totalAmount * (roi / 100),
       monthlyInterest: monthlyEquivalent(totalAmount, payout, roi),
       participatedDate: p?.participatedDate ?? '—',
       status: isClosed ? 'Closed' : 'Active',
@@ -1571,11 +1649,13 @@ function OfflineSection({ fin, memberColor }) {
     key: `migrated-${d?.dealName ?? 'deal'}-${idx}`,
     source: 'migrated',
     dealName: d?.dealName ?? 'Migrated',
-    payoutType: normalizePayoutType(d?.payOutType),
+    payoutType: normalizePayoutType(d?.payOutType) ?? 'MONTHLY',
     baseAmount: Number(d?.participationAmount ?? 0),
     updatesAmount: 0,
     totalInvested: Number(d?.participationAmount ?? 0),
     roi: Number(d?.roi ?? 0),
+    roiDisplay: Number(d?.roi ?? 0),
+    payoutAmount: Number(d?.monthlyInterest ?? 0),
     monthlyInterest: Number(d?.monthlyInterest ?? 0),
     participatedDate: d?.earliestDate ?? '—',
     status: 'Active',
@@ -1585,7 +1665,11 @@ function OfflineSection({ fin, memberColor }) {
     const id = String(d?.dealId ?? '');
     if (!id) return;
     const payoutType = normalizePayoutType(d?.participationType);
-    const amount = Number(d?.participatedAmount ?? 0);
+    const resolved = Number(goldInvestedByDealId[id] ?? 0);
+    const amount = resolved > 0 ? resolved : getGoldInvestedAmount(d);
+    const annualPct = Number(d?.interestEarnedPercentage ?? 0);
+    const payoutAmount = payoutAmountFromAnnualPct(amount, payoutType, annualPct);
+    const payoutRoi = payoutRoiFromAnnualPct(payoutType, annualPct);
     goldById.set(id, {
       key: `gold-running-${id}-${idx}`,
       source: 'gold',
@@ -1594,13 +1678,65 @@ function OfflineSection({ fin, memberColor }) {
       baseAmount: amount,
       updatesAmount: 0,
       totalInvested: amount,
-      roi: null,
-      monthlyInterest: 0,
+      roi: annualPct > 0 ? Number(annualPct.toFixed(2)) : null,
+      roiDisplay: payoutRoi > 0 ? payoutRoi : null,
+      payoutAmount,
+      monthlyInterest: payoutAmountFromAnnualPct(amount, payoutType, annualPct),
       participatedDate: d?.participatedDate ?? d?.participationDate ?? '—',
       status: 'Active',
     });
   });
   const allTableDeals = [...runningTableDeals, ...migratedTableDeals, ...Array.from(goldById.values())];
+  const dealSummaryBaseRows = [
+    { key: 'sd', label: 'SD Lot' },
+    { key: 'gold', label: 'Gold Deals' },
+    { key: 'asset', label: 'Asset' },
+  ].map((r) => ({
+    ...r,
+    monthly: 0,
+    quarterly: 0,
+    halfYearly: 0,
+    yearly: 0,
+    activeDeals: 0,
+    closedDeals: 0,
+    totalInvested: 0,
+  }));
+  const dealSummaryBaseMap = Object.fromEntries(dealSummaryBaseRows.map(r => [r.key, r]));
+  const bucketFromRow = (d) => {
+    if (d?.source === 'gold') return 'gold';
+    const text = `${d?.dealName ?? ''}`.toLowerCase();
+    if (text.includes('gold')) return 'gold';
+    if (text.includes('asset') || text.includes('property')) return 'asset';
+    return 'sd';
+  };
+  const addPayoutAmountToSummary = (row, payoutType, amount) => {
+    const t = normalizePayoutType(payoutType);
+    const val = Number(amount ?? 0);
+    if (t === 'MONTHLY') row.monthly += val;
+    else if (t === 'QUARTELY') row.quarterly += val;
+    else if (t === 'HALFLY') row.halfYearly += val;
+    else if (t === 'YEARLY') row.yearly += val;
+  };
+  allTableDeals.forEach((d) => {
+    const row = dealSummaryBaseMap[bucketFromRow(d)];
+    if (!row) return;
+    row.totalInvested += Number(d?.totalInvested ?? 0);
+    if (d?.status === 'Closed') row.closedDeals += 1;
+    else row.activeDeals += 1;
+    addPayoutAmountToSummary(row, d?.payoutType, d?.payoutAmount ?? 0);
+  });
+  const dealSummaryTotal = dealSummaryBaseRows.reduce((acc, r) => ({
+    key: 'total',
+    label: 'Total',
+    monthly: acc.monthly + r.monthly,
+    quarterly: acc.quarterly + r.quarterly,
+    halfYearly: acc.halfYearly + r.halfYearly,
+    yearly: acc.yearly + r.yearly,
+    activeDeals: acc.activeDeals + r.activeDeals,
+    closedDeals: acc.closedDeals + r.closedDeals,
+    totalInvested: acc.totalInvested + r.totalInvested,
+  }), { monthly: 0, quarterly: 0, halfYearly: 0, yearly: 0, activeDeals: 0, closedDeals: 0, totalInvested: 0 });
+  const dealSummaryRowsForTable = [...dealSummaryBaseRows, dealSummaryTotal];
   const activeDeals = allTableDeals.filter(d => d.status === 'Active').length;
   const closedDeals = allTableDeals.filter(d => d.status === 'Closed').length;
   const totalParticipationCount = allTableDeals.length;
@@ -1675,7 +1811,7 @@ function OfflineSection({ fin, memberColor }) {
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-header-bg)' }}>
-                    {['Deal', 'Monthly Interest', 'Active Deals', 'Closed Deals', 'Total Invested'].map(h => (
+                    {['Deal', 'Monthly', 'Quarterly', 'Half-Yearly', 'Yearly', 'Active', 'Closed', 'Total Invested'].map(h => (
                       <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>
                         {h}
                       </th>
@@ -1683,14 +1819,19 @@ function OfflineSection({ fin, memberColor }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {[...summaryRows, totalSummary].map((r) => (
+                  {dealSummaryRowsForTable.map((r) => (
                     <tr key={r.key}
                       style={{
                         borderBottom: '1px solid var(--table-row-border)',
-                        background: r.key === 'total' ? 'rgba(38,115,187,0.06)' : 'transparent',
+                        background: r.key === 'total'
+                          ? 'rgba(38,115,187,0.06)'
+                          : 'transparent',
                       }}>
                       <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-primary)' }}>{r.label}</td>
-                      <td className="py-3 px-4 font-semibold" style={{ color: '#35a13e' }}>{fmtAmt(r.monthlyInterest)}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#35a13e' }}>{fmtAmt(r.monthly)}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#2673bb' }}>{fmtAmt(r.quarterly)}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#f58311' }}>{fmtAmt(r.halfYearly)}</td>
+                      <td className="py-3 px-4 font-semibold" style={{ color: '#6366f1' }}>{fmtAmt(r.yearly)}</td>
                       <td className="py-3 px-4 font-semibold" style={{ color: '#35a13e' }}>{r.activeDeals}</td>
                       <td className="py-3 px-4 font-semibold" style={{ color: '#2673bb' }}>{r.closedDeals}</td>
                       <td className="py-3 px-4 font-semibold" style={{ color: '#f58311' }}>{fmtAmt(r.totalInvested)}</td>
@@ -1781,7 +1922,7 @@ function OfflineSection({ fin, memberColor }) {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-header-bg)' }}>
-                  {['#', 'Deal Name', 'Payout Type', 'Total Invested', 'ROI %', 'Monthly Interest', 'Participated Date', 'Status'].map(h => (
+                    {['#', 'Deal Name', 'Payout Type', 'Total Invested', 'ROI %', 'Payout Interest', 'Participated Date', 'Status'].map(h => (
                     <th key={h} className="text-left py-3 px-3 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
                 </tr>
@@ -1792,11 +1933,11 @@ function OfflineSection({ fin, memberColor }) {
                 ) : filteredDeals.map((p, idx) => {
                   const payoutType = normalizePayoutType(p?.payoutType);
                   const pc = PAYOUT_COLORS[payoutType] ?? '#888';
-                  const roi = p?.roi;
+                  const roi = p?.roiDisplay ?? p?.roi;
                   const amount = Number(p?.baseAmount ?? 0);
                   const updatesTotal = Number(p?.updatesAmount ?? 0);
                   const totalInvested = Number(p?.totalInvested ?? 0);
-                  const monthlyEarning = Number(p?.monthlyInterest ?? 0);
+                  const payoutInterest = Number(p?.payoutAmount ?? p?.monthlyInterest ?? 0);
                   const isClosed = p?.status === 'Closed';
                   return (
                     <tr key={p.key ?? idx} className="transition-colors" style={{ borderBottom: '1px solid var(--table-row-border)' }}
@@ -1827,7 +1968,7 @@ function OfflineSection({ fin, memberColor }) {
                       <td className="py-3 px-3">
                         <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                           style={{ background: `${pc}12`, color: pc, border: `1px solid ${pc}25` }}>
-                          {PAYOUT_LABELS[payoutType] ?? '—'}
+                          {PAYOUT_LABELS[payoutType] ?? PAYOUT_LABELS["MONTHLY"]}
                         </span>
                       </td>
                       <td className="py-3 px-3">
@@ -1840,7 +1981,7 @@ function OfflineSection({ fin, memberColor }) {
                       </td>
                       <td className="py-3 px-3 font-bold" style={{ color: '#f58311' }}>{Number.isFinite(roi) ? `${roi}%` : '—'}</td>
                       <td className="py-3 px-3 font-bold tabular-nums" style={{ color: '#35a13e' }}>
-                        {monthlyEarning > 0 ? fmtAmt(monthlyEarning) : '—'}
+                        {payoutInterest > 0 ? fmtAmt(payoutInterest) + ' ' + (payoutType === 'MONTHLY' ? 'MLY' : payoutType === 'YEARLY' ? 'YLY' : payoutType === 'QUARTELY' ? 'QLY' : payoutType === 'HALFLY' ? 'HLF' : 'MLY') : '—'}
                       </td>
                       <td className="py-3 px-3 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{p.participatedDate ?? '—'}</td>
                       <td className="py-3 px-3">
@@ -2030,7 +2171,7 @@ function CombinedAnalysis({ fin, memberColor }) {
   const olTotal  = parseAmt(ol.totalEarned);
   const offTotal = parseAmt(off.totalPaid);
   const combined = olTotal + offTotal;
-  const fmtL = (n) => `₹${(n / 100000).toFixed(1)}L`;
+  const fmtL = (n) => formatINR(n ?? 0);
 
   const olPct  = combined > 0 ? Math.round((olTotal  / combined) * 100) : 50;
   const offPct = 100 - olPct;
@@ -2462,6 +2603,7 @@ function MemberDashboard({ memberId, mode }) {
   const [fin, setFin]             = useState(null);
   const [loading, setLoading]     = useState(true);
   const [profile, setProfile]     = useState(null);
+  const [hasMigratedData, setHasMigratedData] = useState(false);
   const [migrateOpen, setMigrateOpen] = useState(false);
   const { user } = useAuth();
   const memberColor = MEMBER_COLORS[memberId] ?? '#2673bb';
@@ -2477,6 +2619,15 @@ function MemberDashboard({ memberId, mode }) {
     getUserProfile()
       .then(p => { if (p) setProfile(p); })
       .catch(() => {});
+
+    getUserOfflineParticipationDealsInfo()
+      .then((rows) => {
+        const hasRows = Array.isArray(rows) && rows.some((r) => Number(r?.currentPrincipalAmount ?? r?.participationAmount ?? 0) > 0);
+        setHasMigratedData(hasRows);
+      })
+      .catch(() => {
+        setHasMigratedData(false);
+      });
   }, [memberId]);
 
   const emptyFin = {
@@ -2523,19 +2674,21 @@ function MemberDashboard({ memberId, mode }) {
             <CopyId id={id} />
           )}
         </div>
-        <div>
-          <button
-            onClick={() => setMigrateOpen(true)}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
-            style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 14px rgba(38,115,187,0.3)', border: '1px solid rgba(38,115,187,0.3)' }}>
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-              <polyline points="17 8 12 3 7 8"/>
-              <line x1="12" y1="3" x2="12" y2="15"/>
-            </svg>
-            Migrate My Data
-          </button>
-        </div>
+        {!hasMigratedData && (
+          <div>
+            <button
+              onClick={() => setMigrateOpen(true)}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+              style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 14px rgba(38,115,187,0.3)', border: '1px solid rgba(38,115,187,0.3)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                <polyline points="17 8 12 3 7 8"/>
+                <line x1="12" y1="3" x2="12" y2="15"/>
+              </svg>
+              Migrate My Data
+            </button>
+          </div>
+        )}
       </div>
 
       {migrateOpen && <MigrateDataModal displayName={displayName} onClose={() => setMigrateOpen(false)} />}

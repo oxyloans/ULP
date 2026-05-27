@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { downloadGoldMouForCurrentUser, getAllParticipationByUser, getGoldDealsEarnings, getGoldGrowthDetail } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const GOLD   = '#f59e0b';
@@ -83,11 +84,7 @@ function fmt(n, decimals = 2) {
 
 function fmtINR(n) {
   if (n == null || isNaN(n)) return '—';
-  const abs = Math.abs(n);
-  if (abs >= 10000000) return `₹${(n / 10000000).toFixed(2)}Cr`;
-  if (abs >= 100000)   return `₹${(n / 100000).toFixed(2)}L`;
-  if (abs >= 1000)     return `₹${(n / 1000).toFixed(1)}K`;
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+  return formatINR(n);
 }
 
 function payoutLabel(type) {

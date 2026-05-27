@@ -3,13 +3,14 @@ import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { getPropertyById, GoldRate } from '../api/afterlogin-user';
 import { get, post } from '../api/client';
 import { getUserId } from '../api/client';
+import { formatINR } from '../utils/currency';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function fmtINR(n) {
   if (!n && n !== 0) return '—';
   const num = Number(n);
   if (isNaN(num)) return '—';
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(num);
+  return formatINR(num);
 }
 
 function capitalizeFirst(s) {
@@ -251,7 +252,7 @@ function FinalModal({ userData, totalAmounts, onOk }) {
 function RoiOfferCard({ item, selected, onSelect, propertyType }) {
   const profit = getProfitSharing(item.amountType);
   const accent = '#f59e0b';
-  const fmt = (n) => n != null ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n) : null;
+  const fmt = (n) => n != null ? formatINR(n) : null;
 
   // Bar heights for mini chart decoration (static per card type)
   const bars = [30, 55, 40, 70, 50, 85, 60, 75, 45, 90];
@@ -499,7 +500,7 @@ export default function GoldDealContribute() {
   // Selected offer details
   const selectedOffer = roiOffers.find(o => o.amountType === selectedType);
   const feePercentage = selectedOffer?.feePercentage1 ?? 0;
-  const feeAmount     = feePercentage > 0 ? Math.round(Number(amount || 0) * (feePercentage / 100) * 1.18) : 0;
+  const feeAmount     = feePercentage > 0 ? Number((Number(amount || 0) * (feePercentage / 100) * 1.18).toFixed(2)) : 0;
 
   // Validation
   const validate = () => {
@@ -709,7 +710,7 @@ export default function GoldDealContribute() {
               <div className="flex items-center gap-2">
                 <span className="text-xs font-semibold" style={{ color: `${accent}77` }}>Max Capital</span>
                 <span className="text-sm font-extrabold" style={{ color: accent, fontFamily: "'JetBrains Mono', monospace" }}>
-                  {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(deal.reservedPrice)}
+                  {formatINR(deal.reservedPrice)}
                 </span>
               </div>
             )}

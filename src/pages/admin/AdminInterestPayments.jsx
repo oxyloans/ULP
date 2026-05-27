@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllLoanActiveDeals } from '../../api/afterlogin-user';
+import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
@@ -15,10 +16,7 @@ const SearchIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 export function fmtINR(n) {
   if (!n && n !== 0) return '—';
-  const abs = Math.abs(n);
-  if (abs >= 10000000) return `₹${(n / 10000000).toFixed(2).replace(/\.?0+$/, '')}Cr`;
-  if (abs >= 100000)   return `₹${(n / 100000).toFixed(2).replace(/\.?0+$/, '')}L`;
-  return `₹${Math.round(n).toLocaleString('en-IN')}`;
+  return formatINR(n);
 }
 
 export const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];

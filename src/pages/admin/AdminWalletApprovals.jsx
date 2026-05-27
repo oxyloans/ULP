@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getWalletSlips, approveWalletSlip, rejectWalletSlip } from '../../api/afterlogin-admin';
 import FilePreviewModal from '../../components/FilePreviewModal';
+import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const CheckIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>;
@@ -11,7 +12,7 @@ const WalletIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const RefreshIcon= () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
 
 function fmtINR(n) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n ?? 0);
+  return formatINR(n ?? 0);
 }
 
 // ─── Map API response → internal shape ───────────────────────────────────────

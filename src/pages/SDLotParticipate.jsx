@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { getSdLotDetail, getWalletBalance, participateInDeal, getRunningDeals } from '../api/afterlogin-user';
 import { useProfile } from '../context/ProfileContext';
+import { formatINR } from '../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -29,7 +30,7 @@ function CopyBtn({ text }) {
 
 function fmtINR(n) {
   if (!n && n !== 0) return '—';
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+  return formatINR(n);
 }
 
 export default function SDLotParticipate() {

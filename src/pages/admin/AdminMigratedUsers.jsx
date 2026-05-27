@@ -3,6 +3,7 @@ import { getAllMigratedUsers, approveMigratedUser } from '../../api/afterlogin-a
 
 const APPROVED_BY_OPTIONS = ['SUBBU', 'ADMIN'];
 const PAGE_SIZE = 20;
+const EXCLUDED_USER_IDS = new Set(['d70aeb27-9800-4a2a-ac56-54648554db92']);
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const MigrateIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
@@ -370,7 +371,7 @@ export default function AdminMigratedUsers() {
     getAllMigratedUsers()
       .then(res => {
         const list = Array.isArray(res) ? res : res?.data ?? res?.users ?? res?.content ?? [];
-        setAllData(list);
+        setAllData(list.filter(u => !EXCLUDED_USER_IDS.has(u?.userId)));
         setPage(0);
       })
       .catch(e => setError(e.message ?? 'Failed to load migrated users'))

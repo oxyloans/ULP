@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals } from "../../api/afterlogin-admin";
+import { formatINR } from "../../utils/currency";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 const DEAL_TYPES       = ["NORMAL", "TEST"];
@@ -156,12 +157,9 @@ function BankSelect({ value, onChange, accounts, loading, error }) {
 
 function fmtINR(n) {
   if (!n) return "";
-  const num = parseInt(String(n).replace(/,/g, ""), 10);
+  const num = Number(String(n).replace(/,/g, ""));
   if (isNaN(num)) return "";
-  if (num >= 10000000) return "₹" + (num / 10000000).toFixed(2) + "Cr";
-  if (num >= 100000)   return "₹" + (num / 100000).toFixed(2) + "L";
-  if (num >= 1000)     return "₹" + (num / 1000).toFixed(0) + "K";
-  return "₹" + num;
+  return formatINR(num);
 }
 function numVal(s) { return parseInt(String(s || "").replace(/,/g, ""), 10) || 0; }
 function toLocale(s) {

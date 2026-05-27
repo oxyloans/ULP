@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadDepositSlip, analyzeDepositSlip, getWalletBalance, getUserProfile, getAdminBankDetailsInfo } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 
 const USE_DUMMY = false; // wallet balance now fetched from real API
 
@@ -14,8 +15,7 @@ const ArrowRight  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCo
 const TrendUp     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>;
 
 function fmtINR(n) {
-  if (n >= 100000) return `₹${(n / 100000).toFixed(2)}L`;
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+  return formatINR(n ?? 0);
 }
 
 // ─── Virtual Debit Card ───────────────────────────────────────────────────────

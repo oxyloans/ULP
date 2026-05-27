@@ -8,15 +8,10 @@ import {
   updateSlipDescription,
   uploadGoldParticipationSlip,
 } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 
 function fmtINR(n) {
-  const num = Number(n ?? 0);
-  if (Number.isNaN(num)) return '₹0';
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    maximumFractionDigits: 0,
-  }).format(num);
+  return formatINR(n ?? 0);
 }
 
 function statusBadge(status) {

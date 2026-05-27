@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { getUserInterestCalculations } from '../api/afterlogin-user';
+import { formatINR } from '../utils/currency';
 
 const GREEN = '#10b981';
 const BLUE = '#6366f1';
@@ -8,9 +9,7 @@ const GOLD = '#f59e0b';
 const RED = '#ef4444';
 
 function fmtINR(n) {
-  const num = Number(n ?? 0);
-  if (Number.isNaN(num)) return '₹0';
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(num);
+  return formatINR(n ?? 0);
 }
 
 function statusChip(status) {

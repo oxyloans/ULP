@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getSdLots } from '../api/afterlogin-user';
 import { useAuth } from '../context/AuthContext';
+import { formatINR } from '../utils/currency';
 
 const USE_DUMMY = false;
 
@@ -11,10 +12,7 @@ const Copy      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColo
 const ArrowRight= () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>;
 
 function fmtINR(n) {
-  if (n >= 10000000) return `₹${(n / 10000000).toFixed(1)}Cr`;
-  if (n >= 100000)   return `₹${(n / 100000).toFixed(1)}L`;
-  if (n >= 1000)     return `₹${(n / 1000).toFixed(0)}K`;
-  return `₹${n}`;
+  return formatINR(n ?? 0);
 }
 
 function CopyBtn({ text }) {
@@ -338,7 +336,7 @@ function MyParticipations() {
       .finally(() => setLoading(false));
   }, []);
 
-  const fmtFull = (n) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n ?? 0);
+  const fmtFull = (n) => formatINR(n ?? 0);
   const participations = data?.participationInfo ?? [];
   const totalInvested  = participations.reduce((s, p) => s + (p.participatedAmount ?? 0), 0);
   const totalCurrent   = participations.reduce((s, p) => {
