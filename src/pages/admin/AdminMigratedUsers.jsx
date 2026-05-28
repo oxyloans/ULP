@@ -183,7 +183,7 @@ function InlineApproveBtn({ user, onApproved }) {
       await approveMigratedUser(user.userId, approvedBy, migrationStatus);
       setApproved(migrationStatus);
       setShowConfirm(false);
-      onApproved?.(user.lenderId);
+      onApproved?.(user.userId, migrationStatus, approvedBy);
     } catch (e) {
       setApproveErr(e.message ?? 'Approval failed.');
     } finally {
@@ -209,12 +209,12 @@ function InlineApproveBtn({ user, onApproved }) {
   return (
     <>
       <button
-        disabled={user.migrationStatus === "APPROVED"}
+        disabled={user.migrationStatus === "APPROVED" || user.migrationStatus === "CANCELLED"}
         title={user.migrationStatus ? 'Already processed' : 'Approve migration'}
         onClick={e => { e.stopPropagation(); setApproveErr(''); setShowConfirm(true); }}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
-        style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', boxShadow: '0 2px 8px rgba(16,185,129,0.15)' }}>
-        {user.migrationStatus === "APPROVED"  ? 'Already processed' : 'Approve migration'}
+        style={{ background: user.migrationStatus === "APPROVED" ? 'linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))' : user.migrationStatus === "CANCELLED" ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.08))' : 'linear-gradient(135deg,rgba(0,0,0,0.2),rgba(0,0,0,0.08))', color: user.migrationStatus === "APPROVED" ? '#10b981' : user.migrationStatus === "CANCELLED" ? '#ef4444' : '#000', border: user.migrationStatus === "APPROVED" || user.migrationStatus === "CANCELLED" ? '1px solid rgba(16,185,129,0.3)' : '1px solid rgba(0,0,0,0.3)', boxShadow: '0 2px 8px rgba(16,185,129,0.15)' }}>
+        {user.migrationStatus === "APPROVED"  ? 'Already processed' : user.migrationStatus === "CANCELLED" ? 'Cancelled' : 'Approve migration'}
       </button>
       {showConfirm && (
         <ApproveConfirmModal
@@ -256,7 +256,7 @@ function DetailDrawer({ user, onClose, onApproved }) {
       await approveMigratedUser(user.userId, approvedBy, migrationStatus);
       setApproved(migrationStatus);
       setShowConfirm(false);
-      onApproved?.(user.lenderId);
+      onApproved?.(user.userId, migrationStatus, approvedBy);
       setTimeout(() => onClose(), 800);
     } catch (e) {
       setApproveErr(e.message ?? 'Approval failed. Please try again.');
@@ -316,6 +316,7 @@ function DetailDrawer({ user, onClose, onApproved }) {
               {approved ? (
                 (() => {
                   const isApproved = approved === 'APPROVED';
+                  // const isRejected = approved === 'CANCELLED';
                   return (
                     <span className="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-bold"
                       style={{
@@ -330,10 +331,10 @@ function DetailDrawer({ user, onClose, onApproved }) {
                 })()
               ) : (
                 <button onClick={() => { setApproveErr(''); setShowConfirm(true); }}
-                  disabled = {approved === "APPROVED"}
+                  disabled = {approved === "APPROVED" || user.migrationStatus === "CANCELLED"}
                   className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.01]"
-                  style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)', boxShadow: '0 2px 10px rgba(16,185,129,0.15)' }}>
-                   {user.migrationStatus === "APPROVED" ? 'Already processed' : 'Approve migration'}
+                  style={{ background: user.migrationStatus === "APPROVED" ? 'linear-gradient(135deg,rgba(16,185,129,0.2),rgba(16,185,129,0.08))' : user.migrationStatus === "CANCELLED" ? 'linear-gradient(135deg,rgba(239,68,68,0.2),rgba(239,68,68,0.08))' : 'linear-gradient(135deg,rgba(0,0,0,0.2),rgba(0,0,0,0.08))', color: user.migrationStatus === "APPROVED" ? '#10b981' : user.migrationStatus === "CANCELLED" ? '#ef4444' : '#000', border: '1px solid rgba(16,185,129,0.3)', boxShadow: user.migrationStatus === "APPROVED" ? '0 2px 10px rgba(16,185,129,0.15)' : '0 2px 10px rgba(160, 2, 2, 0.15)' }}>
+                   {user.migrationStatus === "APPROVED" ? 'Already processed' : user.migrationStatus === "CANCELLED" ? 'Cancelled' : 'Approve migration'}
                 </button>
               )}
             </div>
@@ -363,6 +364,7 @@ export default function AdminMigratedUsers() {
   const [selected,   setSelected]   = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [search,     setSearch]     = useState('');
+  const [statusView, setStatusView] = useState('REQUESTED');
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -381,20 +383,47 @@ export default function AdminMigratedUsers() {
   useEffect(() => { load(); }, [load]);
 
   // ── Search filter ─────────────────────────────────────────────────────────
+  const getBucket = (status) => {
+    const normalized = String(status ?? '').toUpperCase();
+    if (normalized === 'APPROVED') return 'APPROVED';
+    if (normalized === 'CANCELLED' || normalized === 'REJECTED') return 'CANCELLED';
+    return 'REQUESTED';
+  };
+
+  const bucketedCounts = allData.reduce((acc, u) => {
+    const key = getBucket(u?.migrationStatus);
+    acc[key] += 1;
+    return acc;
+  }, { REQUESTED: 0, APPROVED: 0, CANCELLED: 0 });
+
   const q = search.trim().toLowerCase();
-  const filtered = q
-    ? allData.filter(u =>
-        Object.values(u).some(v =>
-          v !== null && v !== undefined && String(v).toLowerCase().includes(q)
-        )
-      )
-    : allData;
+  const filtered = allData
+    .filter(u => getBucket(u?.migrationStatus) === statusView)
+    .filter(u => {
+      if (!q) return true;
+      return Object.values(u).some(v =>
+        v !== null && v !== undefined && String(v).toLowerCase().includes(q)
+      );
+    });
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
   const pageData   = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleSearch  = (val) => { setSearch(val); setPage(0); };
-  const handleApproved = (lenderId) => setAllData(prev => prev.filter(u => u.lenderId !== lenderId));
+  const handleApproved = (userId, migrationStatus, approvedBy) => {
+    setAllData(prev =>
+      prev.map(u =>
+        u.userId === userId
+          ? { ...u, migrationStatus, approvedBy: approvedBy ?? u.approvedBy }
+          : u
+      )
+    );
+    setSelected(prev =>
+      prev?.userId === userId
+        ? { ...prev, migrationStatus, approvedBy: approvedBy ?? prev.approvedBy }
+        : prev
+    );
+  };
 
   const cols = ['#', 'Username', 'Lender ID', 'Mobile', 'User ID', 'Status', 'Consent', 'Migrated On', 'Action'];
 
@@ -439,7 +468,7 @@ export default function AdminMigratedUsers() {
         const s = (u.migrationStatus ?? '').toUpperCase();
         const style = s === 'APPROVED'
           ? { bg: 'rgba(16,185,129,0.1)',  color: '#10b981', border: 'rgba(16,185,129,0.25)'  }
-          : s === 'REJECTED'
+          : s === 'REJECTED' || s === 'CANCELLED'
           ? { bg: 'rgba(239,68,68,0.1)',   color: '#ef4444', border: 'rgba(239,68,68,0.25)'   }
           : { bg: 'rgba(245,158,11,0.1)',  color: '#f59e0b', border: 'rgba(245,158,11,0.25)'  };
         return (
@@ -496,6 +525,26 @@ export default function AdminMigratedUsers() {
       </div>
 
       {/* Search */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {[
+          { key: 'REQUESTED', label: 'Requested', color: '#f59e0b' },
+          { key: 'APPROVED', label: 'Approved', color: '#10b981' },
+          { key: 'CANCELLED', label: 'Cancelled', color: '#ef4444' },
+        ].map(({ key, label, color }) => (
+          <button
+            key={key}
+            onClick={() => { setStatusView(key); setPage(0); }}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all"
+            style={{
+              background: statusView === key ? color : 'var(--input-bg)',
+              color: statusView === key ? '#fff' : 'var(--text-muted)',
+              border: `1px solid ${statusView === key ? 'transparent' : 'var(--border)'}`,
+            }}>
+            {label} ({bucketedCounts[key].toLocaleString('en-IN')})
+          </button>
+        ))}
+      </div>
+
       <div className="relative">
         <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}><SearchIcon /></span>
         <input type="text" value={search} onChange={e => handleSearch(e.target.value)}
@@ -525,7 +574,7 @@ export default function AdminMigratedUsers() {
           <div className="flex items-center gap-2" style={{ color: '#c084fc' }}>
             <MigrateIcon />
             <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              {search ? 'Search Results' : 'Migration Records'}
+              {search ? `${statusView} Search Results` : `${statusView} Records`}
             </span>
           </div>
           {!loading && filtered.length > 0 && totalPages > 1 && (
