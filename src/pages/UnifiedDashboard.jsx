@@ -2617,7 +2617,7 @@ function MemberDashboard({ memberId, mode }) {
       .finally(() => setLoading(false));
 
     getUserProfile()
-      .then(p => { if (p) setProfile(p); })
+      .then(p => { console.log('User profile:', p); if (p) setProfile(p); })
       .catch(() => {});
 
     getUserOfflineParticipationDealsInfo()
@@ -2648,6 +2648,7 @@ function MemberDashboard({ memberId, mode }) {
   const showOff  = mode === 'A' || mode === 'C';
   const showBoth = mode === 'C';
   const isOwn = !fin || memberId === user?.userId || memberId === 'self';
+  console.log('Financial data for member', memberId, profile);
 
   return (
     <div className="grid gap-7">
@@ -2674,7 +2675,7 @@ function MemberDashboard({ memberId, mode }) {
             <CopyId id={id} />
           )}
         </div>
-        {!hasMigratedData && (
+        {(profile?.migrationStatus !== 'APPROVED' && profile?.migrationStatus !== 'REJECTED' && profile?.migrationStatus !== 'CANCELLED')  && !hasMigratedData && (
           <div>
             <button
               onClick={() => setMigrateOpen(true)}
