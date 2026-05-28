@@ -33,6 +33,7 @@ const PAGE_LABELS = {
   '/sd-lot/create': 'Create Deal',
   '/wallet':      'Wallet',
   '/wallet/history': 'Wallet History',
+  '/wallet/withdrawal-requests': 'Withdrawal Requests',
   '/family':      'Family Members',
   '/revenue':     'Revenue Report',
   '/contact':     'Contact Us',

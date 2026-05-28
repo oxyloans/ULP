@@ -1,4 +1,4 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
 import logo from '../assets/WULP.png';
@@ -13,11 +13,16 @@ const pageMeta = {
   '/admin/dashboard':        { crumb: ['Dashboard']         },
   '/admin/approvals':        { crumb: ['Approvals']          },
   '/admin/wallet-approvals': { crumb: ['Wallet Approvals']   },
+  '/admin/wallet-withdrawals': { crumb: ['Wallet Withdrawals'] },
+  '/admin/migrated-users': { crumb: ['Migrated Users'] },
+  '/admin/migrated-total-data': { crumb: ['Migrated Total Data'] },
   '/admin/create-deal':      { crumb: ['Create Deal']        },
   '/admin/oxyloans':         { crumb: ['OxyLoans']           },
   '/admin/offline':          { crumb: ['Offline Deals']      },
   '/admin/properties':       { crumb: ['Properties']         },
   '/admin/support':          { crumb: ['Support']            },
+  '/admin/interest/sd-lot':  { crumb: ['Interest Payout', 'SD Lot'] },
+  '/admin/interest/asset':   { crumb: ['Interest Payout', 'Asset Payout'] },
 };
 
 function getGreeting() {
@@ -81,6 +86,16 @@ export default function AdminTopbar({ onMenuClick }) {
 
       {/* Right: actions */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
+        <NavLink to="/admin/interest/sd-lot"
+          className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+          style={({ isActive }) => ({
+            background: isActive ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(255,255,255,0.16)',
+            border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
+            color: '#fff',
+          })}>
+          <ShieldIcon />
+          Interest Payout
+        </NavLink>
         <ThemeToggle />
         <button className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-105"
           style={{ background: 'var(--topbar-icon-bg)', border: '1px solid var(--topbar-icon-border)', color: 'var(--topbar-icon-color)' }}>

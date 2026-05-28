@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllLoanActiveDeals } from '../../api/afterlogin-user';
+import { getInterestBreakUpByDeal, submitInterestApprovals } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -12,6 +13,7 @@ const DownloadIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const ArrowLeft    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
 const SearchIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const EyeIcon      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/></svg>;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 export function fmtINR(n) {
@@ -76,6 +78,154 @@ export function downloadCSV(rows, filename) {
   const a    = document.createElement('a');
   a.href = url; a.download = filename; a.click();
   URL.revokeObjectURL(url);
+}
+
+function escapeHtml(v) {
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function downloadInterestExcelFile(dealName, rows) {
+  const headers = ['S.No', 'User Name', 'User ID', 'Bank Name', 'Account Number', 'IFSC Code', 'Principal Amount', 'ROI (%)', 'Days', 'Interest Amount'];
+  const body = rows.map((r, idx) => `
+    <tr>
+      <td>${idx + 1}</td>
+      <td>${escapeHtml(r?.userName ?? '-')}</td>
+      <td>${escapeHtml(r?.userId ?? '-')}</td>
+      <td>${escapeHtml(r?.bankName ?? '-')}</td>
+      <td>${escapeHtml(r?.accountNumber ?? '-')}</td>
+      <td>${escapeHtml(r?.ifscCode ?? '-')}</td>
+      <td>${Number(r?.principalAmount ?? 0)}</td>
+      <td>${Number(r?.roi ?? 0)}</td>
+      <td>${Number(r?.days ?? 0)}</td>
+      <td>${Number(r?.interestAmount ?? 0)}</td>
+    </tr>
+  `).join('');
+
+  const html = `
+    <html>
+      <head>
+        <meta charset="utf-8" />
+      </head>
+      <body>
+        <table border="1">
+          <thead>
+            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
+          </thead>
+          <tbody>${body}</tbody>
+        </table>
+      </body>
+    </html>
+  `;
+
+  const blob = new Blob([`\ufeff${html}`], { type: 'application/vnd.ms-excel;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${(dealName ?? 'interest-breakup').replace(/\s+/g, '-')}.xls`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function normalizeDownloadUrl(value) {
+  if (!value) return '';
+  const raw = String(value).trim();
+  const cleaned = raw.replace(/^https:\s*\/\//i, 'https://').replace(/^http:\s*\/\//i, 'http://');
+  if (/^https?:\/\//i.test(cleaned)) return cleaned;
+  return '';
+}
+
+function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener noreferrer';
+  a.download = fileName;
+  a.click();
+}
+
+function LenderBreakupModal({ open, dealName, loading, error, rows, onClose, onDownloadAndApprove, actionLoading }) {
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}>
+      <div className="w-full max-w-5xl rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
+        onClick={e => e.stopPropagation()}>
+        <div className="px-6 py-4 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(99,102,241,0.06)' }}>
+          <div>
+            <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Lender Interest Breakup</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{dealName || '—'}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onDownloadAndApprove}
+              disabled={loading || actionLoading || !rows.length}
+              className="px-3 py-1.5 rounded-lg text-xs font-bold"
+              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+              {actionLoading ? 'Generating...' : 'Download Excel + Approve'}
+            </button>
+            <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              <CloseIcon />
+            </button>
+          </div>
+        </div>
+
+        {loading && (
+          <div className="py-16 text-center text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+            Loading lenders...
+          </div>
+        )}
+
+        {!loading && error && (
+          <div className="m-4 rounded-xl px-4 py-3 text-sm font-semibold"
+            style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)' }}>
+            {error}
+          </div>
+        )}
+
+        {!loading && !error && (
+          <div className="overflow-x-auto max-h-[65vh]">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+                  {['#', 'User Name', 'Account No', 'IFSC', 'Principal', 'ROI', 'Days', 'Interest'].map(h => (
+                    <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
+                      style={{ color: 'var(--text-muted)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.length === 0 ? (
+                  <tr><td colSpan={10} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No lenders found</td></tr>
+                ) : rows.map((r, idx) => (
+                  <tr key={`${r?.userId ?? 'user'}-${idx}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td className="py-3 px-4 text-xs font-bold" style={{ color: 'var(--text-muted)' }}>{idx + 1}</td>
+                    <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-primary)' }}>{r?.userName ?? '-'}</td>
+                    {/* <td className="py-3 px-4" style={{ color: 'var(--text-muted)' }}>{r?.userId ?? '-'}</td> */}
+                    {/* <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>{r?.bankName ?? '-'}</td> */}
+                    <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>{r?.accountNumber ?? '-'}</td>
+                    <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>{r?.ifscCode ?? '-'}</td>
+                    <td className="py-3 px-4 font-bold" style={{ color: '#a855f7' }}>{fmtINR(r?.principalAmount ?? 0)}</td>
+                    <td className="py-3 px-4 font-bold" style={{ color: '#f59e0b' }}>{Number(r?.roi ?? 0)}%</td>
+                    <td className="py-3 px-4" style={{ color: 'var(--text-primary)' }}>{Number(r?.days ?? 0)}</td>
+                    <td className="py-3 px-4 font-bold" style={{ color: '#059669' }}>{fmtINR(r?.interestAmount ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ─── Paid Date Modal ──────────────────────────────────────────────────────────
@@ -347,6 +497,12 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
   const [tab, setTab]           = useState('INITIATED');
   const [paidModal, setPaidModal]   = useState(false);
   const [payLoading, setPayLoading] = useState(false);
+  const [lenderModalOpen, setLenderModalOpen] = useState(false);
+  const [lenderModalLoading, setLenderModalLoading] = useState(false);
+  const [lenderModalError, setLenderModalError] = useState('');
+  const [lenderRows, setLenderRows] = useState([]);
+  const [selectedDealForLenders, setSelectedDealForLenders] = useState(null);
+  const [lenderActionLoading, setLenderActionLoading] = useState(false);
 
   const loadDeals = useCallback(async () => {
     setLoading(true);
@@ -411,6 +567,64 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
     setPayLoading(false);
   };
 
+  const handleOpenLenders = async (deal) => {
+    setSelectedDealForLenders(deal);
+    setLenderModalOpen(true);
+    setLenderModalLoading(true);
+    setLenderModalError('');
+    setLenderRows([]);
+    try {
+      const res = await getInterestBreakUpByDeal(deal.id);
+      setLenderRows(Array.isArray(res?.usersDealsBasedInterestInfoDto) ? res.usersDealsBasedInterestInfoDto : []);
+    } catch (e) {
+      setLenderModalError(e?.message ?? 'Failed to load lenders breakup');
+    } finally {
+      setLenderModalLoading(false);
+    }
+  };
+
+  const handleDownloadAndApprove = async () => {
+    if (!selectedDealForLenders?.id || lenderRows.length === 0) return;
+    setLenderActionLoading(true);
+    try {
+      const today = new Date().toISOString().split('T')[0];
+      const approvalRes = await submitInterestApprovals({
+        dealId: selectedDealForLenders.id,
+        sheetGeneratedDate: today,
+        usersDealsBasedInterestInfoDto: lenderRows.map((r) => ({
+          userName: r?.userName ?? null,
+          userId: r?.userId ?? null,
+          bankName: r?.bankName ?? null,
+          accountNumber: r?.accountNumber ?? null,
+          roi: Number(r?.roi ?? 0),
+          interestAmount: Number(r?.interestAmount ?? 0),
+          principalAmount: Number(r?.principalAmount ?? 0),
+          days: Number(r?.days ?? 0),
+          ifscCode: r?.ifscCode ?? null,
+        })),
+      });
+
+      const responseUrl = normalizeDownloadUrl(
+        typeof approvalRes === 'string'
+          ? approvalRes
+          : approvalRes?.url ?? approvalRes?.fileUrl ?? approvalRes?.downloadUrl ?? ''
+      );
+
+      if (responseUrl) {
+        downloadFromRemoteUrl(
+          responseUrl,
+          `${(selectedDealForLenders?.dealName ?? 'interest-breakup').replace(/\s+/g, '-')}.xlsx`
+        );
+      } else {
+        downloadInterestExcelFile(selectedDealForLenders?.dealName, lenderRows);
+      }
+    } catch (e) {
+      setLenderModalError(e?.message ?? 'Failed to submit interest approval');
+    } finally {
+      setLenderActionLoading(false);
+    }
+  };
+
   const kpis = [
     { label: 'Total Deals',    value: String(deals.length), color: '#a855f7' },
     { label: 'Pending Payout', value: fmtINR(totalPending), color: '#d97706' },
@@ -420,6 +634,16 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
   return (
     <>
+      <LenderBreakupModal
+        open={lenderModalOpen}
+        dealName={selectedDealForLenders?.dealName}
+        loading={lenderModalLoading}
+        error={lenderModalError}
+        rows={lenderRows}
+        actionLoading={lenderActionLoading}
+        onClose={() => setLenderModalOpen(false)}
+        onDownloadAndApprove={handleDownloadAndApprove}
+      />
       {paidModal && (
         <PaidDateModal
           selectedCount={selectedDeals.length}
@@ -555,7 +779,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                    <th className="py-3 px-4 text-xs uppercase tracking-widest font-semibold text-left whitespace-nowrap"
+                    {/* <th className="py-3 px-4 text-xs uppercase tracking-widest font-semibold text-left whitespace-nowrap"
                       style={{ color: 'var(--text-muted)' }}>
                       <div className="flex items-center gap-2">
                         <button onClick={toggleAll}
@@ -566,10 +790,10 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                           }}>
                           {allPendingSelected && <CheckIcon />}
                         </button>
-                        {/* <span>Payment</span> */}
+                        <span>Payment</span>
                       </div>
-                    </th>
-                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Amount', 'Payment Date', 'Status', 'Download'].map(h => (
+                    </th> */}
+                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Amount', 'Payment Date', 'Status', 'Lenders Breakup', 'Download'].map(h => (
                       <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
                         style={{ color: 'var(--text-muted)' }}>{h}</th>
                     ))}
@@ -577,7 +801,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={9} className="py-14 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No deals in this category</td></tr>
+                    <tr><td colSpan={10} className="py-14 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No deals in this category</td></tr>
                   ) : filtered.map((deal, idx) => {
                     const isPaid    = getStatus(deal) === 'PAID';
                     const isChecked = selected.has(deal.id);
@@ -589,7 +813,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                         onMouseLeave={e => { e.currentTarget.style.background = isChecked ? 'rgba(168,85,247,0.05)' : 'transparent'; }}>
 
                         {/* Payment checkbox */}
-                        <td className="py-3.5 px-4">
+                        {/* <td className="py-3.5 px-4">
                           {!isPaid ? (
                             <button onClick={() => toggleOne(deal.id)}
                               className="w-5 h-5 rounded-md flex items-center justify-center transition-all"
@@ -606,7 +830,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                               <CheckIcon />
                             </span>
                           )}
-                        </td>
+                        </td> */}
 
                         <td className="py-3.5 px-4">
                           <span className="text-xs font-bold tabular-nums" style={{ color: 'var(--text-muted)' }}>{idx + 1}</span>
@@ -645,9 +869,20 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
                         <td className="py-3.5 px-4"><StatusChip status={getStatus(deal)} /></td>
 
+                        <td className="py-3.5 px-4">
+                          <button
+                            onClick={() => handleOpenLenders(deal)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                            style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
+                            <EyeIcon />
+                            View
+                          </button>
+                        </td>
+
                         {/* Per-row download */}
                         <td className="py-3.5 px-4">
                           <button
+                            disabled={!isPaid && !paidDate}
                             onClick={() => downloadCSV(
                               [{ ...deal, paymentDate: paidDate ?? deal.paymentDate ?? '' }],
                               `${deal.dealName.replace(/\s+/g,'-')}-${period.label.replace(' ','-')}.csv`

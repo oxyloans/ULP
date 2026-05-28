@@ -47,6 +47,22 @@ export async function rejectWalletSlip({ utrNumber, transactionAmount, transacti
   });
 }
 
+export async function getAdminWalletWithdrawalRequests() {
+  return get('/oxybrick-service/getAllShowingToAdminWalletWithdrawal');
+}
+
+export async function updateAdminWalletWithdrawalStatus({ id, userId, requestAmount, initiatedDate, approvedBy, comments, walletStatus }) {
+  return patch('/oxybrick-service/walletWithdrawalApprovedAndRejectedByAdmin', {
+    id,
+    userId,
+    requestAmount,
+    initiatedDate,
+    approvedBy,
+    comments,
+    walletStatus,
+  });
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DEALS  (SD Lots / Global Deals)
 // Enums:
@@ -240,4 +256,42 @@ export async function approveMigratedUser(userId, approvedBy = '', migrationStat
     migrationStatus,
     userId,
   });
+}
+
+/**
+ * POST /oxybrick-service/adminGetMigratedUserInfo
+ * Body: { lenderName, password }
+ */
+export async function adminGetMigratedUserInfo({ lenderName, password = null }) {
+  return post('/oxybrick-service/adminGetMigratedUserInfo', {
+    lenderName,
+    password,
+  });
+}
+
+/**
+ * PATCH /oxybrick-service/updateMigratedUsersDataByAdmin
+ * Body: { id, interestDate, lenderId, lenderName, participationDate, password, roi }
+ */
+export async function updateMigratedUsersDataByAdmin(payload) {
+  return patch('/oxybrick-service/updateMigratedUsersDataByAdmin', payload);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// SD LOT INTEREST PAYOUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/interestBreakUpByDeal?dealId={dealId}
+ */
+export async function getInterestBreakUpByDeal(dealId) {
+  return get(`/oxybrick-service/interestBreakUpByDeal?dealId=${encodeURIComponent(dealId)}`);
+}
+
+/**
+ * PATCH /oxybrick-service/interestApprovals
+ * Body: { dealId, sheetGeneratedDate, usersDealsBasedInterestInfoDto }
+ */
+export async function submitInterestApprovals(payload) {
+  return patch('/oxybrick-service/interestApprovals', payload);
 }

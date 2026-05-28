@@ -27,22 +27,28 @@ const interestSubItems = [
   { title: 'SD Lot',       path: '/admin/interest/sd-lot'  },
   { title: 'Asset Payout', path: '/admin/interest/asset'   },
 ];
+const migratedSubItems = [
+  { title: 'Migrated Users', path: '/admin/migrated-users' },
+  { title: 'Migrated Total Data', path: '/admin/migrated-total-data' },
+];
+const walletSubItems = [
+  { title: 'Wallet Approvals', path: '/admin/wallet-approvals' },
+  { title: 'Wallet Withdrawals', path: '/admin/wallet-withdrawals' },
+];
 
 const UsersIcon2   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const MigrateIcon2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 
 const navItemsBefore = [
   { title: 'Dashboard',        path: '/admin/dashboard',        Icon: HomeIcon,     badge: null },
-  { title: 'Total Users',      path: '/admin/total-users',      Icon: UsersIcon2,   badge: null },
-  { title: 'Migrated Users',   path: '/admin/migrated-users',   Icon: MigrateIcon2, badge: null },
-  { title: 'Family Approvals', path: '/admin/approvals',        Icon: CheckIcon,    badge: null },
-  { title: 'Wallet Approvals', path: '/admin/wallet-approvals', Icon: WalletIcon,   badge: '3'  },
   { title: 'Create Deal',      path: '/admin/create-deal',      Icon: PlusIcon,     badge: null },
-  { title: 'OxyLoans',         path: '/admin/oxyloans',         Icon: BankIcon,     badge: null },
+  { title: 'Total Users',      path: '/admin/total-users',      Icon: UsersIcon2,   badge: null },
   { title: 'Offline Deals',    path: '/admin/offline',          Icon: PackageIcon,  badge: null },
 ];
 
 const navItemsAfter = [
+  { title: 'OxyLoans',         path: '/admin/oxyloans',         Icon: BankIcon,     badge: null },
+  { title: 'Family Approvals', path: '/admin/approvals',        Icon: CheckIcon,    badge: null },
   { title: 'Properties',       path: '/admin/properties',       Icon: BuildingIcon, badge: null },
   { title: 'Bank Accounts',    path: '/admin/bank-accounts',    Icon: BankIcon,     badge: null },
   { title: 'Support',          path: '/admin/support',          Icon: SupportIcon,  badge: null },
@@ -54,8 +60,12 @@ function AdminSidebarContent({ onClose }) {
   const location = useLocation();
   const isAssetActive    = location.pathname.startsWith('/admin/assets');
   const isInterestActive = location.pathname.startsWith('/admin/interest');
+  const isMigratedActive = location.pathname.startsWith('/admin/migrated-');
+  const isWalletActive   = location.pathname.startsWith('/admin/wallet-');
   const [assetOpen,    setAssetOpen]    = useState(isAssetActive);
   const [interestOpen, setInterestOpen] = useState(isInterestActive);
+  const [migratedOpen, setMigratedOpen] = useState(isMigratedActive);
+  const [walletOpen,   setWalletOpen]   = useState(isWalletActive);
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); onClose?.(); };
 
@@ -87,6 +97,76 @@ function AdminSidebarContent({ onClose }) {
             )}
           </NavLink>
         ))}
+
+        {/* ── Migrated accordion ── */}
+        <button
+          onClick={() => setMigratedOpen(o => !o)}
+          className="admin-sidebar-item w-full text-left"
+          style={isMigratedActive
+            ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
+            : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+          }>
+          <span className="admin-sidebar-icon" style={{ color: isMigratedActive ? '#c084fc' : undefined }}><MigrateIcon2 /></span>
+          <span className="admin-sidebar-label">Migrated</span>
+          <span className="ml-auto"><ChevronDown open={migratedOpen} /></span>
+        </button>
+
+        {migratedOpen && (
+          <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
+            {migratedSubItems.map(sub => (
+              <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
+                className="admin-sidebar-item text-xs"
+                style={({ isActive }) => isActive
+                  ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
+                  : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+                }>
+                {({ isActive }) => (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
+                      style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
+                    <span className="admin-sidebar-label">{sub.title}</span>
+                    {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        )}
+
+        {/* ── Wallet accordion ── */}
+        <button
+          onClick={() => setWalletOpen(o => !o)}
+          className="admin-sidebar-item w-full text-left"
+          style={isWalletActive
+            ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
+            : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+          }>
+          <span className="admin-sidebar-icon" style={{ color: isWalletActive ? '#c084fc' : undefined }}><WalletIcon /></span>
+          <span className="admin-sidebar-label">Wallet</span>
+          <span className="ml-auto"><ChevronDown open={walletOpen} /></span>
+        </button>
+
+        {walletOpen && (
+          <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
+            {walletSubItems.map(sub => (
+              <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
+                className="admin-sidebar-item text-xs"
+                style={({ isActive }) => isActive
+                  ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
+                  : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+                }>
+                {({ isActive }) => (
+                  <>
+                    <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
+                      style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
+                    <span className="admin-sidebar-label">{sub.title}</span>
+                    {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </div>
+        )}
 
         {/* ── Interest Payout accordion ── */}
         <button

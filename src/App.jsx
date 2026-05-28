@@ -31,6 +31,7 @@ import NotFound from './pages/NotFound.jsx';
 import SDLots from './pages/SDLots.jsx';
 import WalletDashboard from './pages/WalletDashboard.jsx';
 import WalletHistory from './pages/WalletHistory.jsx';
+import WalletWithdrawalRequests from './pages/WalletWithdrawalRequests.jsx';
 import SDLotParticipate from './pages/SDLotParticipate.jsx';
 import MyParticipations from './pages/MyParticipations.jsx';
 import Profile from './pages/Profile.jsx';
@@ -58,6 +59,8 @@ import AdminInterestPayments from './pages/admin/AdminInterestPayments.jsx';
 import AdminAssetPayouts from './pages/admin/AdminAssetPayouts.jsx';
 import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
+import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
+import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -155,6 +158,7 @@ function UserLayout() {
             <Route path="/my-participations" element={<MyParticipations />} />
             <Route path="/wallet" element={<WalletDashboard />} />
             <Route path="/wallet/history" element={<WalletHistory />} />
+            <Route path="/wallet/withdrawal-requests" element={<WalletWithdrawalRequests />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/family" element={<FamilyManagement />} />
             <Route path="/revenue" element={<RevenueReport />} />
@@ -182,6 +186,7 @@ function AdminLayout() {
             <Route path="dashboard"             element={<AdminDashboard />} />
             <Route path="approvals"             element={<AdminApprovals />} />
             <Route path="wallet-approvals"      element={<AdminWalletApprovals />} />
+            <Route path="wallet-withdrawals"    element={<AdminWalletWithdrawals />} />
             <Route path="create-deal"           element={<CreateDeal />} />
             <Route path="create-deal/:id"       element={<CreateDeal />} />
             <Route path="properties"            element={<AdminProperties />} />
@@ -196,6 +201,7 @@ function AdminLayout() {
             <Route path="interest/asset"        element={<AdminAssetPayouts />} />
             <Route path="total-users"           element={<AdminTotalUsers />} />
             <Route path="migrated-users"        element={<AdminMigratedUsers />} />
+            <Route path="migrated-total-data"   element={<AdminMigratedTotalData />} />
             <Route path="*"                     element={<NotFound />} />
           </Routes>
         </main>

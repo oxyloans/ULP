@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getWalletSlips, approveWalletSlip, rejectWalletSlip } from '../../api/afterlogin-admin';
 import FilePreviewModal from '../../components/FilePreviewModal';
 import { formatINR } from '../../utils/currency';
@@ -175,6 +176,7 @@ function ConfirmModal({ txn, action, onConfirm, onCancel, loading }) {
 
 
 export default function AdminWalletApprovals() {
+  const navigate = useNavigate();
   const [txns, setTxns]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [fetchErr, setFetchErr] = useState('');
@@ -257,6 +259,11 @@ export default function AdminWalletApprovals() {
             <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>Review and approve user deposit slips</p>
           </div>
           <div className="flex items-center gap-3">
+            <button onClick={() => navigate('/admin/wallet-withdrawals')}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
+              style={{ background: 'rgba(59,130,246,0.1)', color: '#2563eb', border: '1px solid rgba(59,130,246,0.25)' }}>
+              <WalletIcon /> User Withdrawals
+            </button>
             <button onClick={fetchSlips}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
               style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
