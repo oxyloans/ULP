@@ -1,0 +1,33 @@
+name: Web Contract and Mobile Impact
+
+on:
+  pull_request:
+    branches: ["main", "master"]
+  push:
+    branches: ["main", "master"]
+
+jobs:
+  contract-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Validate contract metadata
+        run: node scripts/validate-contracts.cjs
+
+      - name: Detect mobile impact
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+        run: node scripts/detect-mobile-impact.cjs > mobile-impact.json
+
+      - name: Upload mobile impact artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-impact
+          path: mobile-impact.json

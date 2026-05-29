@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Profile Contracts",
+  "type": "object",
+  "properties": {
+    "userProfile": {
+      "type": "object",
+      "properties": {
+        "firstName": { "type": ["string", "null"] },
+        "lastName": { "type": ["string", "null"] },
+        "email": { "type": ["string", "null"] },
+        "mobileNumber": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

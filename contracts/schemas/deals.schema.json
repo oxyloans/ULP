@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Deals Contracts",
+  "type": "object",
+  "properties": {
+    "deal": {
+      "type": "object",
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "dealName": { "type": ["string", "null"] },
+        "dealType": { "type": ["string", "null"] },
+        "loanActiveDate": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Wallet Contracts",
+  "type": "object",
+  "properties": {
+    "walletBalance": {
+      "type": "object",
+      "properties": {
+        "availableBalance": { "type": ["number", "string", "null"] },
+        "userId": { "type": ["string", "null"] }
+      }
+    },
+    "walletWithdrawal": {
+      "type": "object",
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "requestAmount": { "type": ["number", "string", "null"] },
+        "walletStatus": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

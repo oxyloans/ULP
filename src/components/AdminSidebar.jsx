@@ -62,10 +62,21 @@ function AdminSidebarContent({ onClose }) {
   const isInterestActive = location.pathname.startsWith('/admin/interest');
   const isMigratedActive = location.pathname.startsWith('/admin/migrated-');
   const isWalletActive   = location.pathname.startsWith('/admin/wallet-');
-  const [assetOpen,    setAssetOpen]    = useState(isAssetActive);
-  const [interestOpen, setInterestOpen] = useState(isInterestActive);
-  const [migratedOpen, setMigratedOpen] = useState(isMigratedActive);
-  const [walletOpen,   setWalletOpen]   = useState(isWalletActive);
+  const [openSection, setOpenSection] = useState(
+    isAssetActive ? 'assets'
+      : isInterestActive ? 'interest'
+      : isMigratedActive ? 'migrated'
+      : isWalletActive ? 'wallet'
+      : null
+  );
+  const assetOpen = openSection === 'assets';
+  const interestOpen = openSection === 'interest';
+  const migratedOpen = openSection === 'migrated';
+  const walletOpen = openSection === 'wallet';
+
+  const toggleSection = (section) => {
+    setOpenSection(current => current === section ? null : section);
+  };
 
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); onClose?.(); };
 
@@ -100,7 +111,7 @@ function AdminSidebarContent({ onClose }) {
 
         {/* ── Migrated accordion ── */}
         <button
-          onClick={() => setMigratedOpen(o => !o)}
+          onClick={() => toggleSection('migrated')}
           className="admin-sidebar-item w-full text-left"
           style={isMigratedActive
             ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
@@ -135,7 +146,7 @@ function AdminSidebarContent({ onClose }) {
 
         {/* ── Wallet accordion ── */}
         <button
-          onClick={() => setWalletOpen(o => !o)}
+          onClick={() => toggleSection('wallet')}
           className="admin-sidebar-item w-full text-left"
           style={isWalletActive
             ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
@@ -170,7 +181,7 @@ function AdminSidebarContent({ onClose }) {
 
         {/* ── Interest Payout accordion ── */}
         <button
-          onClick={() => setInterestOpen(o => !o)}
+          onClick={() => toggleSection('interest')}
           className="admin-sidebar-item w-full text-left"
           style={isInterestActive
             ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
@@ -205,7 +216,7 @@ function AdminSidebarContent({ onClose }) {
 
         {/* ── Assets accordion ── */}
         <button
-          onClick={() => setAssetOpen(o => !o)}
+          onClick={() => toggleSection('assets')}
           className="admin-sidebar-item w-full text-left"
           style={isAssetActive
             ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }

@@ -1,7 +1,9 @@
 import { useState } from 'react';
+import { saveAssetBasedInfo, uploadSaleDeedDocument } from '../../api/afterlogin-admin';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const REGISTRATION_TYPES = ['Sale Deed', 'Gift Deed', 'Mortgage Deed', 'Lease Deed', 'Agreement of Sale'];
+const REGISTRATION_TYPES = ['SALEDEED', 'AGPA'];
+const ASSET_TYPES        = ['PLOT', 'FLAT', 'AREA'];
 const ACCESS_TYPES       = ['En Access', 'Separate', 'Shared'];
 const ASSET_UNITS        = [
   { value: 'sqft',   label: 'Sq. Feet'  },
@@ -14,10 +16,13 @@ const EMPTY = {
   borrowerName: '', projectName: '', documentNumber: '',
   dateOfExecution: '', typeOfRegistration: '',
   documentValue: '', actualAssetValue: '', takenAssetValue: '',
-  plotNumber: '', 
+  assetType: 'PLOT', plotNumber: '', 
   // accessType: 'En Access',
-  assetUnit: '', assetArea: '', surveyNo: '',
+  assetUnit: '', assetArea: '', surveyNo: '', flatNumber: '',
+  saleDeedDoc: null, ownerName: '', onLenderName: false,
 };
+
+const toNumber = (value) => Number(String(value ?? '').replace(/,/g, '')) || 0;
 
 // ─── Shared style helpers ─────────────────────────────────────────────────────
 const inputStyle = (err) => ({
@@ -106,14 +111,23 @@ export default function LoadAsset() {
   const [form,      setForm]      = useState(EMPTY);
   const [errors,    setErrors]    = useState({});
   const [submitted, setSubmitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState('');
 
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
-    setErrors(e => ({ ...e, [k]: '' }));
+    setErrors(e => {
+      if (k !== 'assetType') return { ...e, [k]: '' };
+      return { ...e, assetType: '', plotNumber: '', flatNumber: '', assetArea: '' };
+    });
   };
 
   const validate = () => {
     const e = {};
+    const isPlot = form.assetType === 'PLOT';
+    const isFlat = form.assetType === 'FLAT';
+    const isArea = form.assetType === 'AREA';
+
     if (!form.borrowerName.trim())     e.borrowerName     = 'Required';
     if (!form.projectName.trim())      e.projectName      = 'Required';
     if (!form.documentNumber.trim())   e.documentNumber   = 'Required';
@@ -122,21 +136,59 @@ export default function LoadAsset() {
     if (!form.documentValue)           e.documentValue    = 'Required';
     if (!form.actualAssetValue)        e.actualAssetValue = 'Required';
     if (!form.takenAssetValue)         e.takenAssetValue  = 'Required';
-    if (!form.plotNumber.trim())       e.plotNumber       = 'Required';
-    if (!form.assetUnit)               e.assetUnit        = 'Required';
-    if (!form.assetArea)               e.assetArea        = 'Required';
+    if (!form.assetType)               e.assetType        = 'Required';
+    if (isPlot && !form.plotNumber.trim()) e.plotNumber = 'Required';
+    if (isFlat && !form.flatNumber.trim()) e.flatNumber = 'Required';
+    if (isArea && !form.assetArea.trim())  e.assetArea  = 'Required';
     if (!form.surveyNo.trim())         e.surveyNo         = 'Required';
+    if (!form.saleDeedDoc)             e.saleDeedDoc      = 'Required';
+    if (!form.ownerName.trim())        e.ownerName        = 'Required';
     return e;
   };
 
-  const handleSubmit = e => {
+  const handleSubmit = async e => {
     e.preventDefault();
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
-    setSubmitted(true);
+
+    setSubmitting(true);
+    setSubmitError('');
+    try {
+      const assetNumber = form.assetType === 'FLAT'
+        ? form.flatNumber.trim()
+        : form.assetType === 'AREA'
+          ? form.assetArea.trim()
+          : form.plotNumber.trim();
+
+      const saveResponse = await saveAssetBasedInfo({
+        actualAssetValue: toNumber(form.actualAssetValue),
+        assetType: form.assetType,
+        borrowerName: form.borrowerName.trim(),
+        dateOfExecution: form.dateOfExecution,
+        documentNumber: toNumber(form.documentNumber),
+        documentValue: toNumber(form.documentValue),
+        id: form.id,
+        ownerName: form.ownerName.trim(),
+        plotNumber: assetNumber,
+        projectName: form.projectName.trim(),
+        surveyNumber: form.surveyNo.trim(),
+        takenAssetValue: toNumber(form.takenAssetValue),
+        typeOfRegistration: form.typeOfRegistration,
+      });
+
+      const assetId = saveResponse?.id ?? saveResponse?.assetId ?? saveResponse?.data?.id;
+      if (!assetId) throw new Error('Asset saved, but no asset id was returned.');
+
+      await uploadSaleDeedDocument({ assetId, file: form.saleDeedDoc });
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err.message ?? 'Failed to load asset. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
-  const reset = () => { setForm(EMPTY); setErrors({}); setSubmitted(false); };
+  const reset = () => { setForm(EMPTY); setErrors({}); setSubmitted(false); setSubmitError(''); };
 
   const unitLabel = ASSET_UNITS.find(u => u.value === form.assetUnit)?.label ?? 'Area';
 
@@ -229,7 +281,7 @@ export default function LoadAsset() {
           </Field>
 
           <Field label="Document Number" required error={errors.documentNumber}>
-            <input type="text" placeholder="e.g. DOC-2024-00123"
+            <input type="number" min="0" placeholder="0"
               value={form.documentNumber} onChange={e => set('documentNumber', e.target.value)}
               style={inputStyle(errors.documentNumber)} />
           </Field>
@@ -254,20 +306,20 @@ export default function LoadAsset() {
 
         {/* ── Valuation ── */}
         <Section accent="#10b981" title="Valuation">
-          <Field label="Document Value (₹)" required error={errors.documentValue}>
+          <Field label="Document Value (Govt) (₹)" required error={errors.documentValue}>
             <input type="number" min="0" placeholder="0"
               value={form.documentValue} onChange={e => set('documentValue', e.target.value)}
               style={inputStyle(errors.documentValue)} />
           </Field>
 
-          <Field label="Actual Asset Value (₹)" required error={errors.actualAssetValue}>
+          <Field label="Actual Asset Value (Market) (₹)" required error={errors.actualAssetValue}>
             <input type="number" min="0" placeholder="0"
               value={form.actualAssetValue} onChange={e => set('actualAssetValue', e.target.value)}
               style={inputStyle(errors.actualAssetValue)} />
           </Field>
 
           <div className="sm:col-span-2">
-            <Field label="Taken Asset Value (₹)" required error={errors.takenAssetValue}>
+            <Field label="what Value We Given (₹)" required error={errors.takenAssetValue}>
               <input type="number" min="0" placeholder="0"
                 value={form.takenAssetValue} onChange={e => set('takenAssetValue', e.target.value)}
                 style={inputStyle(errors.takenAssetValue)} />
@@ -275,18 +327,106 @@ export default function LoadAsset() {
           </div>
         </Section>
 
+        {/* ── Document Details ── */}
+        <Section accent="#06b6d4" title="Document Details">
+          <Field label="Sale Deed Doc" required error={errors.saleDeedDoc}>
+            <label
+              className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-3 cursor-pointer"
+              style={{
+                background: 'var(--input-bg)',
+                border: `1.5px dashed ${errors.saleDeedDoc ? '#ef4444' : 'var(--border)'}`,
+              }}
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
+                  {form.saleDeedDoc ? form.saleDeedDoc.name : 'Upload sale deed document'}
+                </p>
+                {/* <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  PDF, JPG, JPEG, PNG
+                </p> */}
+              </div>
+              <span
+                className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
+                style={{
+                  background: 'rgba(6,182,212,0.15)',
+                  color: '#0891b2',
+                  border: '1px solid rgba(6,182,212,0.35)',
+                }}
+              >
+                Choose File
+              </span>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                onChange={e => set('saleDeedDoc', e.target.files?.[0] ?? null)}
+                className="hidden"
+              />
+            </label>
+          </Field>
+
+          <Field label="Owner Name" required error={errors.ownerName}>
+            <input
+              type="text"
+              placeholder="Enter owner name"
+              value={form.ownerName}
+              onChange={e => set('ownerName', e.target.value)}
+              style={inputStyle(errors.ownerName)}
+            />
+          </Field>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+              <input
+                type="checkbox"
+                checked={form.onLenderName}
+                onChange={e => set('onLenderName', e.target.checked)}
+              />
+              <span>it is on lender name</span>
+            </label>
+          </div>
+        </Section>
+
         {/* ── Plot & Area ── */}
         <Section accent="#f59e0b" title="Plot & Area Details">
-          <Field label="Plot Number" required error={errors.plotNumber}>
+          <div className="sm:col-span-2">
+            <Field label="Asset Type" required error={errors.assetType}>
+              <PillSelect
+                value={form.assetType}
+                onChange={v => set('assetType', v)}
+                options={ASSET_TYPES}
+                accent="#f59e0b"
+              />
+            </Field>
+          </div>
+
+          {/* <Field label="Plot Number" required error={errors.plotNumber}>
             <input type="text" placeholder="e.g. P-42"
               value={form.plotNumber} onChange={e => set('plotNumber', e.target.value)}
               style={inputStyle(errors.plotNumber)} />
-          </Field>
+          </Field> */}
 
           <Field label="Survey No." required error={errors.surveyNo}>
             <input type="text" placeholder="Enter survey number"
               value={form.surveyNo} onChange={e => set('surveyNo', e.target.value)}
               style={inputStyle(errors.surveyNo)} />
+          </Field>
+
+          <Field label="Area" required={form.assetType === 'AREA'} error={errors.assetArea}>
+            <input type="text" placeholder="Enter area"
+              value={form.assetArea} onChange={e => set('assetArea', e.target.value)}
+              style={inputStyle(errors.assetArea)} />
+          </Field>
+
+          <Field label="Plots" required={form.assetType === 'PLOT'} error={errors.plotNumber}>
+            <input type="text" placeholder="Enter Plot"
+              value={form.plotNumber} onChange={e => set('plotNumber', e.target.value)}
+              style={inputStyle(errors.plotNumber)} />
+          </Field>
+
+          <Field label="Flat" required={form.assetType === 'FLAT'} error={errors.flatNumber}>
+            <input type="text" placeholder="Enter Flat"
+              value={form.flatNumber} onChange={e => set('flatNumber', e.target.value)}
+              style={inputStyle(errors.flatNumber)} />
           </Field>
 
           {/* <div className="sm:col-span-2">
@@ -300,7 +440,7 @@ export default function LoadAsset() {
             </Field>
           </div> */}
 
-          <div className="sm:col-span-2">
+          {/* <div className="sm:col-span-2">
             <Field label="Asset Type (Unit)" required error={errors.assetUnit}>
               <PillSelect
                 value={form.assetUnit}
@@ -309,28 +449,35 @@ export default function LoadAsset() {
                 accent="#f59e0b"
               />
             </Field>
-          </div>
+          </div> */}
 
-          <div className="sm:col-span-2">
+          {/* <div className="sm:col-span-2">
             <Field label={`Area${form.assetUnit ? ` (${unitLabel})` : ''}`} required error={errors.assetArea}>
               <input type="number" min="0" placeholder="Enter area"
                 value={form.assetArea} onChange={e => set('assetArea', e.target.value)}
                 style={inputStyle(errors.assetArea)} />
             </Field>
-          </div>
+          </div> */}
         </Section>
 
         {/* ── Actions ── */}
+        {submitError && (
+          <div className="rounded-xl px-4 py-3 text-sm font-semibold"
+            style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: '#ef4444' }}>
+            {submitError}
+          </div>
+        )}
+
         <div className="flex gap-3 justify-end">
-          <button type="button" onClick={reset}
+          <button type="button" onClick={reset} disabled={submitting}
             className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-80"
             style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
             Reset
           </button>
-          <button type="submit"
+          <button type="submit" disabled={submitting}
             className="px-7 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
-            style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 14px rgba(168,85,247,0.4)' }}>
-            Load Asset
+            style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 14px rgba(168,85,247,0.4)', opacity: submitting ? 0.7 : 1 }}>
+            {submitting ? 'Loading Asset...' : 'Load Asset'}
           </button>
         </div>
 

@@ -1,0 +1,27 @@
+name: Weekly Mobile Drift Report
+
+on:
+  schedule:
+    - cron: '0 5 * * 1'
+  workflow_dispatch:
+
+jobs:
+  drift-report:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Validate contracts
+        run: node scripts/validate-contracts.cjs
+      - name: Generate drift summary
+        run: |
+          echo "Weekly parity drift report" > drift-report.txt
+          echo "Contract version:" >> drift-report.txt
+          cat contracts/contract-version.json >> drift-report.txt
+      - name: Upload report
+        uses: actions/upload-artifact@v4
+        with:
+          name: weekly-drift-report
+          path: drift-report.txt

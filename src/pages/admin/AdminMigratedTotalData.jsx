@@ -1,16 +1,18 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { adminGetMigratedUserInfo, updateMigratedUsersDataByAdmin } from '../../api/afterlogin-admin';
 
 const fmtMoney = (n) => Number(n || 0).toLocaleString('en-IN');
 
 export default function AdminMigratedTotalData() {
-  const [lenderName, setLenderName] = useState('');
-  const [password, setPassword] = useState('');
+  const [lenderName, setLenderName] = useState(null);
+  const [password, setPassword] = useState(null);
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState('');
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
   const [editById, setEditById] = useState({});
+  const [lenderId, setLenderId] = useState(null);
+  const [dealName, setDealName] = useState(null);
 
   const totals = useMemo(() => {
     return rows.reduce((acc, row) => {
@@ -21,18 +23,24 @@ export default function AdminMigratedTotalData() {
     }, { principalAmount: 0, balancePrincipal: 0, returnedPrincipal: 0 });
   }, [rows]);
 
+  useEffect(() => {
+     onSearch(); // Auto-fetch data on component mount
+  }, [lenderName, lenderId, dealName, password]);
+
   const onSearch = async (e) => {
-    e.preventDefault();
-    if (!lenderName.trim()) {
-      setError('Lender name is required.');
-      return;
-    }
+    // e.preventDefault();
+    // if (!lenderName.trim()) {
+    //   setError('Lender name is required.');
+    //   return;
+    // }
     setLoading(true);
     setError('');
     try {
       const res = await adminGetMigratedUserInfo({
-        lenderName: lenderName.trim(),
-        password: password.trim() || null,
+        lenderName: lenderName || null,
+        lenderId: lenderId || null,
+        dealName: dealName || null,
+        password: password || null,
       });
       const list = Array.isArray(res) ? res : res?.data ?? [];
       setRows(list);
@@ -105,9 +113,23 @@ export default function AdminMigratedTotalData() {
           style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
         />
         <input
+          value={lenderId}
+          onChange={(e) => setLenderId(e.target.value)}
+          placeholder="Lender ID"
+          className="px-3 py-2.5 rounded-xl text-sm outline-none"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+        />
+        <input
+          value={dealName}
+          onChange={(e) => setDealName(e.target.value)}
+          placeholder="Deal name"
+          className="px-3 py-2.5 rounded-xl text-sm outline-none"
+          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+        />
+        <input
           value={password}
           onChange={(e) => setPassword(e.target.value)}
-          placeholder="Password (optional)"
+          placeholder="Password"
           className="px-3 py-2.5 rounded-xl text-sm outline-none"
           style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
         />

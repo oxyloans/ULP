@@ -6,7 +6,12 @@ import { formatINR } from "../../utils/currency";
 // ─── Enums ────────────────────────────────────────────────────────────────────
 const DEAL_TYPES       = ["NORMAL", "TEST"];
 const DEAL_SUB_TYPES   = ["STUDENT"];
-const GLOBAL_DEAL_TYPES= ["SDLOT", "GOLD", "REALGOLD"];
+const DEAL_TABS = [
+  { key: "ASSET", label: "Asset - Fractional Lending" },
+  { key: "SDLOT", label: "SD Lot" },
+  { key: "GOLD", label: "Gold Lot" },
+];
+const ASSET_AREA_TYPES = ["PLOT", "FLAT"];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -206,6 +211,67 @@ function Field({ label, required, error, hint, children }) {
   );
 }
 
+function DealTabs({ active, onChange }) {
+  return (
+    <div className="grid gap-2 sm:grid-cols-3 rounded-2xl p-2"
+      style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+      {DEAL_TABS.map((tab, index) => {
+        const isActive = active === tab.key;
+        return (
+          <button
+            key={tab.key}
+            type="button"
+            onClick={() => onChange(tab.key)}
+            className="px-3 py-3 rounded-xl text-sm font-black text-left transition-all"
+            style={isActive ? {
+              background: "linear-gradient(135deg,#6366f1,#4338ca)",
+              color: "#fff",
+              boxShadow: "0 4px 18px rgba(99,102,241,0.35)",
+            } : {
+              background: "var(--input-bg)",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)",
+            }}>
+            <span className="text-xs opacity-75 mr-1">{index + 1}.</span>
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function FilePicker({ label, file, files = [], multiple, accept, required = true, error, onChange }) {
+  const names = multiple
+    ? files.map(f => f.name).join(", ")
+    : file?.name;
+
+  return (
+    <Field label={label} required={required} error={error}>
+      <label className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-3 cursor-pointer"
+        style={{
+          background: "var(--input-bg)",
+          border: `1.5px dashed ${error ? "#ef4444" : "var(--border)"}`,
+        }}>
+        <span className="text-sm font-semibold truncate" style={{ color: names ? "var(--text-primary)" : "var(--text-muted)" }}>
+          {names || "Choose file"}
+        </span>
+        <span className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
+          style={{ background: "rgba(99,102,241,0.14)", color: "#6366f1", border: "1px solid rgba(99,102,241,0.25)" }}>
+          Upload
+        </span>
+        <input
+          type="file"
+          accept={accept}
+          multiple={multiple}
+          onChange={e => onChange(multiple ? Array.from(e.target.files ?? []) : (e.target.files?.[0] ?? null))}
+          className="hidden"
+        />
+      </label>
+    </Field>
+  );
+}
+
 const EMPTY_FORM = {
   dealName: "", dealType: "NORMAL", dealSubType: "STUDENT", globalDealType: "SDLOT",
   dealAmount: "", duration: "",
@@ -218,6 +284,16 @@ const EMPTY_FORM = {
   transferTo:      "",   // company name (auto from selection)
 };
 
+const EMPTY_ASSET_FORM = {
+  dealName: "", dealValue: "", dealType: "NORMAL",
+  monthlyInterest: "", quartelyInterest: "", halfInterest: "", yearlyInterest: "",
+  borrowerName: "", projectName: "",
+  legalReport: null, valuationReport: null,
+  assetValue: "", latitude: "", longitude: "",
+  assetArea: "", assetAreaType: "PLOT",
+  images: [], videos: [],
+};
+
 export default function CreateDeal({ editDeal: editDealProp = null }) {
   const navigate   = useNavigate();
   const { id: editId } = useParams();
@@ -225,10 +301,12 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   const [editDeal,   setEditDeal]   = useState(editDealProp);
   const [dealLoading, setDealLoading] = useState(!!editId && !editDealProp);
   const isEdit     = !!(editDeal || editId);
+  const [activeTab, setActiveTab] = useState("ASSET");
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState("");
   const [errors, setErrors]   = useState({});
+  const [assetErrors, setAssetErrors] = useState({});
   const [IdsField,setIdsField] = useState();
   const [showIdsField, setShowIdsField] = useState(false)
 
@@ -263,10 +341,14 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   }, [editId, editDealProp]);
 
   const [form, setForm] = useState(EMPTY_FORM);
+  const [assetForm, setAssetForm] = useState(EMPTY_ASSET_FORM);
 
   // Populate form when editDeal is loaded (either from prop or async fetch)
   useEffect(() => {
     if (!editDeal) return;
+    if (editDeal.globalDealType === "GOLD" || editDeal.globalDealType === "SDLOT") {
+      setActiveTab(editDeal.globalDealType);
+    }
     setForm({
       dealName:                  editDeal.dealName                  ?? "",
       dealType:                  editDeal.dealType                  ?? "NORMAL",
@@ -291,6 +373,16 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   }, [editDeal]);
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: "" })); };
+  const setAsset = (k, v) => { setAssetForm(f => ({ ...f, [k]: v })); setAssetErrors(e => ({ ...e, [k]: "" })); };
+
+  const changeTab = (tab) => {
+    setActiveTab(tab);
+    setSubmitted(false);
+    setSubmitError("");
+    setErrors({});
+    setAssetErrors({});
+    if (tab === "SDLOT" || tab === "GOLD") set("globalDealType", tab);
+  };
 
   // Derive selected bank object from transferFundsId
   const selectedBank = bankAccounts.find(b => String(b.id ?? b.accountNumber) === form.transferFundsId) ?? null;
@@ -309,6 +401,24 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     if (!form.emiEndDate)                   e.emiEndDate            = "EMI end date is required";
     const min = numVal(form.minimumParticipation), max = numVal(form.maxParticipation);
     if (min && max && min >= max) e.maxParticipation = "Max must be greater than min";
+    return e;
+  };
+
+  const validateAsset = () => {
+    const e = {};
+    if (!assetForm.dealName.trim())       e.dealName = "Deal name is required";
+    if (!assetForm.dealValue)             e.dealValue = "Deal value is required";
+    if (!assetForm.monthlyInterest)       e.monthlyInterest = "Monthly ROI is required";
+    if (!assetForm.borrowerName.trim())   e.borrowerName = "Borrower name is required";
+    if (!assetForm.projectName.trim())    e.projectName = "Project name is required";
+    if (!assetForm.legalReport)           e.legalReport = "Legal report is required";
+    if (!assetForm.valuationReport)       e.valuationReport = "Valuation report is required";
+    if (!assetForm.assetValue)            e.assetValue = "Asset value is required";
+    if (!assetForm.latitude)              e.latitude = "Latitude is required";
+    if (!assetForm.longitude)             e.longitude = "Longitude is required";
+    if (!assetForm.assetArea.trim())      e.assetArea = "Asset area is required";
+    if (assetForm.images.length > 3)      e.images = "Upload up to 3 images";
+    if (assetForm.videos.length > 3)      e.videos = "Upload up to 3 videos";
     return e;
   };
 
@@ -353,7 +463,53 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     }
   };
 
-  const resetForm = () => { setForm(EMPTY_FORM); setErrors({}); setSubmitted(false); setSubmitError(""); };
+  const handleAssetSubmit = async (e) => {
+    e.preventDefault();
+    const errs = validateAsset();
+    if (Object.keys(errs).length) { setAssetErrors(errs); return; }
+
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const payload = new FormData();
+      payload.append("dealName", assetForm.dealName.trim());
+      payload.append("dealAmount", numVal(assetForm.dealValue));
+      payload.append("dealType", assetForm.dealType);
+      payload.append("dealSubType", "FRACTIONAL_LENDING");
+      payload.append("globalDealType", "ASSET");
+      payload.append("monthlyInterest", parseFloat(assetForm.monthlyInterest) || 0);
+      payload.append("quartelyInterest", parseFloat(assetForm.quartelyInterest) || 0);
+      payload.append("halfInterest", parseFloat(assetForm.halfInterest) || 0);
+      payload.append("yearlyInterest", parseFloat(assetForm.yearlyInterest) || 0);
+      payload.append("borrowerName", assetForm.borrowerName.trim());
+      payload.append("projectName", assetForm.projectName.trim());
+      payload.append("assetValue", numVal(assetForm.assetValue));
+      payload.append("latitude", assetForm.latitude);
+      payload.append("longitude", assetForm.longitude);
+      payload.append("assetArea", assetForm.assetArea.trim());
+      payload.append("assetAreaType", assetForm.assetAreaType);
+      payload.append("legalReport", assetForm.legalReport);
+      payload.append("valuationReport", assetForm.valuationReport);
+      assetForm.images.forEach(file => payload.append("images", file));
+      assetForm.videos.forEach(file => payload.append("videos", file));
+
+      await createOrUpdateDeal(payload);
+      setSubmitted(true);
+    } catch (err) {
+      setSubmitError(err.message ?? "Submission failed. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const resetForm = () => {
+    setForm({ ...EMPTY_FORM, globalDealType: activeTab === "GOLD" ? "GOLD" : "SDLOT" });
+    setAssetForm(EMPTY_ASSET_FORM);
+    setErrors({});
+    setAssetErrors({});
+    setSubmitted(false);
+    setSubmitError("");
+  };
 
   const minAmt    = numVal(form.minimumParticipation);
   const roiNum    = parseFloat(form.monthlyInterest) || 0;
@@ -363,7 +519,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   const showPreview = minAmt > 0 && roiNum > 0 && tenureNum > 0;
 
   if (dealLoading) return (
-    <div className="max-w-2xl mx-auto grid gap-5">
+    <div className="max-w-3xl mx-auto grid gap-5">
       <div className="flex items-center gap-3">
         <button onClick={() => navigate("/admin/dashboard")}
           className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity"
@@ -386,10 +542,10 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
       </div>
       <div>
         <h2 className="text-3xl font-black" style={{ color: "var(--text-primary)" }}>
-          {isEdit ? "Deal Updated!" : "Deal Created!"}
+          {activeTab === "ASSET" ? "Asset Deal Created!" : isEdit ? "Deal Updated!" : "Deal Created!"}
         </h2>
         <p className="text-sm mt-2" style={{ color: "var(--text-muted)" }}>
-          <span className="font-bold" style={{ color: "var(--text-primary)" }}>{form.dealName}</span> has been saved.
+          <span className="font-bold" style={{ color: "var(--text-primary)" }}>{activeTab === "ASSET" ? assetForm.dealName : form.dealName}</span> has been saved.
         </p>
       </div>
       <div className="w-full rounded-2xl overflow-hidden"
@@ -401,12 +557,17 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         </div>
         {/* Left — Deal stats single horizontal row */}
         <div className="flex items-stretch gap-0 divide-x" style={{ borderBottom: '1px solid var(--border)', '--tw-divide-opacity': 1 }}>
-          {[
+          {(activeTab === "ASSET" ? [
+            { label: "Deal Value", value: fmtINR(numVal(assetForm.dealValue)), color: "#6366f1" },
+            { label: "Monthly ROI", value: assetForm.monthlyInterest ? assetForm.monthlyInterest + "%" : "—", color: "#10b981" },
+            { label: "Asset Value", value: fmtINR(numVal(assetForm.assetValue)), color: "#818cf8" },
+            { label: "Area Type", value: assetForm.assetAreaType, color: "#f59e0b" },
+          ] : [
             { label: "Deal Amount",  value: fmtINR(numVal(form.dealAmount)),                                                          color: "#6366f1" },
             { label: "Monthly ROI", value: form.monthlyInterest ? form.monthlyInterest + "%" : "—",                                  color: "#10b981" },
             { label: "Duration",    value: form.duration ? form.duration + " months" : "—",                                          color: "#818cf8" },
             { label: "Min / Max",   value: fmtINR(numVal(form.minimumParticipation)) + " – " + fmtINR(numVal(form.maxParticipation)), color: "#f59e0b" },
-          ].map(s => (
+          ]).map(s => (
             <div key={s.label} className="flex-1 px-4 py-4 text-center"
               style={{ borderRight: '1px solid var(--border)' }}>
               <p className="text-xs font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
@@ -416,7 +577,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         </div>
 
         {/* Right — Bank details table */}
-        {(form.transferTo || form.transferFunds || selectedBank) && (
+        {activeTab !== "ASSET" && (form.transferTo || form.transferFunds || selectedBank) && (
           <div>
             <div className="px-5 py-2.5 flex items-center gap-2"
               style={{ borderBottom: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.04)' }}>
@@ -485,13 +646,131 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           </span>
         </div>
         <h1 className="text-2xl font-black" style={{ color: "var(--text-primary)" }}>
-          {isEdit ? "Edit SD Lot Deal" : "New SD Lot Deal"}
+          {activeTab === "ASSET" ? "New Asset Fractional Lending Deal" : isEdit ? `Edit ${activeTab === "GOLD" ? "Gold Lot" : "SD Lot"} Deal` : `New ${activeTab === "GOLD" ? "Gold Lot" : "SD Lot"} Deal`}
         </h1>
         <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
-          {isEdit ? "Update the deal details below" : "Create a new investment offering for participants"}
+          {activeTab === "ASSET" ? "Create a fractional lending deal with asset validation reports and media" : isEdit ? "Update the deal details below" : "Create a new investment offering for participants"}
         </p>
       </div>
 
+      <DealTabs active={activeTab} onChange={changeTab} />
+
+      {activeTab === "ASSET" ? (
+      <form onSubmit={handleAssetSubmit} className="grid gap-4">
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#818cf8" }}>Deal Identity</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Deal Name" required error={assetErrors.dealName}>
+              <input type="text" placeholder="Enter deal name"
+                value={assetForm.dealName} onChange={e => setAsset("dealName", e.target.value)}
+                style={inp(assetErrors.dealName)} />
+            </Field>
+            <Field label="Deal Value (₹)" required error={assetErrors.dealValue} hint={numVal(assetForm.dealValue) > 0 ? fmtINR(numVal(assetForm.dealValue)) : undefined}>
+              <input type="text" inputMode="numeric" placeholder="e.g. 1000000"
+                value={assetForm.dealValue} onChange={e => setAsset("dealValue", toLocale(e.target.value))}
+                style={{ ...inp(assetErrors.dealValue), fontFamily: "'JetBrains Mono', monospace" }} />
+            </Field>
+          </div>
+          <Field label="Deal Type" required>
+            <PillSelect value={assetForm.dealType} onChange={v => setAsset("dealType", v)} options={DEAL_TYPES} accent="#818cf8" />
+          </Field>
+        </div>
+
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#10b981" }}>ROI (%)</p>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[
+              { key: "monthlyInterest", label: "Monthly", required: true },
+              { key: "quartelyInterest", label: "Quarterly", required: false },
+              { key: "yearlyInterest", label: "Yearly", required: false },
+              { key: "halfInterest", label: "Half-Yearly", required: false },
+            ].map(f => (
+              <Field key={f.key} label={f.label} required={f.required} error={assetErrors[f.key]}>
+                <div className="relative">
+                  <input type="text" inputMode="decimal" placeholder="0.0"
+                    value={assetForm[f.key]} onChange={e => setAsset(f.key, e.target.value.replace(/[^0-9.]/g, ""))}
+                    style={{ ...inp(assetErrors[f.key]), paddingRight: 28 }} />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold" style={{ color: "var(--text-muted)" }}>%</span>
+                </div>
+              </Field>
+            ))}
+          </div>
+        </div>
+
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#06b6d4" }}>Borrower & Asset</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Borrower Name" required error={assetErrors.borrowerName}>
+              <input type="text" placeholder="Enter borrower name"
+                value={assetForm.borrowerName} onChange={e => setAsset("borrowerName", e.target.value)}
+                style={inp(assetErrors.borrowerName)} />
+            </Field>
+            <Field label="Project Name" required error={assetErrors.projectName}>
+              <input type="text" placeholder="Enter project name"
+                value={assetForm.projectName} onChange={e => setAsset("projectName", e.target.value)}
+                style={inp(assetErrors.projectName)} />
+            </Field>
+            <Field label="Asset Value (₹)" required error={assetErrors.assetValue} hint={numVal(assetForm.assetValue) > 0 ? fmtINR(numVal(assetForm.assetValue)) : undefined}>
+              <input type="text" inputMode="numeric" placeholder="e.g. 2500000"
+                value={assetForm.assetValue} onChange={e => setAsset("assetValue", toLocale(e.target.value))}
+                style={{ ...inp(assetErrors.assetValue), fontFamily: "'JetBrains Mono', monospace" }} />
+            </Field>
+            <Field label="Asset Area" required error={assetErrors.assetArea}>
+              <input type="text" placeholder="Enter area"
+                value={assetForm.assetArea} onChange={e => setAsset("assetArea", e.target.value)}
+                style={inp(assetErrors.assetArea)} />
+            </Field>
+            <Field label="Latitude" required error={assetErrors.latitude}>
+              <input type="text" inputMode="decimal" placeholder="e.g. 17.3850"
+                value={assetForm.latitude} onChange={e => setAsset("latitude", e.target.value.replace(/[^0-9.-]/g, ""))}
+                style={inp(assetErrors.latitude)} />
+            </Field>
+            <Field label="Longitude" required error={assetErrors.longitude}>
+              <input type="text" inputMode="decimal" placeholder="e.g. 78.4867"
+                value={assetForm.longitude} onChange={e => setAsset("longitude", e.target.value.replace(/[^0-9.-]/g, ""))}
+                style={inp(assetErrors.longitude)} />
+            </Field>
+          </div>
+          <Field label="Asset Type" required>
+            <PillSelect value={assetForm.assetAreaType} onChange={v => setAsset("assetAreaType", v)} options={ASSET_AREA_TYPES} accent="#06b6d4" />
+          </Field>
+        </div>
+
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>Validation Check</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FilePicker label="Legal Report" file={assetForm.legalReport} accept=".pdf,.jpg,.jpeg,.png"
+              error={assetErrors.legalReport} onChange={file => setAsset("legalReport", file)} />
+            <FilePicker label="Valuation Report" file={assetForm.valuationReport} accept=".pdf,.jpg,.jpeg,.png"
+              error={assetErrors.valuationReport} onChange={file => setAsset("valuationReport", file)} />
+            <FilePicker label="Images (max 3)" files={assetForm.images} multiple accept="image/*" required={false}
+              error={assetErrors.images} onChange={files => setAsset("images", files.slice(0, 3))} />
+            <FilePicker label="Videos (max 3)" files={assetForm.videos} multiple accept="video/*" required={false}
+              error={assetErrors.videos} onChange={files => setAsset("videos", files.slice(0, 3))} />
+          </div>
+        </div>
+
+        {submitError && (
+          <div className="px-4 py-3 rounded-xl text-sm font-semibold"
+            style={{ background: "#fef2f2", color: "#dc2626", border: "1px solid #fecaca" }}>
+            {submitError}
+          </div>
+        )}
+
+        <button type="submit" disabled={submitting}
+          className="w-full flex items-center justify-center gap-2.5 py-4 rounded-2xl font-black text-base transition-all disabled:opacity-60"
+          style={{ background: "linear-gradient(135deg,#6366f1,#4338ca)", color: "#fff", boxShadow: "0 4px 24px rgba(99,102,241,0.4)" }}>
+          {submitting
+            ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>
+            : <PlusIcon />}
+          {submitting ? "Saving…" : "Create Asset Deal"}
+        </button>
+      </form>
+      ) : (
       <form onSubmit={handleSubmit} className="grid gap-4">
 
         {/* Deal Identity */}
@@ -503,7 +782,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               value={form.dealName} onChange={e => set("dealName", e.target.value)}
               style={inp(errors.dealName)} />
           </Field>
-           <div className="grid gap-4 sm:grid-cols-3">
+           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Deal Type" required>
               <select value={form.dealType} onChange={e => set("dealType", e.target.value)}
                 style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
@@ -514,12 +793,6 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               <select value={form.dealSubType} onChange={e => set("dealSubType", e.target.value)}
                 style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
                 {DEAL_SUB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </Field>
-            <Field label="Global Deal Type" required>
-              <select value={form.globalDealType} onChange={e => set("globalDealType", e.target.value)}
-                style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
-                {GLOBAL_DEAL_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </Field>
           </div>
@@ -778,6 +1051,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           {submitting ? "Saving…" : isEdit ? "Update Deal" : "Create Deal"}
         </button>
       </form>
+      )}
     </div>
   );
 }

@@ -1,0 +1,28 @@
+name: Sync Mobile Impact Artifact
+
+on:
+  push:
+    branches: ["main", "master"]
+
+jobs:
+  mobile-impact-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Generate mobile impact payload
+        run: node scripts/detect-mobile-impact.cjs > mobile-impact.json
+      - name: Build mobile issue draft
+        run: |
+          echo "# Mobile Parity Impact" > mobile-impact-issue.md
+          echo "Web commit: $GITHUB_SHA" >> mobile-impact-issue.md
+          echo "" >> mobile-impact-issue.md
+          echo '```json' >> mobile-impact-issue.md
+          cat mobile-impact.json >> mobile-impact-issue.md
+          echo '```' >> mobile-impact-issue.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mobile-impact-issue-draft
+          path: mobile-impact-issue.md

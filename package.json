@@ -6,7 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "contracts:validate": "node scripts/validate-contracts.cjs",
+    "mobile-impact:detect": "node scripts/detect-mobile-impact.cjs"
   },
   "dependencies": {
     "axios": "^1.15.2",

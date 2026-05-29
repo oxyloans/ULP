@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Auth Contracts",
+  "type": "object",
+  "properties": {
+    "signIn": {
+      "type": "object",
+      "properties": {
+        "request": {
+          "type": "object",
+          "required": ["credential", "password"],
+          "properties": {
+            "credential": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        },
+        "response": {
+          "type": "object",
+          "properties": {
+            "accessToken": { "type": "string" },
+            "userId": { "type": "string" },
+            "role": { "type": "string" }
+          }
+        }
+      }
+    }
+  }
+}

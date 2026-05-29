@@ -51,26 +51,63 @@ function mapPaymentStatus(status) {
   return 'INITIATED';
 }
 
+function numberOrNull(value) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
+function getFirstNumber(...values) {
+  for (const value of values) {
+    const n = numberOrNull(value);
+    if (n !== null) return n;
+  }
+  return null;
+}
+
 function mapApiDealToRow(item, index) {
   const id = item?.dealId ?? `deal-${index + 1}`;
   const fallbackName = typeof id === 'string' ? `Deal ${id.slice(0, 8)}` : `Deal ${index + 1}`;
+  const breakupRows = Array.isArray(item?.usersDealsBasedInterestInfoDto) ? item.usersDealsBasedInterestInfoDto : [];
   return {
     id,
     dealName: item?.dealName ?? fallbackName,
     roi: Number(item?.roi ?? 0),
-    lenders: item?.lenders ?? '—',
+    lenders: getFirstNumber(
+      item?.lenders,
+      item?.lendersCount,
+      item?.lenderCount,
+      item?.totalLenders,
+      item?.noOfLenders,
+      item?.participatedUsersCount,
+      breakupRows.length || null
+    ),
     amount: Number(item?.totalPrincipalParticipationAmount ?? item?.currentPrincipalAmount ?? item?.dealAmount ?? 0),
+    interestAmount: getFirstNumber(
+      item?.interestAmount,
+      item?.totalInterestAmount,
+      item?.totalInterest,
+      item?.payableInterest,
+      item?.monthlyInterestAmount,
+      breakupRows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0) || null
+    ),
     status: mapPaymentStatus(item?.paymentStatus),
     paymentDate: item?.actualInterestDate ?? null,
   };
 }
 
+function summarizeInterestRows(rows) {
+  return {
+    lenders: rows.length,
+    interestAmount: rows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0),
+  };
+}
+
 export function downloadCSV(rows, filename) {
-  const headers = ['#', 'Deal Name', 'ROI (%)', 'Lenders', 'Amount (INR)', 'Payment Date', 'Status'];
+  const headers = ['#', 'Deal Name', 'ROI (%)', 'Lenders', 'Principal Amount (INR)', 'Interest Amount (INR)', 'Payment Date', 'Status'];
   const lines = [
     headers.join(','),
     ...rows.map((d, i) =>
-      [i + 1, `"${d.dealName}"`, d.roi, d.lenders, d.amount, d.paymentDate ?? '', d.status].join(',')
+      [i + 1, `"${d.dealName}"`, d.roi, d.lenders ?? '', d.amount, d.interestAmount ?? '', d.paymentDate ?? '', d.status].join(',')
     ),
   ];
   const blob = new Blob([lines.join('\n')], { type: 'text/csv' });
@@ -150,6 +187,7 @@ function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
 
 function LenderBreakupModal({ open, dealName, loading, error, rows, onClose, onDownloadAndApprove, actionLoading }) {
   if (!open) return null;
+  const totalInterest = rows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0);
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
@@ -161,7 +199,9 @@ function LenderBreakupModal({ open, dealName, loading, error, rows, onClose, onD
           style={{ borderBottom: '1px solid var(--border)', background: 'rgba(99,102,241,0.06)' }}>
           <div>
             <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Lender Interest Breakup</p>
-            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{dealName || '—'}</p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {dealName || '—'} · {rows.length} lender{rows.length !== 1 ? 's' : ''} · {fmtINR(totalInterest)}
+            </p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -169,7 +209,7 @@ function LenderBreakupModal({ open, dealName, loading, error, rows, onClose, onD
               disabled={loading || actionLoading || !rows.length}
               className="px-3 py-1.5 rounded-lg text-xs font-bold"
               style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              {actionLoading ? 'Generating...' : 'Download Excel + Approve'}
+              {actionLoading ? 'Generating...' : 'Generate Excel'}
             </button>
             <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
@@ -503,16 +543,41 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
   const [lenderRows, setLenderRows] = useState([]);
   const [selectedDealForLenders, setSelectedDealForLenders] = useState(null);
   const [lenderActionLoading, setLenderActionLoading] = useState(false);
+  const [interestSummaryByDeal, setInterestSummaryByDeal] = useState({});
 
   const loadDeals = useCallback(async () => {
     setLoading(true);
     setError('');
+    setInterestSummaryByDeal({});
     try {
+      let rows = [];
       if (typeof fetchDeals === 'function') {
-        const rows = await fetchDeals(period);
-        setDeals(Array.isArray(rows) ? rows : []);
+        const fetchedRows = await fetchDeals(period);
+        rows = Array.isArray(fetchedRows) ? fetchedRows : [];
       } else {
-        setDeals(Array.isArray(mockDeals) ? mockDeals : []);
+        rows = Array.isArray(mockDeals) ? mockDeals : [];
+      }
+      setDeals(rows);
+
+      if (typeof fetchDeals === 'function') {
+        const summaries = await Promise.allSettled(rows.map(async (deal) => {
+          const res = await getInterestBreakUpByDeal(deal.id);
+          const breakupRows = Array.isArray(res?.usersDealsBasedInterestInfoDto)
+            ? res.usersDealsBasedInterestInfoDto
+            : Array.isArray(res) ? res : [];
+          return [deal.id, summarizeInterestRows(breakupRows)];
+        }));
+        const summaryMap = {};
+        summaries.forEach((result) => {
+          if (result.status === 'fulfilled') {
+            const [dealId, summary] = result.value;
+            summaryMap[dealId] = summary;
+          }
+        });
+        if (Object.keys(summaryMap).length) {
+          setInterestSummaryByDeal(summaryMap);
+          setDeals(prev => prev.map(deal => summaryMap[deal.id] ? { ...deal, ...summaryMap[deal.id] } : deal));
+        }
       }
     } catch (e) {
       setDeals([]);
@@ -526,6 +591,9 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
   const getStatus = (d) => (paidMap[d.id] ? 'PAID' : (d.status ?? mapPaymentStatus(d.paymentStatus)));
   const getPaidDate = (d) => paidMap[d.id]?.date ?? null;
+  const getLendersCount = (d) => interestSummaryByDeal[d.id]?.lenders ?? d.lenders ?? null;
+  const getInterestAmount = (d) => interestSummaryByDeal[d.id]?.interestAmount ?? d.interestAmount ?? null;
+  const formatOptionalINR = (value) => value === null || value === undefined ? '—' : fmtINR(value);
 
   const pendingDeals = deals.filter(d => getStatus(d) === 'INITIATED');
   const paidDeals    = deals.filter(d => getStatus(d) === 'PAID');
@@ -551,8 +619,9 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
   const selectedDeals = deals.filter(d => selected.has(d.id));
   const selectedTotal = selectedDeals.reduce((s, d) => s + d.amount, 0);
-  const totalPending  = pendingDeals.reduce((s, d) => s + d.amount, 0);
-  const totalPaid     = paidDeals.reduce((s, d) => s + d.amount, 0);
+  const totalPendingInterest = pendingDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
+  const totalPaidInterest = paidDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
+  const totalInterest = deals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
 
   const handleMarkPaid = async (paidDate) => {
     setPayLoading(true);
@@ -575,7 +644,16 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
     setLenderRows([]);
     try {
       const res = await getInterestBreakUpByDeal(deal.id);
-      setLenderRows(Array.isArray(res?.usersDealsBasedInterestInfoDto) ? res.usersDealsBasedInterestInfoDto : []);
+      const rows = Array.isArray(res?.usersDealsBasedInterestInfoDto)
+        ? res.usersDealsBasedInterestInfoDto
+        : Array.isArray(res) ? res : [];
+      const interestAmount = rows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0);
+      setLenderRows(rows);
+      setInterestSummaryByDeal(prev => ({
+        ...prev,
+        [deal.id]: { lenders: rows.length, interestAmount },
+      }));
+      setDeals(prev => prev.map(row => row.id === deal.id ? { ...row, lenders: rows.length, interestAmount } : row));
     } catch (e) {
       setLenderModalError(e?.message ?? 'Failed to load lenders breakup');
     } finally {
@@ -627,8 +705,9 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
   const kpis = [
     { label: 'Total Deals',    value: String(deals.length), color: '#a855f7' },
-    { label: 'Pending Payout', value: fmtINR(totalPending), color: '#d97706' },
-    { label: 'Paid Out',       value: fmtINR(totalPaid),    color: '#059669' },
+    { label: 'Pending Interest', value: fmtINR(totalPendingInterest), color: '#d97706' },
+    { label: 'Paid Interest',  value: fmtINR(totalPaidInterest), color: '#059669' },
+    { label: 'Total Interest', value: fmtINR(totalInterest), color: '#6366f1' },
     { label: 'Selected',       value: String(selected.size),color: '#6366f1' },
   ];
 
@@ -699,7 +778,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
         </div>
 
         {/* KPIs */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-5 gap-3">
           {kpis.map(k => (
             <div key={k.label} className="rounded-xl px-4 py-3"
               style={{ background: `${k.color}0a`, border: `1px solid ${k.color}20` }}>
@@ -759,8 +838,8 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                 style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.2)' }}>
                 <CoinIcon />
                 <div>
-                  <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Pending</p>
-                  <p className="text-sm font-black" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalPending)}</p>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Interest</p>
+                  <p className="text-sm font-black" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalPendingInterest)}</p>
                 </div>
               </div>
             )}
@@ -793,7 +872,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                         <span>Payment</span>
                       </div>
                     </th> */}
-                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Amount', 'Payment Date', 'Status', 'Lenders Breakup', 'Download'].map(h => (
+                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Principal Amount', 'Interest Amount', 'Payment Date', 'Status', 'Lenders Breakup', 'Download'].map(h => (
                       <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
                         style={{ color: 'var(--text-muted)' }}>{h}</th>
                     ))}
@@ -845,12 +924,16 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                         <td className="py-3.5 px-4">
                           <div className="flex items-center gap-1.5">
                             <UsersIcon />
-                            <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{deal.lenders}</span>
+                            <span className="text-sm font-bold tabular-nums" style={{ color: 'var(--text-primary)' }}>{getLendersCount(deal) ?? '—'}</span>
                           </div>
                         </td>
                         <td className="py-3.5 px-4">
                           <span className="text-sm font-extrabold tabular-nums"
                             style={{ color: '#a855f7', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(deal.amount)}</span>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-sm font-extrabold tabular-nums"
+                            style={{ color: '#059669', fontFamily: "'JetBrains Mono', monospace" }}>{formatOptionalINR(getInterestAmount(deal))}</span>
                         </td>
 
                         {/* Payment Date */}
@@ -906,11 +989,16 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
               <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
                 {filtered.length} deal{filtered.length !== 1 ? 's' : ''} · {period.label}
               </span>
-              {selected.size > 0 && (
-                <span className="text-xs font-bold" style={{ color: '#c084fc' }}>
-                  {selected.size} selected · {fmtINR(selectedTotal)}
+              <div className="flex items-center gap-3 flex-wrap">
+                <span className="text-xs font-bold" style={{ color: '#059669' }}>
+                  Total interest amount · {fmtINR(filtered.reduce((sum, deal) => sum + Number(getInterestAmount(deal) ?? 0), 0))}
                 </span>
-              )}
+                {selected.size > 0 && (
+                  <span className="text-xs font-bold" style={{ color: '#c084fc' }}>
+                    {selected.size} selected · {fmtINR(selectedTotal)}
+                  </span>
+                )}
+              </div>
             </div>
           )}
         </div>

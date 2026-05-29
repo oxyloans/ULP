@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Migrations Contracts",
+  "type": "object",
+  "properties": {
+    "migratedUser": {
+      "type": "object",
+      "properties": {
+        "id": { "type": ["string", "null"] },
+        "lenderId": { "type": ["string", "null"] },
+        "lenderName": { "type": ["string", "null"] },
+        "principalAmount": { "type": ["number", "null"] },
+        "balancePrincipal": { "type": ["number", "null"] },
+        "roi": { "type": ["number", "null"] },
+        "interestDate": { "type": ["number", "null"] }
+      }
+    }
+  }
+}

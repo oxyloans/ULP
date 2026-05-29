@@ -262,10 +262,12 @@ export async function approveMigratedUser(userId, approvedBy = '', migrationStat
  * POST /oxybrick-service/adminGetMigratedUserInfo
  * Body: { lenderName, password }
  */
-export async function adminGetMigratedUserInfo({ lenderName, password = null }) {
+export async function adminGetMigratedUserInfo({ lenderName, password = null, lenderId = null, dealName = null } = {}) {
   return post('/oxybrick-service/adminGetMigratedUserInfo', {
     lenderName,
     password,
+    lenderId,
+    dealName
   });
 }
 
@@ -294,4 +296,35 @@ export async function getInterestBreakUpByDeal(dealId) {
  */
 export async function submitInterestApprovals(payload) {
   return patch('/oxybrick-service/interestApprovals', payload);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ASSET BASED INFO
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * PATCH /oxybrick-service/saveAssetBasedInfo
+ */
+export async function saveAssetBasedInfo(payload) {
+  return patch('/oxybrick-service/saveAssetBasedInfo', payload);
+}
+
+/**
+ * GET /oxybrick-service/getAllLoadAssetDetails
+ */
+export async function getAllLoadAssetDetails() {
+  return get('/oxybrick-service/getAllLoadAssetDetails');
+}
+
+/**
+ * POST /upload-service/adminUplaodSaleDeedDocuments?fileType=saledeed&assetId={assetId}
+ */
+export async function uploadSaleDeedDocument({ assetId, file }) {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return post(
+    `/upload-service/adminUplaodSaleDeedDocuments?fileType=saledeed&assetId=${encodeURIComponent(assetId)}`,
+    formData
+  );
 }

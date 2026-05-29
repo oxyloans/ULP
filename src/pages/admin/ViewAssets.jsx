@@ -1,12 +1,5 @@
 import { useState, useRef, useEffect } from 'react';
-
-/* ── Mock data ─────────────────────────────────────────────────────────────── */
-const MOCK_ASSETS = [
-  { id: 'AST-001', borrowerName: 'Ravi Kumar',   projectName: 'Green Valley',   documentNumber: 'DOC-2024-001', dateOfExecution: '2024-01-15', typeOfRegistration: 'Sale Deed',     documentValue: 2500000,  actualAssetValue: 3000000, plotNumber: 'P-12', accessType: 'En Access', area: '1200', areaUnit: 'Sq. Feet',  surveyNo: 'SRV-45/A' },
-  { id: 'AST-002', borrowerName: 'Priya Sharma', projectName: 'Silver Heights', documentNumber: 'DOC-2024-002', dateOfExecution: '2024-02-20', typeOfRegistration: 'Mortgage Deed', documentValue: 1800000,  actualAssetValue: 2200000, plotNumber: 'P-07', accessType: 'Separate',  area: '900',  areaUnit: 'Sq. Yards', surveyNo: 'SRV-12/B' },
-  { id: 'AST-003', borrowerName: 'Suresh Reddy', projectName: 'Blue Lagoon',    documentNumber: 'DOC-2024-003', dateOfExecution: '2024-03-10', typeOfRegistration: 'Gift Deed',     documentValue: 4000000,  actualAssetValue: 4500000, plotNumber: 'P-33', accessType: 'Shared',    area: '1800', areaUnit: 'Sq. Feet',  surveyNo: 'SRV-78/C' },
-  { id: 'AST-004', borrowerName: 'Anita Patel',  projectName: 'Sun City',       documentNumber: 'DOC-2024-004', dateOfExecution: '2024-04-05', typeOfRegistration: 'Sale Deed',     documentValue: 3200000,  actualAssetValue: 3800000, plotNumber: 'P-21', accessType: 'En Access', area: '1500', areaUnit: 'Acres',     surveyNo: 'SRV-90/D' },
-];
+import { getAllLoadAssetDetails } from '../../api/afterlogin-admin';
 
 const MOCK_USERS = [
   { id: 'U001', name: 'Arjun Mehta',    phone: '98765 43210' },
@@ -19,23 +12,41 @@ const MOCK_USERS = [
   { id: 'U008', name: 'Pooja Desai',    phone: '32109 87654' },
 ];
 
-const accessColor = { 'En Access': '#6366f1', Separate: '#10b981', Shared: '#f59e0b' };
-const fmt = n => '₹' + Number(n).toLocaleString('en-IN');
+const fmt = n => Number.isFinite(Number(n)) ? '₹' + Number(n).toLocaleString('en-IN') : '—';
+const formatDate = value => {
+  if (!value) return '—';
+  const date = typeof value === 'number' ? new Date(value) : new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString('en-IN', { year: 'numeric', month: 'short', day: '2-digit' });
+};
 
 /* ══════════════════════════════════════════════════════════════════════════════
    Main page
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function ViewAssets() {
   const [search,        setSearch]        = useState('');
+  const [assets,        setAssets]        = useState([]);
+  const [loading,       setLoading]       = useState(true);
+  const [error,         setError]         = useState('');
   const [detailAsset,   setDetailAsset]   = useState(null);
   const [allocAsset,    setAllocAsset]    = useState(null);
   // allocations: { [assetId]: [ { user, lendAmount } ] }
   const [allocations,   setAllocations]   = useState({});
 
-  const filtered = MOCK_ASSETS.filter(a =>
-    a.borrowerName.toLowerCase().includes(search.toLowerCase()) ||
-    a.projectName.toLowerCase().includes(search.toLowerCase()) ||
-    a.documentNumber.toLowerCase().includes(search.toLowerCase())
+  useEffect(() => {
+    setLoading(true);
+    setError('');
+    getAllLoadAssetDetails()
+      .then(data => setAssets(Array.isArray(data) ? data : []))
+      .catch(err => setError(err.message ?? 'Failed to load assets.'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = assets.filter(a =>
+    String(a.borrowerName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    String(a.projectName ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    String(a.documentNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
+    String(a.assetType ?? '').toLowerCase().includes(search.toLowerCase())
   );
 
   const saveAllocation = (assetId, lenders) => {
@@ -51,7 +62,7 @@ export default function ViewAssets() {
           <p className="text-xs uppercase tracking-widest mb-1" style={{ color: '#c084fc' }}>Assets</p>
           <h2 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>View Assets</h2>
         </div>
-        <p className="text-3xl font-bold" style={{ color: '#c084fc' }}>{MOCK_ASSETS.length}</p>
+        <p className="text-3xl font-bold" style={{ color: '#c084fc' }}>{assets.length}</p>
       </div>
 
       {/* Table */}
@@ -69,17 +80,22 @@ export default function ViewAssets() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-elevated)' }}>
-                {['Asset ID','Borrower','Project','Doc No.','Date','Reg. Type','Doc Value','Asset Value','Plot','Access','Area','Survey No.','Lenders','Action'].map(h => (
+                {['Asset ID','Borrower','Project','Doc No.','Date','Reg. Type','Doc Value','Asset Value','Taken Value','Asset Type','Asset No.','Survey No.','Owner','Sale Deed','Lenders','Action'].map(h => (
                   <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-medium whitespace-nowrap"
                     style={{ color: 'var(--text-muted)' }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {filtered.length === 0 ? (
-                <tr><td colSpan={14} className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No assets found.</td></tr>
+              {loading ? (
+                <tr><td colSpan={16} className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading assets...</td></tr>
+              ) : error ? (
+                <tr><td colSpan={16} className="py-10 text-center text-sm" style={{ color: '#f87171' }}>{error}</td></tr>
+              ) : filtered.length === 0 ? (
+                <tr><td colSpan={16} className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No assets found.</td></tr>
               ) : filtered.map(a => {
                 const lenders = allocations[a.id] ?? [];
+                const saleDeed = a.saleDeedDocumentsDto?.[0];
                 return (
                   <tr key={a.id} className="table-row-hover transition-colors"
                     style={{ borderBottom: '1px solid var(--border)' }}>
@@ -89,19 +105,30 @@ export default function ViewAssets() {
                       onClick={() => setDetailAsset(a)}>{a.borrowerName}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.projectName}</td>
                     <td className="py-3 px-4 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{a.documentNumber}</td>
-                    <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.dateOfExecution}</td>
+                    <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{formatDate(a.dateOfExecution)}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.typeOfRegistration}</td>
                     <td className="py-3 px-4 text-xs font-semibold whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{fmt(a.documentValue)}</td>
                     <td className="py-3 px-4 text-xs font-semibold whitespace-nowrap" style={{ color: '#10b981' }}>{fmt(a.actualAssetValue)}</td>
-                    <td className="py-3 px-4 text-xs" style={{ color: 'var(--text-muted)' }}>{a.plotNumber}</td>
+                    <td className="py-3 px-4 text-xs font-semibold whitespace-nowrap" style={{ color: '#f59e0b' }}>{fmt(a.takenAssetValue)}</td>
                     <td className="py-3 px-4">
                       <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
-                        style={{ background: `${accessColor[a.accessType]}18`, color: accessColor[a.accessType], border: `1px solid ${accessColor[a.accessType]}30` }}>
-                        {a.accessType}
+                        style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.3)' }}>
+                        {a.assetType ?? '—'}
                       </span>
                     </td>
-                    <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.area} {a.areaUnit}</td>
-                    <td className="py-3 px-4 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{a.surveyNo}</td>
+                    <td className="py-3 px-4 text-xs" style={{ color: 'var(--text-muted)' }}>{a.plotNumber}</td>
+                    <td className="py-3 px-4 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{a.surveyNumber}</td>
+                    <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.ownerName}</td>
+                    <td className="py-3 px-4 text-xs whitespace-nowrap">
+                      {saleDeed?.documentPath ? (
+                        <a href={saleDeed.documentPath}
+                          download={saleDeed.documentName}
+                          className="font-semibold hover:underline"
+                          style={{ color: '#c084fc' }}>
+                          Download
+                        </a>
+                      ) : <span style={{ color: 'var(--text-muted)' }}>—</span>}
+                    </td>
                     <td className="py-3 px-4 text-xs">
                       {lenders.length > 0
                         ? <span className="px-2 py-0.5 rounded-full font-semibold"
@@ -128,7 +155,11 @@ export default function ViewAssets() {
 
       {/* Detail modal */}
       {detailAsset && (
-        <DetailModal asset={detailAsset} lenders={allocations[detailAsset.id] ?? []} onClose={() => setDetailAsset(null)} />
+        <DetailModal
+          asset={detailAsset}
+          lenders={allocations[detailAsset.id] ?? []}
+          onClose={() => setDetailAsset(null)}
+        />
       )}
 
       {/* Allocation modal */}
@@ -148,6 +179,8 @@ export default function ViewAssets() {
    Detail modal
 ══════════════════════════════════════════════════════════════════════════════ */
 function DetailModal({ asset: a, lenders, onClose }) {
+  const saleDeeds = Array.isArray(a.saleDeedDocumentsDto) ? a.saleDeedDocumentsDto : [];
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)' }}>
@@ -164,17 +197,33 @@ function DetailModal({ asset: a, lenders, onClose }) {
         <div className="p-6 grid grid-cols-2 gap-4 max-h-[70vh] overflow-y-auto">
           {[
             ['Borrower Name', a.borrowerName], ['Project Name', a.projectName],
-            ['Document Number', a.documentNumber], ['Date of Execution', a.dateOfExecution],
+            ['Document Number', a.documentNumber], ['Date of Execution', formatDate(a.dateOfExecution)],
             ['Type of Registration', a.typeOfRegistration], ['Document Value', fmt(a.documentValue)],
-            ['Actual Asset Value', fmt(a.actualAssetValue)], ['Plot Number', a.plotNumber],
-            ['Access Type', a.accessType], ['Area', `${a.area} ${a.areaUnit}`],
-            ['Survey No.', a.surveyNo],
+            ['Actual Asset Value', fmt(a.actualAssetValue)], ['Taken Asset Value', fmt(a.takenAssetValue)],
+            ['Asset Type', a.assetType], ['Asset No.', a.plotNumber],
+            ['Survey No.', a.surveyNumber], ['Owner Name', a.ownerName],
           ].map(([k, v]) => (
             <div key={k}>
               <p className="text-xs uppercase tracking-wide mb-0.5" style={{ color: 'var(--text-muted)' }}>{k}</p>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{v}</p>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{v || '—'}</p>
             </div>
           ))}
+          {saleDeeds.length > 0 && (
+            <div className="col-span-2">
+              <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Sale Deed Documents</p>
+              <div className="flex flex-col gap-2">
+                {saleDeeds.map(doc => (
+                  <a key={doc.id ?? doc.documentPath}
+                    href={doc.documentPath}
+                    download={doc.documentName}
+                    className="px-3 py-2 rounded-xl text-sm font-semibold hover:opacity-80"
+                    style={{ background: 'rgba(168,85,247,0.07)', border: '1px solid rgba(168,85,247,0.2)', color: '#c084fc' }}>
+                    {doc.documentName ?? 'Download sale deed'}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
           {lenders.length > 0 && (
             <div className="col-span-2">
               <p className="text-xs uppercase tracking-wide mb-2" style={{ color: 'var(--text-muted)' }}>Lenders</p>

@@ -1,0 +1,6 @@
+{
+  "contractVersion": "1.0.0",
+  "lastUpdated": "2026-05-29",
+  "domains": ["auth", "wallet", "migrations", "interest", "profile", "deals"],
+  "breakingChangePolicy": "Any breaking change must bump major version and include a changelog entry before merge."
+}
