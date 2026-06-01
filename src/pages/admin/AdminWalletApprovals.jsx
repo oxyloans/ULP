@@ -58,7 +58,7 @@ function StatusChip({ status }) {
 }
 
 // ─── Admin names for "Approved By" dropdown ───────────────────────────────────
-const ADMIN_NAMES = ['subbu', 'admin', 'ravi', 'priya', 'vikram'];
+const ADMIN_NAMES = ['subbu', 'admin'];
 
 // ─── Confirmation Modal ───────────────────────────────────────────────────────
 function ConfirmModal({ txn, action, onConfirm, onCancel, loading }) {

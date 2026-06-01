@@ -1,24 +1,17 @@
-import { useState } from 'react';
-import { saveAssetBasedInfo, uploadSaleDeedDocument } from '../../api/afterlogin-admin';
+import { useState, useEffect } from 'react';
+import { saveAssetBasedInfo, uploadSaleDeedDocument, getAllBorrowers } from '../../api/afterlogin-admin';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const REGISTRATION_TYPES = ['SALEDEED', 'AGPA'];
-const ASSET_TYPES        = ['PLOT', 'FLAT', 'AREA'];
-const ACCESS_TYPES       = ['En Access', 'Separate', 'Shared'];
-const ASSET_UNITS        = [
-  { value: 'sqft',   label: 'Sq. Feet'  },
-  { value: 'sqyard', label: 'Sq. Yards' },
-  { value: 'acres',  label: 'Acres'     },
-  { value: 'guntas', label: "Gunta's"   },
-];
+const ASSET_TYPES        = ['PLOT', 'FLAT', 'ACRE'];
 
 const EMPTY = {
-  borrowerName: '', projectName: '', documentNumber: '',
+  borrowerId: '', borrowerName: '', projectName: '', documentNumber: '',
   dateOfExecution: '', typeOfRegistration: '',
   documentValue: '', actualAssetValue: '', takenAssetValue: '',
-  assetType: 'PLOT', plotNumber: '', 
-  // accessType: 'En Access',
+  assetType: 'PLOT', plotNumber: '',
   assetUnit: '', assetArea: '', surveyNo: '', flatNumber: '',
+  size: '', othersComments: '',
   saleDeedDoc: null, ownerName: '', onLenderName: false,
 };
 
@@ -89,7 +82,7 @@ function Field({ label, required, error, children }) {
 }
 
 // ─── Section card ─────────────────────────────────────────────────────────────
-function Section({ accent = '#a855f7', icon, title, children }) {
+function Section({ accent = '#a855f7', title, children }) {
   return (
     <div className="rounded-2xl overflow-hidden"
       style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
@@ -114,6 +107,17 @@ export default function LoadAsset() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState('');
 
+  // Borrower list
+  const [borrowers,        setBorrowers]        = useState([]);
+  const [borrowersLoading, setBorrowersLoading] = useState(true);
+
+  useEffect(() => {
+    getAllBorrowers()
+      .then(data => setBorrowers(Array.isArray(data) ? data : []))
+      .catch(() => setBorrowers([]))
+      .finally(() => setBorrowersLoading(false));
+  }, []);
+
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => {
@@ -122,13 +126,25 @@ export default function LoadAsset() {
     });
   };
 
+  // Each borrower is one record (projectName is comma-separated inside it)
+  const handleBorrowerSelect = (borrowerId) => {
+    const b = borrowers.find(x => x.id === borrowerId);
+    setForm(f => ({
+      ...f,
+      borrowerId,
+      borrowerName: b?.borrowerName ?? '',
+      projectName:  f.projectName, // keep whatever the user typed
+    }));
+    setErrors(e => ({ ...e, borrowerId: '', borrowerName: '' }));
+  };
+
   const validate = () => {
     const e = {};
     const isPlot = form.assetType === 'PLOT';
     const isFlat = form.assetType === 'FLAT';
-    const isArea = form.assetType === 'AREA';
+    const isArea = form.assetType === 'ACRE' || form.assetType === 'AREA';
 
-    if (!form.borrowerName.trim())     e.borrowerName     = 'Required';
+    if (!form.borrowerId)              e.borrowerId       = 'Required';
     if (!form.projectName.trim())      e.projectName      = 'Required';
     if (!form.documentNumber.trim())   e.documentNumber   = 'Required';
     if (!form.dateOfExecution)         e.dateOfExecution  = 'Required';
@@ -154,25 +170,23 @@ export default function LoadAsset() {
     setSubmitting(true);
     setSubmitError('');
     try {
-      const assetNumber = form.assetType === 'FLAT'
-        ? form.flatNumber.trim()
-        : form.assetType === 'AREA'
-          ? form.assetArea.trim()
-          : form.plotNumber.trim();
-
       const saveResponse = await saveAssetBasedInfo({
         actualAssetValue: toNumber(form.actualAssetValue),
-        assetType: form.assetType,
-        borrowerName: form.borrowerName.trim(),
-        dateOfExecution: form.dateOfExecution,
-        documentNumber: toNumber(form.documentNumber),
-        documentValue: toNumber(form.documentValue),
-        id: form.id,
-        ownerName: form.ownerName.trim(),
-        plotNumber: assetNumber,
-        projectName: form.projectName.trim(),
-        surveyNumber: form.surveyNo.trim(),
-        takenAssetValue: toNumber(form.takenAssetValue),
+        assetType:        form.assetType,
+        borrowerName:     form.borrowerName.trim(),
+        dateOfExecution:  form.dateOfExecution,
+        documentNumber:   toNumber(form.documentNumber),
+        documentValue:    toNumber(form.documentValue),
+        id:               form.id,
+        ownerName:        form.ownerName.trim(),
+        plotNumber:       form.plotNumber.trim(),
+        flatNumber:       form.flatNumber.trim(),
+        area:             form.assetArea.trim(),
+        size:             form.size.trim(),
+        othersComments:   form.othersComments.trim(),
+        projectName:      form.projectName.trim(),
+        surveyNumber:     form.surveyNo.trim(),
+        takenAssetValue:  toNumber(form.takenAssetValue),
         typeOfRegistration: form.typeOfRegistration,
       });
 
@@ -189,8 +203,6 @@ export default function LoadAsset() {
   };
 
   const reset = () => { setForm(EMPTY); setErrors({}); setSubmitted(false); setSubmitError(''); };
-
-  const unitLabel = ASSET_UNITS.find(u => u.value === form.assetUnit)?.label ?? 'Area';
 
   // ── Success ──
   if (submitted) return (
@@ -232,8 +244,8 @@ export default function LoadAsset() {
           <div className="grid grid-cols-3 divide-x">
             {[
               { label: 'Plot',    value: form.plotNumber },
-              { label: 'Area',    value: `${form.assetArea} ${unitLabel}` },
-              { label: 'Survey',  value: form.surveyNo },
+              { label: 'Area',    value: form.assetArea  },
+              { label: 'Survey',  value: form.surveyNo   },
             ].map(s => (
               <div key={s.label} className="px-4 py-3 text-center">
                 <p className="text-xs font-semibold mb-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
@@ -268,11 +280,53 @@ export default function LoadAsset() {
 
         {/* ── Borrower & Document ── */}
         <Section accent="#818cf8" title="Borrower & Document Details">
-          <Field label="Borrower Name" required error={errors.borrowerName}>
-            <input type="text" placeholder="Enter borrower name"
-              value={form.borrowerName} onChange={e => set('borrowerName', e.target.value)}
-              style={inputStyle(errors.borrowerName)} />
-          </Field>
+          <div className="sm:col-span-2">
+            <Field label="Borrower" required error={errors.borrowerId}>
+              <div className="relative">
+                <select
+                  value={form.borrowerId}
+                  onChange={e => handleBorrowerSelect(e.target.value)}
+                  disabled={borrowersLoading}
+                  style={{
+                    ...inputStyle(errors.borrowerId),
+                    appearance: 'none',
+                    cursor: borrowersLoading ? 'wait' : 'pointer',
+                    paddingRight: 36,
+                    opacity: borrowersLoading ? 0.6 : 1,
+                  }}
+                >
+                  <option value="">
+                    {borrowersLoading ? 'Loading borrowers…' : '— Select borrower —'}
+                  </option>
+                  {borrowers.map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.borrowerName}{b.projectName ? ` (${b.projectName})` : ''}
+                    </option>
+                  ))}
+                </select>
+                {/* chevron */}
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--text-muted)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </span>
+              </div>
+              {/* Show selected borrower tag */}
+              {form.borrowerName && (
+                <div className="mt-2 flex items-center gap-2 px-3 py-1.5 rounded-lg w-fit"
+                  style={{ background: 'rgba(129,140,248,0.1)', border: '1px solid rgba(129,140,248,0.25)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.8"
+                    strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                    <circle cx="12" cy="7" r="4"/>
+                  </svg>
+                  <span className="text-xs font-bold" style={{ color: '#818cf8' }}>{form.borrowerName}</span>
+                </div>
+              )}
+            </Field>
+          </div>
 
           <Field label="Project Name" required error={errors.projectName}>
             <input type="text" placeholder="Enter project name"
@@ -411,7 +465,7 @@ export default function LoadAsset() {
               style={inputStyle(errors.surveyNo)} />
           </Field>
 
-          <Field label="Area" required={form.assetType === 'AREA'} error={errors.assetArea}>
+          <Field label="ACRE" required={form.assetType === 'AREA' || form.assetType === 'ACRE'} error={errors.assetArea}>
             <input type="text" placeholder="Enter area"
               value={form.assetArea} onChange={e => set('assetArea', e.target.value)}
               style={inputStyle(errors.assetArea)} />
@@ -429,35 +483,19 @@ export default function LoadAsset() {
               style={inputStyle(errors.flatNumber)} />
           </Field>
 
-          {/* <div className="sm:col-span-2">
-            <Field label="Access Type">
-              <PillSelect
-                value={form.accessType}
-                onChange={v => set('accessType', v)}
-                options={ACCESS_TYPES}
-                accent="#f59e0b"
-              />
-            </Field>
-          </div> */}
+          <Field label="Size" error={errors.size}>
+            <input type="text" placeholder="e.g. 1200 sqft, 2 BHK"
+              value={form.size} onChange={e => set('size', e.target.value)}
+              style={inputStyle(errors.size)} />
+          </Field>
 
-          {/* <div className="sm:col-span-2">
-            <Field label="Asset Type (Unit)" required error={errors.assetUnit}>
-              <PillSelect
-                value={form.assetUnit}
-                onChange={v => set('assetUnit', v)}
-                options={ASSET_UNITS}
-                accent="#f59e0b"
-              />
+          <div className="sm:col-span-2">
+            <Field label="Others / Comments" error={errors.othersComments}>
+              <textarea rows={3} placeholder="Any additional notes or comments…"
+                value={form.othersComments} onChange={e => set('othersComments', e.target.value)}
+                style={{ ...inputStyle(errors.othersComments), resize: 'vertical', minHeight: 72 }} />
             </Field>
-          </div> */}
-
-          {/* <div className="sm:col-span-2">
-            <Field label={`Area${form.assetUnit ? ` (${unitLabel})` : ''}`} required error={errors.assetArea}>
-              <input type="number" min="0" placeholder="Enter area"
-                value={form.assetArea} onChange={e => set('assetArea', e.target.value)}
-                style={inputStyle(errors.assetArea)} />
-            </Field>
-          </div> */}
+          </div>
         </Section>
 
         {/* ── Actions ── */}

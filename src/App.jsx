@@ -61,6 +61,10 @@ import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
 import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
 import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
+import AdminStats from './pages/admin/AdminStats.jsx';
+import AdminBorrowers from './pages/admin/AdminBorrowers.jsx';
+
+import { DEFAULT_ADMIN_ROLE, hasPermission, ROUTE_PERM_MAP } from './config/adminRoles.js';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -134,6 +138,19 @@ function RequireAuth({ children, role }) {
   return children;
 }
 
+// ─── Admin permission guard ───────────────────────────────────────────────────
+// Wraps a single admin route. If the current adminRole lacks the required
+// permission, redirects to /admin/dashboard (the one page all roles can see).
+function RequireAdminPerm({ routeKey, children }) {
+  const { user } = useAuth();
+  const adminRole = user?.adminRole ?? DEFAULT_ADMIN_ROLE;
+  const perm = ROUTE_PERM_MAP[routeKey];
+  if (perm && !hasPermission(adminRole, perm)) {
+    return <Navigate replace to="/admin/dashboard" />;
+  }
+  return children;
+}
+
 // ─── User Layout ──────────────────────────────────────────────────────────────
 function UserLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -183,25 +200,27 @@ function AdminLayout() {
         <main className="main-with-fixed-topbar flex-1 p-4 sm:p-5 lg:p-7 lg:pl-[248px] grid gap-5 content-start">
           <Routes>
             <Route index                        element={<Navigate replace to="dashboard" />} />
-            <Route path="dashboard"             element={<AdminDashboard />} />
-            <Route path="approvals"             element={<AdminApprovals />} />
-            <Route path="wallet-approvals"      element={<AdminWalletApprovals />} />
-            <Route path="wallet-withdrawals"    element={<AdminWalletWithdrawals />} />
-            <Route path="create-deal"           element={<CreateDeal />} />
-            <Route path="create-deal/:id"       element={<CreateDeal />} />
-            <Route path="properties"            element={<AdminProperties />} />
-            <Route path="oxyloans"              element={<AdminOxyLoans />} />
-            <Route path="offline"               element={<AdminOffline />} />
-            <Route path="support"               element={<AdminSupport />} />
-            <Route path="bank-accounts"         element={<AdminBankAccounts />} />
-            <Route path="assets/load"           element={<LoadAsset />} />
-            <Route path="assets/view"           element={<ViewAssets />} />
-            <Route path="assets/allocated"      element={<AllocatedAssets />} />
-            <Route path="interest/sd-lot"       element={<AdminInterestPayments />} />
-            <Route path="interest/asset"        element={<AdminAssetPayouts />} />
-            <Route path="total-users"           element={<AdminTotalUsers />} />
-            <Route path="migrated-users"        element={<AdminMigratedUsers />} />
-            <Route path="migrated-total-data"   element={<AdminMigratedTotalData />} />
+            <Route path="dashboard"             element={<RequireAdminPerm routeKey="dashboard"><AdminDashboard /></RequireAdminPerm>} />
+            <Route path="approvals"             element={<RequireAdminPerm routeKey="approvals"><AdminApprovals /></RequireAdminPerm>} />
+            <Route path="wallet-approvals"      element={<RequireAdminPerm routeKey="wallet-approvals"><AdminWalletApprovals /></RequireAdminPerm>} />
+            <Route path="wallet-withdrawals"    element={<RequireAdminPerm routeKey="wallet-withdrawals"><AdminWalletWithdrawals /></RequireAdminPerm>} />
+            <Route path="create-deal"           element={<RequireAdminPerm routeKey="create-deal"><CreateDeal /></RequireAdminPerm>} />
+            <Route path="create-deal/:id"       element={<RequireAdminPerm routeKey="create-deal"><CreateDeal /></RequireAdminPerm>} />
+            <Route path="properties"            element={<RequireAdminPerm routeKey="properties"><AdminProperties /></RequireAdminPerm>} />
+            <Route path="oxyloans"              element={<RequireAdminPerm routeKey="oxyloans"><AdminOxyLoans /></RequireAdminPerm>} />
+            <Route path="offline"               element={<RequireAdminPerm routeKey="offline"><AdminOffline /></RequireAdminPerm>} />
+            <Route path="support"               element={<RequireAdminPerm routeKey="support"><AdminSupport /></RequireAdminPerm>} />
+            <Route path="bank-accounts"         element={<RequireAdminPerm routeKey="bank-accounts"><AdminBankAccounts /></RequireAdminPerm>} />
+            <Route path="assets/load"           element={<RequireAdminPerm routeKey="assets/load"><LoadAsset /></RequireAdminPerm>} />
+            <Route path="assets/view"           element={<RequireAdminPerm routeKey="assets/view"><ViewAssets /></RequireAdminPerm>} />
+            <Route path="assets/allocated"      element={<RequireAdminPerm routeKey="assets/allocated"><AllocatedAssets /></RequireAdminPerm>} />
+            <Route path="interest/sd-lot"       element={<RequireAdminPerm routeKey="interest/sd-lot"><AdminInterestPayments /></RequireAdminPerm>} />
+            <Route path="interest/asset"        element={<RequireAdminPerm routeKey="interest/asset"><AdminAssetPayouts /></RequireAdminPerm>} />
+            <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
+            <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />
+            <Route path="migrated-total-data"   element={<RequireAdminPerm routeKey="migrated-total-data"><AdminMigratedTotalData /></RequireAdminPerm>} />
+            <Route path="stats"                 element={<RequireAdminPerm routeKey="stats"><AdminStats /></RequireAdminPerm>} />
+            <Route path="borrowers"             element={<RequireAdminPerm routeKey="borrowers"><AdminBorrowers /></RequireAdminPerm>} />
             <Route path="*"                     element={<NotFound />} />
           </Routes>
         </main>

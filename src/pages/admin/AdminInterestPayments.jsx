@@ -25,8 +25,11 @@ export const MONTHS = ['January','February','March','April','May','June','July',
 
 export const STATUS_CFG = {
   INITIATED:  { bg: '#fef3c7', text: '#d97706', border: '#fde68a', label: 'Initiated',  pulse: true  },
-  PAID:       { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Paid',       pulse: false },
-  PROCESSING: { bg: '#eff6ff', text: '#3b82f6', border: '#bfdbfe', label: 'Processing', pulse: true  },
+  GENERATED:  { bg: '#eff6ff', text: '#3b82f6', border: '#bfdbfe', label: 'Generated',  pulse: false },
+  EXECUTED:   { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Executed',   pulse: false },
+  // legacy aliases kept for backward compat
+  PAID:       { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Executed',   pulse: false },
+  PROCESSING: { bg: '#eff6ff', text: '#3b82f6', border: '#bfdbfe', label: 'Generated',  pulse: false },
 };
 
 export function StatusChip({ status }) {
@@ -46,8 +49,11 @@ function mapPaymentStatus(status) {
   const s = String(status ?? '').trim().toUpperCase();
   if (!s) return 'INITIATED';
   if (s === 'INITIATED') return 'INITIATED';
-  if (['PAID', 'COMPLETED', 'SUCCESS'].includes(s)) return 'PAID';
-  if (['PROCESSING', 'IN_PROGRESS'].includes(s)) return 'PROCESSING';
+  if (s === 'GENERATED') return 'GENERATED';
+  if (s === 'EXECUTED') return 'EXECUTED';
+  // legacy aliases
+  if (['PAID', 'COMPLETED', 'SUCCESS'].includes(s)) return 'EXECUTED';
+  if (['PROCESSING', 'IN_PROGRESS'].includes(s)) return 'GENERATED';
   return 'INITIATED';
 }
 
@@ -185,9 +191,10 @@ function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
   a.click();
 }
 
-function LenderBreakupModal({ open, dealName, loading, error, rows, onClose, onDownloadAndApprove, actionLoading }) {
+function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, onClose, onDownloadAndApprove, actionLoading }) {
   if (!open) return null;
   const totalInterest = rows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0);
+  const canGenerate = dealStatus !== 'GENERATED' && dealStatus !== 'EXECUTED';
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
@@ -204,13 +211,20 @@ function LenderBreakupModal({ open, dealName, loading, error, rows, onClose, onD
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={onDownloadAndApprove}
-              disabled={loading || actionLoading || !rows.length}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold"
-              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-              {actionLoading ? 'Generating...' : 'Generate Excel'}
-            </button>
+            {canGenerate ? (
+              <button
+                onClick={onDownloadAndApprove}
+                disabled={loading || actionLoading || !rows.length}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                {actionLoading ? 'Generating...' : 'Generate Excel'}
+              </button>
+            ) : (
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                style={{ background: 'rgba(16,185,129,0.08)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', cursor: 'not-allowed' }}>
+                Excel {dealStatus === 'EXECUTED' ? 'Executed' : 'Generated'}
+              </span>
+            )}
             <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
               <CloseIcon />
@@ -589,22 +603,28 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
   useEffect(() => { loadDeals(); }, [loadDeals]);
 
-  const getStatus = (d) => (paidMap[d.id] ? 'PAID' : (d.status ?? mapPaymentStatus(d.paymentStatus)));
+  const getStatus = (d) => (paidMap[d.id] ? 'EXECUTED' : (d.status ?? mapPaymentStatus(d.paymentStatus)));
   const getPaidDate = (d) => paidMap[d.id]?.date ?? null;
   const getLendersCount = (d) => interestSummaryByDeal[d.id]?.lenders ?? d.lenders ?? null;
   const getInterestAmount = (d) => interestSummaryByDeal[d.id]?.interestAmount ?? d.interestAmount ?? null;
   const formatOptionalINR = (value) => value === null || value === undefined ? '—' : fmtINR(value);
 
-  const pendingDeals = deals.filter(d => getStatus(d) === 'INITIATED');
-  const paidDeals    = deals.filter(d => getStatus(d) === 'PAID');
+  const initiatedDeals  = deals.filter(d => getStatus(d) === 'INITIATED');
+  const generatedDeals  = deals.filter(d => getStatus(d) === 'GENERATED');
+  const executedDeals   = deals.filter(d => getStatus(d) === 'EXECUTED');
 
   const TABS = [
-    { key: 'INITIATED', label: 'Initiated', color: '#d97706', count: pendingDeals.length },
-    { key: 'PAID',    label: 'Paid',    color: '#059669', count: paidDeals.length    },
-    { key: 'ALL',     label: 'All',     color: '#6366f1', count: deals.length        },
+    { key: 'INITIATED', label: 'Initiated', color: '#d97706', count: initiatedDeals.length },
+    { key: 'GENERATED', label: 'Generated', color: '#3b82f6', count: generatedDeals.length },
+    { key: 'EXECUTED',  label: 'Executed',  color: '#059669', count: executedDeals.length  },
+    { key: 'ALL',       label: 'All',       color: '#6366f1', count: deals.length          },
   ];
 
-  const filtered = tab === 'ALL' ? deals : tab === 'INITIATED' ? pendingDeals : paidDeals;
+  const filtered = tab === 'ALL' ? deals
+    : tab === 'INITIATED' ? initiatedDeals
+    : tab === 'GENERATED' ? generatedDeals
+    : executedDeals;
+
   const pendingFiltered = filtered.filter(d => getStatus(d) === 'INITIATED');
   const allPendingSelected = pendingFiltered.length > 0 && pendingFiltered.every(d => selected.has(d.id));
 
@@ -619,8 +639,9 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
 
   const selectedDeals = deals.filter(d => selected.has(d.id));
   const selectedTotal = selectedDeals.reduce((s, d) => s + d.amount, 0);
-  const totalPendingInterest = pendingDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
-  const totalPaidInterest = paidDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
+  const totalInitiatedInterest = initiatedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
+  const totalGeneratedInterest = generatedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
+  const totalExecutedInterest  = executedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
   const totalInterest = deals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
 
   const handleMarkPaid = async (paidDate) => {
@@ -704,11 +725,11 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
   };
 
   const kpis = [
-    { label: 'Total Deals',    value: String(deals.length), color: '#a855f7' },
-    { label: 'Pending Interest', value: fmtINR(totalPendingInterest), color: '#d97706' },
-    { label: 'Paid Interest',  value: fmtINR(totalPaidInterest), color: '#059669' },
-    { label: 'Total Interest', value: fmtINR(totalInterest), color: '#6366f1' },
-    { label: 'Selected',       value: String(selected.size),color: '#6366f1' },
+    { label: 'Total Deals',        value: String(deals.length),          color: '#a855f7' },
+    { label: 'Initiated Interest', value: fmtINR(totalInitiatedInterest), color: '#d97706' },
+    { label: 'Generated Interest', value: fmtINR(totalGeneratedInterest), color: '#3b82f6' },
+    { label: 'Executed Interest',  value: fmtINR(totalExecutedInterest),  color: '#059669' },
+    { label: 'Total Interest',     value: fmtINR(totalInterest),          color: '#6366f1' },
   ];
 
   return (
@@ -716,6 +737,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
       <LenderBreakupModal
         open={lenderModalOpen}
         dealName={selectedDealForLenders?.dealName}
+        dealStatus={selectedDealForLenders ? getStatus(selectedDealForLenders) : undefined}
         loading={lenderModalLoading}
         error={lenderModalError}
         rows={lenderRows}
@@ -829,7 +851,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
             style={{ borderBottom: '1px solid var(--border)', background: 'rgba(168,85,247,0.04)' }}>
             <div className="w-2 h-2 rounded-full" style={{ background: '#a855f7', boxShadow: '0 0 6px #a855f7' }} />
             <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>
-              {tab === 'ALL' ? 'All Deals' : tab === 'INITIATED' ? 'Pending Payouts' : 'Paid Deals'} — {period.label}
+              {tab === 'ALL' ? 'All Deals' : tab === 'INITIATED' ? 'Initiated Deals' : tab === 'GENERATED' ? 'Generated Deals' : 'Executed Deals'} — {period.label}
             </h2>
             <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
               style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc' }}>{filtered.length}</span>
@@ -839,7 +861,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                 <CoinIcon />
                 <div>
                   <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Interest</p>
-                  <p className="text-sm font-black" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalPendingInterest)}</p>
+                  <p className="text-sm font-black" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalInitiatedInterest)}</p>
                 </div>
               </div>
             )}
@@ -1019,7 +1041,7 @@ export default function AdminInterestPayments() {
     const year = String(selectedPeriod.year);
     const startDate = `${startDay}`;
     const endDate = `${endDay}`;
-    const monthName = MONTHS[selectedPeriod.month];
+    const monthName = MONTHS[selectedPeriod.month].toLocaleLowerCase();
 
     const response = await getAllLoanActiveDeals({
       monthName,

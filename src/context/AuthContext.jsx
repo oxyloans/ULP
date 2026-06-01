@@ -1,21 +1,59 @@
 import { createContext, useContext, useState } from 'react';
 import { login as apiLogin, hiddenLogin as apiHiddenLogin, getUserMe, verifyLoginOtp } from '../api/beforelogin';
-import { clearSession, getToken, getUserId, getRole, setSession } from '../api/client';
+import { clearSession, getToken, getUserId, getRole, getAdminRole, setSession } from '../api/client';
+import { DEFAULT_ADMIN_ROLE, ADMIN_ROLES } from '../config/adminRoles';
 
 const AuthContext = createContext(null);
 
 // Restore session from localStorage on page reload
 function restoreUser() {
-  const token  = getToken();
-  const userId = getUserId();
-  const role   = getRole();
+  const token     = getToken();
+  const userId    = getUserId();
+  const role      = getRole();
+  const adminRole = getAdminRole();
   if (!token || !userId) return null;
-  return { userId, role: role === 'ADMIN' ? 'admin' : 'user', lrId: userId, name: '' };
+  return {
+    userId,
+    role:      role === 'ADMIN' ? 'admin' : 'user',
+    adminRole: adminRole || DEFAULT_ADMIN_ROLE,
+    lrId:      userId,
+    name:      '',
+  };
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(restoreUser);
   const [loading, setLoading] = useState(false);
+
+  // Update the admin sub-role at runtime (e.g. from the role-switcher UI)
+  const setAdminRole = (adminRole) => {
+    sessionStorage.setItem('adminRole', adminRole);
+    setUser(u => u ? { ...u, adminRole } : u);
+  };
+
+  /**
+   * demoLogin(adminRole)
+   * Instantly logs in as a demo admin with the given sub-role.
+   * No API call — purely local. Used for CEO / ACCOUNTS_MANAGER / WALLET_OPS demos.
+   */
+  const demoLogin = (adminRole) => {
+    const roleDef = ADMIN_ROLES[adminRole];
+    if (!roleDef) return;
+    // Store a fake session so restoreUser works on reload
+    sessionStorage.setItem('accessToken', 'demo-token');
+    sessionStorage.setItem('userId',      `demo-${adminRole.toLowerCase()}`);
+    sessionStorage.setItem('roles',       'ADMIN');
+    sessionStorage.setItem('adminRole',   adminRole);
+    setUser({
+      userId:    `demo-${adminRole.toLowerCase()}`,
+      name:      roleDef.label,
+      email:     `${adminRole.toLowerCase()}@demo.local`,
+      lrId:      `demo-${adminRole.toLowerCase()}`,
+      role:      'admin',
+      adminRole,
+      isDemo:    true,
+    });
+  };
 
   /**
    * login(credential, password)
@@ -29,11 +67,12 @@ export function AuthProvider({ children }) {
 
       const role = result.role === 'ADMIN' ? 'admin' : 'user';
       setUser({
-        userId: result.userId,
-        name:   result.name,
-        email:  result.email,
-        lrId:   result.lrId,
+        userId:    result.userId,
+        name:      result.name,
+        email:     result.email,
+        lrId:      result.lrId,
         role,
+        adminRole: role === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
       });
       return { success: true, role };
 
@@ -58,14 +97,16 @@ export function AuthProvider({ children }) {
       const userId = me.userId ?? me.user_id ?? me.id ?? '';
       const role   = me.roles?.[0]?.name ?? me.role ?? 'INVESTOR';
       setSession({ accessToken: token, userId, role });
+      const mappedRole = role === 'ADMIN' ? 'admin' : 'user';
       setUser({
         userId,
-        name:  me.name ?? me.fullName ?? me.firstName ?? '',
-        email: me.email ?? '',
-        lrId:  me.lrId ?? userId,
-        role:  role === 'ADMIN' ? 'admin' : 'user',
+        name:      me.name ?? me.fullName ?? me.firstName ?? '',
+        email:     me.email ?? '',
+        lrId:      me.lrId ?? userId,
+        role:      mappedRole,
+        adminRole: mappedRole === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
       });
-      return { success: true, role: role === 'ADMIN' ? 'admin' : 'user' };
+      return { success: true, role: mappedRole };
     } catch (err) {
       return { success: false, error: err.message ?? 'Google login failed.' };
     } finally {
@@ -90,11 +131,12 @@ export function AuthProvider({ children }) {
       console.log({result})
       const role = result.role === 'ADMIN' ? 'admin' : 'user';
       setUser({
-        userId: result.userId,
-        name:   result.name,
-        email:  result.email,
-        lrId:   result.lrId,
+        userId:    result.userId,
+        name:      result.name,
+        email:     result.email,
+        lrId:      result.lrId,
         role,
+        adminRole: role === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
       });
       return { success: true, role };
     } catch (err) {
@@ -118,11 +160,12 @@ export function AuthProvider({ children }) {
       const result = await verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue });
       const role = (Array.isArray(result.role) ? result.role[0] : result.role) === 'ADMIN' ? 'admin' : 'user';
       setUser({
-        userId: result.userId,
-        name:   result.name   ?? '',
-        email:  result.email  ?? '',
-        lrId:   result.lrId   ?? result.userId,
+        userId:    result.userId,
+        name:      result.name   ?? '',
+        email:     result.email  ?? '',
+        lrId:      result.lrId   ?? result.userId,
         role,
+        adminRole: role === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
       });
       return { success: true, role };
     } catch (err) {
@@ -135,7 +178,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, otpLogin, loading, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, otpLogin, setAdminRole, demoLogin, loading, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

@@ -17,20 +17,24 @@ export const BASE_URL    = 'https://meta.oxyloans.com/api';
 export const ACCESS_TOKEN = 'accessToken';
 export const USERID       = 'userId';
 export const ROLES        = 'roles';
+export const ADMIN_ROLE   = 'adminRole';
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
-export const getToken   = ()      => sessionStorage.getItem(ACCESS_TOKEN) ?? '';
-export const getUserId  = ()      => sessionStorage.getItem(USERID) ?? '';
-export const getRole    = ()      => sessionStorage.getItem(ROLES) ?? '';
-export const setSession = ({ accessToken, userId, role }) => {
+export const getToken      = ()      => sessionStorage.getItem(ACCESS_TOKEN) ?? '';
+export const getUserId     = ()      => sessionStorage.getItem(USERID) ?? '';
+export const getRole       = ()      => sessionStorage.getItem(ROLES) ?? '';
+export const getAdminRole  = ()      => sessionStorage.getItem(ADMIN_ROLE) ?? '';
+export const setSession = ({ accessToken, userId, role, adminRole }) => {
   sessionStorage.setItem(ACCESS_TOKEN, accessToken);
   sessionStorage.setItem(USERID,       userId);
   sessionStorage.setItem(ROLES,        role);
+  if (adminRole) sessionStorage.setItem(ADMIN_ROLE, adminRole);
 };
 export const clearSession = () => {
   sessionStorage.removeItem(ACCESS_TOKEN);
   sessionStorage.removeItem(USERID);
   sessionStorage.removeItem(ROLES);
+  sessionStorage.removeItem(ADMIN_ROLE);
 };
 
 // ─── Axios instance ───────────────────────────────────────────────────────────

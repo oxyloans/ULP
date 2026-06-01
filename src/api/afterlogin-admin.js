@@ -328,3 +328,24 @@ export async function uploadSaleDeedDocument({ assetId, file }) {
     formData
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// BORROWERS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/gtAllBorrowerAssetInfo
+ * Returns list of all borrowers.
+ */
+export async function getAllBorrowers() {
+  return get('/oxybrick-service/gtAllBorrowerAssetInfo');
+}
+
+/**
+ * PATCH /oxybrick-service/saveBorrowerAssetDetails
+ * Create or update a borrower.
+ * Body: { id, borrowerName, projectName, panNumber, phoneNumber, address }
+ */
+export async function saveBorrower(payload) {
+  return patch('/oxybrick-service/saveBorrowerAssetDetails', payload);
+}
