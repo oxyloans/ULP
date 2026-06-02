@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getAllLoanActiveDeals } from '../../api/afterlogin-user';
-import { getInterestBreakUpByDeal, submitInterestApprovals } from '../../api/afterlogin-admin';
+import { getInterestBreakUpByDeal, submitInterestApprovals, updateLenderInterestPayments } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -182,6 +182,23 @@ function normalizeDownloadUrl(value) {
   return '';
 }
 
+function normalizeDateToYmd(value) {
+  if (!value) return null;
+  const raw = String(value).trim();
+  if (!raw) return null;
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return raw.slice(0, 10);
+  const dmyMatch = raw.match(/^(\d{2})[/-](\d{2})[/-](\d{4})$/);
+  if (dmyMatch) {
+    const [, dd, mm, yyyy] = dmyMatch;
+    return `${yyyy}-${mm}-${dd}`;
+  }
+  const parsed = new Date(raw);
+  if (!Number.isNaN(parsed.getTime())) {
+    return parsed.toISOString().split('T')[0];
+  }
+  return raw;
+}
+
 function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
   const a = document.createElement('a');
   a.href = url;
@@ -191,10 +208,25 @@ function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
   a.click();
 }
 
-function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, onClose, onDownloadAndApprove, actionLoading }) {
+function LenderBreakupModal({
+  open,
+  dealName,
+  dealStatus,
+  loading,
+  error,
+  rows,
+  selectedUsers,
+  onToggleUser,
+  onToggleAll,
+  onClose,
+  onDownloadAndApprove,
+  onMarkPaid,
+  actionLoading,
+}) {
   if (!open) return null;
   const totalInterest = rows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0);
-  const canGenerate = dealStatus !== 'GENERATED' && dealStatus !== 'EXECUTED';
+  const isGenerated = dealStatus === 'GENERATED';
+  const selectedCount = rows.filter(r => selectedUsers.has(r?.userId)).length;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
@@ -211,7 +243,20 @@ function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, 
             </p>
           </div>
           <div className="flex items-center gap-2">
-            {canGenerate ? (
+            {isGenerated ? (
+              <button
+                onClick={onMarkPaid}
+                disabled={loading || actionLoading || !selectedCount}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                style={{ background: 'rgba(5,150,105,0.1)', color: '#059669', border: '1px solid rgba(5,150,105,0.25)' }}>
+                {actionLoading ? 'Saving...' : `Mark Paid (${selectedCount})`}
+              </button>
+            ) : dealStatus === 'EXECUTED' ? (
+              <span className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                style={{ background: 'rgba(16,185,129,0.08)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', cursor: 'not-allowed' }}>
+                Excel Executed
+              </span>
+            ) : (
               <button
                 onClick={onDownloadAndApprove}
                 disabled={loading || actionLoading || !rows.length}
@@ -219,11 +264,6 @@ function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, 
                 style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
                 {actionLoading ? 'Generating...' : 'Generate Excel'}
               </button>
-            ) : (
-              <span className="px-3 py-1.5 rounded-lg text-xs font-bold"
-                style={{ background: 'rgba(16,185,129,0.08)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)', cursor: 'not-allowed' }}>
-                Excel {dealStatus === 'EXECUTED' ? 'Executed' : 'Generated'}
-              </span>
             )}
             <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center"
               style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
@@ -250,7 +290,7 @@ function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, 
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                  {['#', 'User Name', 'Account No', 'IFSC', 'Principal', 'ROI', 'Days', 'Interest'].map(h => (
+                  {(isGenerated ? ['Select', '#', 'User Name', 'Account No', 'IFSC', 'Principal', 'ROI', 'Days', 'Interest'] : ['#', 'User Name', 'Account No', 'IFSC', 'Principal', 'ROI', 'Days', 'Interest']).map(h => (
                     <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
                       style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
@@ -258,9 +298,25 @@ function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, 
               </thead>
               <tbody>
                 {rows.length === 0 ? (
-                  <tr><td colSpan={10} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No lenders found</td></tr>
+                  <tr><td colSpan={isGenerated ? 9 : 8} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No lenders found</td></tr>
                 ) : rows.map((r, idx) => (
                   <tr key={`${r?.userId ?? 'user'}-${idx}`} style={{ borderBottom: '1px solid var(--border)' }}>
+                    {isGenerated && (
+                      <td className="py-3 px-4">
+                        <button
+                          type="button"
+                          onClick={() => onToggleUser(r)}
+                          className="w-5 h-5 rounded-md flex items-center justify-center transition-all"
+                          style={{
+                            background: selectedUsers.has(r?.userId) ? 'rgba(5,150,105,0.85)' : 'var(--input-bg)',
+                            border: `1.5px solid ${selectedUsers.has(r?.userId) ? 'rgba(5,150,105,0.85)' : 'rgba(5,150,105,0.25)'}`,
+                            color: '#fff',
+                          }}
+                        >
+                          {selectedUsers.has(r?.userId) && <CheckIcon />}
+                        </button>
+                      </td>
+                    )}
                     <td className="py-3 px-4 text-xs font-bold" style={{ color: 'var(--text-muted)' }}>{idx + 1}</td>
                     <td className="py-3 px-4 font-semibold" style={{ color: 'var(--text-primary)' }}>{r?.userName ?? '-'}</td>
                     {/* <td className="py-3 px-4" style={{ color: 'var(--text-muted)' }}>{r?.userId ?? '-'}</td> */}
@@ -275,6 +331,20 @@ function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, 
                 ))}
               </tbody>
             </table>
+            {isGenerated && (
+              <div className="px-4 py-3 flex items-center justify-between gap-2 flex-wrap" style={{ borderTop: '1px solid var(--border)' }}>
+                <button
+                  type="button"
+                  onClick={onToggleAll}
+                  className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                  style={{ background: 'rgba(5,150,105,0.08)', color: '#059669', border: '1px solid rgba(5,150,105,0.2)' }}>
+                  Toggle All
+                </button>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                  Selected {selectedCount} lender{selectedCount !== 1 ? 's' : ''} · {fmtINR(rows.filter(r => selectedUsers.has(r?.userId)).reduce((sum, r) => sum + Number(r?.interestAmount ?? 0), 0))}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -284,8 +354,7 @@ function LenderBreakupModal({ open, dealName, dealStatus, loading, error, rows, 
 
 // ─── Paid Date Modal ──────────────────────────────────────────────────────────
 export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel, loading }) {
-  const today = new Date().toISOString().split('T')[0];
-  const [paidDate, setPaidDate] = useState(today);
+  const [paidDate, setPaidDate] = useState('');
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
@@ -301,9 +370,9 @@ export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel
               <CheckIcon />
             </div>
             <div>
-              <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Mark as Paid</p>
+              <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Confirm Paid Date</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                {selectedCount} deal{selectedCount !== 1 ? 's' : ''} · {fmtINR(selectedTotal)}
+                Enter `YYYY-MM-DD` for paid date · {selectedCount} deal{selectedCount !== 1 ? 's' : ''} · {fmtINR(selectedTotal)}
               </p>
             </div>
           </div>
@@ -315,7 +384,7 @@ export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel
         <div className="px-6 py-5 grid gap-4">
           <div>
             <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-              Payment Date
+              Paid Date
             </label>
             <div className="relative">
               <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}><CalendarIcon /></span>
@@ -323,6 +392,9 @@ export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel
                 className="w-full rounded-xl text-sm outline-none"
                 style={{ padding: '10px 14px 10px 36px', background: 'var(--input-bg)', border: '1.5px solid rgba(5,150,105,0.35)', color: 'var(--text-primary)' }} />
             </div>
+            <p className="mt-2 text-[11px]" style={{ color: 'var(--text-muted)' }}>
+              Use the format `YYYY-MM-DD`, for example `2026-05-30`.
+            </p>
           </div>
           <div className="px-4 py-3 rounded-xl flex items-center justify-between"
             style={{ background: 'rgba(5,150,105,0.07)', border: '1px solid rgba(5,150,105,0.2)' }}>
@@ -558,6 +630,9 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
   const [selectedDealForLenders, setSelectedDealForLenders] = useState(null);
   const [lenderActionLoading, setLenderActionLoading] = useState(false);
   const [interestSummaryByDeal, setInterestSummaryByDeal] = useState({});
+  const [selectedLenderIds, setSelectedLenderIds] = useState(new Set());
+  const [lenderPaymentMeta, setLenderPaymentMeta] = useState({ actualInterestDate: null, sheetGeneratedDate: null });
+  const [lenderPaidModalOpen, setLenderPaidModalOpen] = useState(false);
 
   const loadDeals = useCallback(async () => {
     setLoading(true);
@@ -663,13 +738,19 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
     setLenderModalLoading(true);
     setLenderModalError('');
     setLenderRows([]);
+    setSelectedLenderIds(new Set());
+    setLenderPaymentMeta({ actualInterestDate: null, sheetGeneratedDate: null });
     try {
       const res = await getInterestBreakUpByDeal(deal.id);
       const rows = Array.isArray(res?.usersDealsBasedInterestInfoDto)
         ? res.usersDealsBasedInterestInfoDto
         : Array.isArray(res) ? res : [];
+      const actualInterestDate = res?.actualInterestDate ?? deal?.actualInterestDate ?? deal?.paymentDate ?? null;
+      const sheetGeneratedDate = normalizeDateToYmd(res?.sheetGeneratedOn ?? res?.sheetGeneratedDate ?? deal?.sheetGeneratedOn ?? deal?.sheetGeneratedDate ?? null);
       const interestAmount = rows.reduce((sum, row) => sum + Number(row?.interestAmount ?? 0), 0);
       setLenderRows(rows);
+      setSelectedLenderIds(new Set(rows.map(r => r?.userId).filter(Boolean)));
+      setLenderPaymentMeta({ actualInterestDate, sheetGeneratedDate });
       setInterestSummaryByDeal(prev => ({
         ...prev,
         [deal.id]: { lenders: rows.length, interestAmount },
@@ -724,6 +805,61 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
     }
   };
 
+  const handleToggleLender = (row) => {
+    const userId = row?.userId;
+    if (!userId) return;
+    setSelectedLenderIds(prev => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  };
+
+  const handleToggleAllLenders = () => {
+    const allIds = lenderRows.map(r => r?.userId).filter(Boolean);
+    setSelectedLenderIds(prev => (prev.size === allIds.length ? new Set() : new Set(allIds)));
+  };
+
+  const handleMarkSelectedLendersPaid = async () => {
+    if (!selectedDealForLenders?.id) return;
+    const selectedRows = lenderRows.filter(r => selectedLenderIds.has(r?.userId));
+    if (!selectedRows.length) return;
+    setLenderPaidModalOpen(true);
+  };
+
+  const submitSelectedLendersPaid = async (paidDate) => {
+    const normalizedPaidDate = normalizeDateToYmd(paidDate);
+    if (!selectedDealForLenders?.id || !normalizedPaidDate) return;
+    const selectedRows = lenderRows.filter(r => selectedLenderIds.has(r?.userId));
+    if (!selectedRows.length) return;
+    setLenderActionLoading(true);
+    try {
+      await updateLenderInterestPayments({
+        actualInterestDate: normalizeDateToYmd(lenderPaymentMeta.actualInterestDate)
+          ?? normalizeDateToYmd(selectedDealForLenders?.actualInterestDate)
+          ?? normalizedPaidDate,
+        dealId: selectedDealForLenders.id,
+        paidDate: normalizedPaidDate,
+        sheetGeneratedDate: normalizeDateToYmd(lenderPaymentMeta.sheetGeneratedDate) ?? normalizedPaidDate,
+        usersDealsBasedInterestInfoDto: selectedRows.map((r) => ({
+          days: Number(r?.days ?? 0),
+          interestAmount: Number(r?.interestAmount ?? 0),
+          userId: r?.userId ?? null,
+        })),
+      });
+      setDeals(prev => prev.map(row =>
+        row.id === selectedDealForLenders.id ? { ...row, paymentDate: normalizedPaidDate, status: 'EXECUTED' } : row
+      ));
+      setPaidMap(prev => ({ ...prev, [selectedDealForLenders.id]: { date: normalizedPaidDate } }));
+      setLenderModalOpen(false);
+      setLenderPaidModalOpen(false);
+    } catch (e) {
+      setLenderModalError(e?.message ?? 'Failed to update lender interest payments');
+    } finally {
+      setLenderActionLoading(false);
+    }
+  };
+
   const kpis = [
     { label: 'Total Deals',        value: String(deals.length),          color: '#a855f7' },
     { label: 'Initiated Interest', value: fmtINR(totalInitiatedInterest), color: '#d97706' },
@@ -741,10 +877,23 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
         loading={lenderModalLoading}
         error={lenderModalError}
         rows={lenderRows}
+        selectedUsers={selectedLenderIds}
+        onToggleUser={handleToggleLender}
+        onToggleAll={handleToggleAllLenders}
         actionLoading={lenderActionLoading}
         onClose={() => setLenderModalOpen(false)}
         onDownloadAndApprove={handleDownloadAndApprove}
+        onMarkPaid={handleMarkSelectedLendersPaid}
       />
+      {lenderPaidModalOpen && (
+        <PaidDateModal
+          selectedCount={selectedLenderIds.size}
+          selectedTotal={lenderRows.filter(r => selectedLenderIds.has(r?.userId)).reduce((sum, r) => sum + Number(r?.interestAmount ?? 0), 0)}
+          loading={lenderActionLoading}
+          onSubmit={submitSelectedLendersPaid}
+          onCancel={() => setLenderPaidModalOpen(false)}
+        />
+      )}
       {paidModal && (
         <PaidDateModal
           selectedCount={selectedDeals.length}

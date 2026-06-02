@@ -298,6 +298,20 @@ export async function submitInterestApprovals(payload) {
   return patch('/oxybrick-service/interestApprovals', payload);
 }
 
+/**
+ * PATCH /api/oxybrick-service/updateLenderInterestPayments
+ * Body: {
+ *   actualInterestDate,
+ *   dealId,
+ *   paidDate,
+ *   sheetGeneratedDate,
+ *   usersDealsBasedInterestInfoDto: [{ days, interestAmount, userId }]
+ * }
+ */
+export async function updateLenderInterestPayments(payload) {
+  return patch('/api/oxybrick-service/updateLenderInterestPayments', payload);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // ASSET BASED INFO
 // ══════════════════════════════════════════════════════════════════════════════

@@ -4,15 +4,16 @@ import { adminGetMigratedUserInfo, updateMigratedUsersDataByAdmin } from '../../
 const fmtMoney = (n) => Number(n || 0).toLocaleString('en-IN');
 
 export default function AdminMigratedTotalData() {
-  const [lenderName, setLenderName] = useState(null);
-  const [password, setPassword] = useState(null);
+  const [lenderName, setLenderName] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [savingId, setSavingId] = useState('');
   const [error, setError] = useState('');
   const [rows, setRows] = useState([]);
   const [editById, setEditById] = useState({});
-  const [lenderId, setLenderId] = useState(null);
-  const [dealName, setDealName] = useState(null);
+  const [lenderId, setLenderId] = useState('');
+  const [dealName, setDealName] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
 
   const totals = useMemo(() => {
     return rows.reduce((acc, row) => {
@@ -78,15 +79,18 @@ export default function AdminMigratedTotalData() {
     if (!payload) return;
     setSavingId(id);
     setError('');
+    setSuccessMessage('');
     try {
       await updateMigratedUsersDataByAdmin({
         ...payload,
+        lenderId: payload.lenderId ?? '',
         interestDate: Number(payload.interestDate || 0),
         roi: Number(payload.roi || 0),
       });
       setRows((prev) =>
         prev.map((r) => (r.id === id ? { ...r, ...payload, interestDate: Number(payload.interestDate || 0), roi: Number(payload.roi || 0) } : r))
       );
+      setSuccessMessage('Migrated data saved successfully.');
     } catch (err) {
       setError(err.message || 'Update failed.');
     } finally {
@@ -102,6 +106,25 @@ export default function AdminMigratedTotalData() {
           <h1 className="text-xl font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrated Total Data</h1>
         </div>
       </div>
+
+      {successMessage && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.55)' }}>
+          <div className="w-full max-w-sm rounded-2xl p-5" style={{ background: 'var(--card-bg)', border: '1px solid rgba(16,185,129,0.3)' }}>
+            <p className="text-sm font-black" style={{ color: '#10b981' }}>Success</p>
+            <p className="mt-2 text-sm" style={{ color: 'var(--text-primary)' }}>{successMessage}</p>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setSuccessMessage('')}
+                className="px-4 py-2 rounded-xl text-sm font-bold"
+                style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff' }}
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <form onSubmit={onSearch} className="rounded-2xl p-4 grid gap-3 md:grid-cols-[1fr_1fr_auto]"
         style={{ background: 'var(--card-bg)', border: '1px solid rgba(168,85,247,0.18)' }}>
@@ -171,7 +194,7 @@ export default function AdminMigratedTotalData() {
           <table className="w-full text-sm">
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-elevated)' }}>
-                {['Lender ID', 'Deal', 'Principal', 'Balance', 'ROI', 'Interest Date', 'Participation Date', 'Password', 'Update'].map((h) => (
+        {['Lender ID', 'Deal', 'Principal', 'Balance', 'ROI', 'Interest Date', 'Participation Date', 'Password', 'Update'].map((h) => (
                   <th key={h} className="text-left py-3 px-3 text-xs uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>{h}</th>
                 ))}
               </tr>
@@ -184,7 +207,10 @@ export default function AdminMigratedTotalData() {
                 const edit = editById[row.id] || {};
                 return (
                   <tr key={row.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                    <td className="py-2.5 px-3">{row.lenderId || '-'}</td>
+                    <td className="py-2.5 px-3 min-w-[160px]">
+                      <input value={edit.lenderId ?? ''} onChange={(e) => onFieldChange(row.id, 'lenderId', e.target.value)} className="w-full px-2 py-1.5 rounded-lg text-xs outline-none"
+                        style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }} />
+                    </td>
                     <td className="py-2.5 px-3">{row.dealName || '-'}</td>
                     <td className="py-2.5 px-3">{fmtMoney(row.principalAmount)}</td>
                     <td className="py-2.5 px-3">{fmtMoney(row.balancePrincipal)}</td>
@@ -206,6 +232,7 @@ export default function AdminMigratedTotalData() {
                     </td>
                     <td className="py-2.5 px-3">
                       <button
+                        type="button"
                         onClick={() => onUpdate(row.id)}
                         disabled={savingId === row.id}
                         className="px-3 py-1.5 rounded-lg text-xs font-bold disabled:opacity-60"
