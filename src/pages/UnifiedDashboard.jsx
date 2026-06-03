@@ -1240,6 +1240,7 @@ function OfflineSection({ fin, memberColor }) {
   const [migratedDeals, setMigratedDeals] = useState([]);
   const [goldEarningsData, setGoldEarningsData] = useState(null);
   const [goldInvestedByDealId, setGoldInvestedByDealId] = useState({});
+  const [goldApprovedDateByDealId, setGoldApprovedDateByDealId] = useState({});
   const PAYOUT_LABELS = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
   const PAYOUT_COLORS = { MONTHLY: '#35a13e', QUARTELY: '#2673bb', HALFLY: '#f58311', YEARLY: '#e95330', ENDOFTHEDEAL: '#6366f1' };
 
@@ -1267,15 +1268,18 @@ function OfflineSection({ fin, memberColor }) {
         const uniqueDealIds = Array.from(new Set(runningGold.map(d => String(d?.dealId ?? '')).filter(Boolean)));
         if (uniqueDealIds.length === 0) {
           setGoldInvestedByDealId({});
+          setGoldApprovedDateByDealId({});
           return;
         }
         const growthResults = await Promise.allSettled(uniqueDealIds.map(dealId => getGoldGrowthDetail(dealId)));
         if (ignore) return;
         const amountMap = {};
+        const approvedDateMap = {};
         growthResults.forEach((res, idx) => {
           const dealId = uniqueDealIds[idx];
           if (res.status !== 'fulfilled') return;
           const rows = Array.isArray(res.value) ? res.value : (res.value ? [res.value] : []);
+          approvedDateMap[dealId] = rows[0]?.adminApprovedDate ?? '';
           const totalApproved = rows.reduce((sum, row) => (
             sum + Number(
               row?.approvedAmount
@@ -1288,9 +1292,11 @@ function OfflineSection({ fin, memberColor }) {
           amountMap[dealId] = totalApproved;
         });
         setGoldInvestedByDealId(amountMap);
+        setGoldApprovedDateByDealId(approvedDateMap);
       } else {
         setGoldEarningsData(null);
         setGoldInvestedByDealId({});
+        setGoldApprovedDateByDealId({});
       }
     };
     load().catch(() => {});
@@ -1682,7 +1688,7 @@ function OfflineSection({ fin, memberColor }) {
       roiDisplay: payoutRoi > 0 ? payoutRoi : null,
       payoutAmount,
       monthlyInterest: payoutAmountFromAnnualPct(amount, payoutType, annualPct),
-      participatedDate: d?.participatedDate ?? d?.participationDate ?? '—',
+      participatedDate: goldApprovedDateByDealId[id] ?? d?.adminApprovedDate ?? d?.participatedDate ?? d?.participationDate ?? '—',
       status: 'Active',
     });
   });

@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from "react";
+﻿import { Fragment, useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getRunningDeals, getUserOfflineParticipationDealsInfo } from "../api/afterlogin-user";
+import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
 
 const INDIGO = '#6366f1';
@@ -48,6 +48,16 @@ const CalIcon = () => (
 const LayersIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
     <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+  </svg>
+);
+const EyeIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+    <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+  </svg>
+);
+const CloseIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 );
 
@@ -141,7 +151,379 @@ function payoutInterest(amount, roi, type) {
   return amount * (roi / 100);
 }
 
-function DealRow({ p, index, navigate }) {
+function interestStatusChip(status) {
+  const s = (status ?? "").toUpperCase();
+  if (s === "PAID") {
+    return <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ color: GREEN, background: `${GREEN}16`, border: `1px solid ${GREEN}30` }}>PAID</span>;
+  }
+  if (s === "NOTYETPAID" || s === "NOT YET PAID") {
+    return <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ color: AMBER, background: `${AMBER}16`, border: `1px solid ${AMBER}30` }}>NOT YET PAID</span>;
+  }
+  return <span className="text-[11px] font-bold px-2.5 py-1 rounded-full" style={{ color: RED, background: `${RED}16`, border: `1px solid ${RED}30` }}>{s || "NA"}</span>;
+}
+
+function InterestStatementModal({ deal, onClose }) {
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [expandedIdx, setExpandedIdx] = useState(null);
+
+  const load = () => {
+    if (!deal?.dealId) return;
+    setLoading(true);
+    setError("");
+    getUserViewInterestStatement(deal.dealId)
+      .then(res => setData(res))
+      .catch(e => setError(e?.message ?? "Failed to load interest statement"))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [deal?.dealId]);
+
+  const rows = data?.participationInterestStatement ?? [];
+
+  const totalInterest = useMemo(
+    () => rows.reduce((sum, r) => sum + Number(r?.interestAmount ?? 0), 0),
+    [rows]
+  );
+
+  // First-row amount & date (filled only for month 1 in the API)
+  const firstRow = rows[0] ?? {};
+  const participationAmount = data?.totalParticipationAmount ?? firstRow?.participationAmount ?? null;
+  const participationDate   = firstRow?.participationDate ?? null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
+      onClick={onClose}
+    >
+      <div
+        className="rounded-2xl overflow-hidden w-full flex flex-col"
+        style={{
+          background: "var(--surface-card)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
+          maxHeight: "92vh",
+          maxWidth: "min(960px, 96vw)",
+          width: "100%",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="px-4 py-3 flex items-start justify-between gap-3 flex-shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: AMBER }}>Interest Statement</p>
+            <h2 className="text-base sm:text-xl font-black truncate" style={{ color: "var(--text-primary)" }}>{deal?.dealName ?? "SD Deal"}</h2>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-110 flex-shrink-0 mt-0.5"
+            style={{ background: "var(--input-bg)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
+            aria-label="Close interest statement modal"
+          >
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div className="overflow-y-auto p-5 grid gap-4">
+          {loading && (
+            <div className="py-14 text-center text-sm font-bold" style={{ color: "var(--text-muted)" }}>
+              Loading interest statement...
+            </div>
+          )}
+
+          {!loading && error && (
+            <div className="py-12 grid place-items-center gap-3 text-center">
+              <p className="text-sm font-bold" style={{ color: RED }}>{error}</p>
+              <button
+                type="button"
+                onClick={load}
+                className="px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                style={{ background: `${INDIGO}12`, color: INDIGO, border: `1px solid ${INDIGO}25` }}
+              >
+                Retry
+              </button>
+            </div>
+          )}
+
+          {!loading && !error && (
+            <>
+              {/* Top info bar — Amount Invested + Participation Date always visible */}
+              <div className="flex flex-wrap gap-2">
+                <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[140px]" style={{ background: `${INDIGO}0f`, border: `1px solid ${INDIGO}28` }}>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Amount Invested</p>
+                    <p className="text-base font-black tabular-nums" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                      {participationAmount != null ? fmtINR(participationAmount) : "-"}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[140px]" style={{ background: `${GREEN}0f`, border: `1px solid ${GREEN}28` }}>
+                  <div>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Participation Date</p>
+                    <p className="text-base font-black" style={{ color: GREEN }}>
+                      {participationDate ?? "-"}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4 Summary KPI cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {[
+                  // { label: "Total Participation",     value: participationAmount != null ? fmtINR(participationAmount) : "-", color: INDIGO },
+                  { label: "Total Interest",           value: fmtINR(totalInterest),                                          color: AMBER  },
+                  { label: "ROI",                      value: data?.roi != null ? `${data.roi}%` : "-",                       color: GREEN  },
+                  { label: "Return Type",              value: data?.returnType ?? "-",                                         color: PURPLE },
+                ].map(s => (
+                  <div key={s.label} className="rounded-xl px-3 py-3" style={{ border: `1px solid ${s.color}28`, background: `${s.color}0f` }}>
+                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{s.label}</p>
+                    <p className="text-lg font-black mt-1 truncate" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Statement — desktop table / mobile cards */}
+              {rows.length > 0 ? (
+                <div className="rounded-xl overflow-hidden" style={{ border: "1px solid var(--border)", background: "var(--surface-card)" }}>
+                  <div className="px-4 py-3 flex items-center justify-between gap-2 flex-wrap" style={{ borderBottom: "1px solid var(--border)", background: "var(--input-bg)" }}>
+                    <p className="text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Monthly Interest Schedule</p>
+                    <span className="text-xs font-semibold px-2 py-0.5 rounded-full" style={{ background: `${AMBER}14`, color: AMBER, border: `1px solid ${AMBER}30` }}>
+                      {rows.length} months
+                    </span>
+                  </div>
+
+                  {/* ── Desktop table (hidden on mobile) ── */}
+                  <div className="hidden sm:block overflow-x-auto">
+                    <table className="w-full text-sm" style={{ minWidth: 640 }}>
+                      <thead>
+                        <tr style={{ background: "var(--table-header-bg)" }}>
+                          {["#", "Actual Int. Date", "Days", "Interest", "Paid Date", "Status"].map(h => (
+                            <th key={h} className="text-left py-3 px-3 text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {rows.map((row, idx) => {
+                          const hasBreakup = Array.isArray(row?.updationParticiInterestStatement) && row.updationParticiInterestStatement.length > 0;
+                          const isExpanded = expandedIdx === idx;
+                          return (
+                            <Fragment key={idx}>
+                              <tr
+                                style={{ borderTop: "1px solid var(--border)" }}
+                                onMouseEnter={e => e.currentTarget.style.background = "var(--row-hover)"}
+                                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                              >
+                                <td className="py-3 px-3 text-xs font-bold" style={{ color: "var(--text-muted)" }}>{idx + 1}</td>
+                                <td className="py-3 px-3 text-xs whitespace-nowrap font-semibold" style={{ color: "var(--text-primary)" }}>{row?.actualInterestDate ?? "-"}</td>
+                                {/* <td className="py-3 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                                  {row?.participationAmount != null ? fmtINR(row.participationAmount) : "-"}
+                                </td> */}
+                                {/* <td className="py-3 px-3 text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{row?.participationDate ?? "-"}</td> */}
+                                <td className="py-3 px-3 text-xs font-semibold" style={{ color: "var(--text-muted)" }}>{row?.days ?? "-"}</td>
+                                <td className="py-3 px-3 font-black tabular-nums whitespace-nowrap" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>
+                                  {fmtINR(row?.interestAmount ?? 0)}
+                                  {hasBreakup && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                                      className="ml-2 px-2 py-0.5 rounded-full text-[10px] font-bold"
+                                      style={{ border: `1px solid ${PURPLE}40`, background: `${PURPLE}14`, color: PURPLE }}
+                                    >
+                                      {isExpanded ? "Close" : "BreakUp"}
+                                    </button>
+                                  )}
+                                </td>
+                                <td className="py-3 px-3 text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{row?.paidDate ?? "-"}</td>
+                                <td className="py-3 px-3">{interestStatusChip(row?.status)}</td>
+                              </tr>
+
+                              {/* Breakup sub-table */}
+                              {isExpanded && hasBreakup && (
+                                <tr style={{ borderTop: "1px solid var(--border)", background: "var(--table-header-bg)" }}>
+                                  <td colSpan={8} className="p-3">
+                                    <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${PURPLE}30` }}>
+                                      <div className="px-3 py-2" style={{ background: `${PURPLE}10`, borderBottom: `1px solid ${PURPLE}20` }}>
+                                        <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: PURPLE }}>
+                                          First Month Participation Breakup — {row.updationParticiInterestStatement.length + 1} entries
+                                        </p>
+                                      </div>
+                                      <table className="w-full text-sm">
+                                        <thead>
+                                          <tr style={{ background: "var(--table-header-bg)" }}>
+                                            {["#", "Participation Date", "Days", "Amount Invested", "Interest", "Status"].map(h => (
+                                              <th key={h} className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {/* Base (initial) entry for this month */}
+                                          <tr style={{ borderTop: "1px solid var(--border)" }}>
+                                            <td className="py-2 px-3 text-xs font-bold" style={{ color: "var(--text-muted)" }}>1</td>
+                                            <td className="py-2 px-3 text-xs" style={{ color: "var(--text-primary)" }}>{row?.participationDate ?? "-"}</td>
+                                            <td className="py-2 px-3 text-xs" style={{ color: "var(--text-muted)" }}>{row?.days ?? "-"}</td>
+                                            <td className="py-2 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                                              {row?.participationAmount != null ? fmtINR(row.participationAmount) : "-"}
+                                            </td>
+                                            <td className="py-2 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>
+                                              {fmtINR(row?.interestAmount ?? 0)}
+                                            </td>
+                                            <td className="py-2 px-3">{interestStatusChip(row?.status)}</td>
+                                          </tr>
+                                          {/* Top-up entries within the first month */}
+                                          {row.updationParticiInterestStatement.map((upd, uIdx) => (
+                                            <tr key={`upd-${uIdx}`} style={{ borderTop: "1px solid var(--border)" }}>
+                                              <td className="py-2 px-3 text-xs font-bold" style={{ color: "var(--text-muted)" }}>{uIdx + 2}</td>
+                                              <td className="py-2 px-3 text-xs" style={{ color: "var(--text-primary)" }}>{upd?.participationDate ?? "-"}</td>
+                                              <td className="py-2 px-3 text-xs" style={{ color: "var(--text-muted)" }}>{upd?.days ?? "-"}</td>
+                                              <td className="py-2 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                                                {upd?.participationAmount != null ? fmtINR(upd.participationAmount) : "-"}
+                                              </td>
+                                              <td className="py-2 px-3 font-bold tabular-nums whitespace-nowrap" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>
+                                                {fmtINR(upd?.interestAmount ?? 0)}
+                                              </td>
+                                              <td className="py-2 px-3">{interestStatusChip(upd?.status)}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                        <tfoot>
+                                          <tr style={{ borderTop: `2px solid ${PURPLE}30`, background: `${PURPLE}08` }}>
+                                            <td colSpan={3} className="py-2 px-3 text-xs font-black uppercase" style={{ color: PURPLE }}>Total</td>
+                                            <td className="py-2 px-3 font-black tabular-nums whitespace-nowrap" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                                              {fmtINR((row?.participationAmount ?? 0) + row.updationParticiInterestStatement.reduce((s, u) => s + Number(u?.participationAmount ?? 0), 0))}
+                                            </td>
+                                            <td className="py-2 px-3 font-black tabular-nums whitespace-nowrap" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>
+                                              {fmtINR((row?.interestAmount ?? 0) + row.updationParticiInterestStatement.reduce((s, u) => s + Number(u?.interestAmount ?? 0), 0))}
+                                            </td>
+                                            <td />
+                                          </tr>
+                                        </tfoot>
+                                      </table>
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </Fragment>
+                          );
+                        })}
+                      </tbody>
+                      <tfoot>
+                        <tr style={{ borderTop: `2px solid var(--border)`, background: `${AMBER}18` }}>
+                          <td colSpan={5} className="py-3 px-3 text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total Interest</td>
+                          <td className="py-3 px-3 font-black tabular-nums" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalInterest)}</td>
+                          <td colSpan={2} />
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+
+                  {/* ── Mobile cards (shown only on mobile) ── */}
+                  <div className="sm:hidden divide-y" style={{ borderColor: "var(--border)" }}>
+                    {rows.map((row, idx) => {
+                      const hasBreakup = Array.isArray(row?.updationParticiInterestStatement) && row.updationParticiInterestStatement.length > 0;
+                      const isExpanded = expandedIdx === idx;
+                      return (
+                        <div key={idx} className="p-3 grid gap-2">
+                          {/* Row header */}
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Month {idx + 1}</span>
+                            {interestStatusChip(row?.status)}
+                          </div>
+
+                          {/* Primary info grid */}
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="rounded-lg px-3 py-2" style={{ background: `${AMBER}0f`, border: `1px solid ${AMBER}20` }}>
+                              <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>Interest</p>
+                              <p className="text-base font-black tabular-nums" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(row?.interestAmount ?? 0)}</p>
+                            </div>
+                            <div className="rounded-lg px-3 py-2" style={{ background: `${INDIGO}0f`, border: `1px solid ${INDIGO}20` }}>
+                              <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>Invested</p>
+                              <p className="text-base font-black tabular-nums" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                                {row?.participationAmount != null ? fmtINR(row.participationAmount) : "-"}
+                              </p>
+                            </div>
+                          </div>
+
+                          {/* Secondary details */}
+                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+                            <div className="flex justify-between">
+                              <span style={{ color: "var(--text-muted)" }}>Interest Date</span>
+                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.actualInterestDate ?? "-"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span style={{ color: "var(--text-muted)" }}>Part. Date</span>
+                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.participationDate ?? "-"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span style={{ color: "var(--text-muted)" }}>Days</span>
+                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.days ?? "-"}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span style={{ color: "var(--text-muted)" }}>Paid Date</span>
+                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.paidDate ?? "-"}</span>
+                            </div>
+                          </div>
+
+                          {/* BreakUp toggle */}
+                          {hasBreakup && (
+                            <button
+                              type="button"
+                              onClick={() => setExpandedIdx(isExpanded ? null : idx)}
+                              className="w-full py-1.5 rounded-lg text-xs font-bold transition-all"
+                              style={{ border: `1px solid ${PURPLE}40`, background: isExpanded ? `${PURPLE}18` : `${PURPLE}0a`, color: PURPLE }}
+                            >
+                              {isExpanded ? "Close Breakup" : `View First-Month Breakup (${row.updationParticiInterestStatement.length + 1} entries)`}
+                            </button>
+                          )}
+
+                          {isExpanded && hasBreakup && (
+                            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${PURPLE}30` }}>
+                              <div className="px-3 py-2" style={{ background: `${PURPLE}10`, borderBottom: `1px solid ${PURPLE}20` }}>
+                                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: PURPLE }}>Breakup</p>
+                              </div>
+                              <div className="divide-y" style={{ borderColor: `${PURPLE}20` }}>
+                                {[
+                                  { date: row?.participationDate, days: row?.days, amount: row?.participationAmount, interest: row?.interestAmount, status: row?.status },
+                                  ...row.updationParticiInterestStatement.map(u => ({ date: u?.participationDate, days: u?.days, amount: u?.participationAmount, interest: u?.interestAmount, status: u?.status })),
+                                ].map((entry, eIdx) => (
+                                  <div key={eIdx} className="px-3 py-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                                    <span className="col-span-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: PURPLE }}>Entry {eIdx + 1}</span>
+                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Date</span><span className="font-semibold" style={{ color: "var(--text-primary)" }}>{entry.date ?? "-"}</span></div>
+                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Days</span><span className="font-semibold" style={{ color: "var(--text-primary)" }}>{entry.days ?? "-"}</span></div>
+                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Invested</span><span className="font-bold tabular-nums" style={{ color: INDIGO }}>{entry.amount != null ? fmtINR(entry.amount) : "-"}</span></div>
+                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Interest</span><span className="font-bold tabular-nums" style={{ color: AMBER }}>{fmtINR(entry.interest ?? 0)}</span></div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+
+                    {/* Mobile total footer */}
+                    <div className="px-3 py-3 flex justify-between items-center" style={{ background: `${AMBER}10` }}>
+                      <span className="text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total Interest</span>
+                      <span className="font-black tabular-nums" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalInterest)}</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="rounded-xl px-4 py-8 text-center text-sm font-semibold" style={{ border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+                  No interest statement available.
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DealRow({ p, index, navigate, onViewInterest }) {
   const [expanded, setExpanded] = useState(false);
   const updates = p.updatedParticipation ?? [];
 
@@ -252,6 +634,13 @@ function DealRow({ p, index, navigate }) {
             </div>
 
             <div className="flex items-center gap-1.5 flex-shrink-0">
+              <button
+                onClick={() => onViewInterest(p)}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                style={{ background: `${GREEN}12`, color: GREEN, border: `1px solid ${GREEN}30` }}
+              >
+                <EyeIcon /> View Interest
+              </button>
               {canMore && (
                 <button
                   onClick={() => navigate(`/sd-lot/participate/${p.dealId}`)}
@@ -570,6 +959,7 @@ export default function MyParticipations() {
   const [migratedDeals, setMigratedDeals] = useState([]);
   const [migratedError, setMigratedError] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
+  const [interestDeal, setInterestDeal] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -929,12 +1319,13 @@ export default function MyParticipations() {
           <div className="grid gap-4">
             {filteredItems.map((item, i) => (
               item.source === "running"
-                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} />
+                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} onViewInterest={setInterestDeal} />
                 : <MigratedDealRow key={item.key} d={item.payload} index={i} />
             ))}
           </div>
         )}
       </div>
+      {interestDeal && <InterestStatementModal deal={interestDeal} onClose={() => setInterestDeal(null)} />}
     </>
   );
 }

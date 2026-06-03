@@ -336,3 +336,17 @@ export async function migrateUserData({ lenderId, migrationConsent = 'yes', mobi
 export async function GoldRate(){
   return get('/user-service/gold_daily-update');
 }
+
+// ═════════════════════════════════════════════════════════════════════════════
+// INTEREST STATEMENT
+// ═════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/oxybrick-service/userViewInterestStatement/{userId}/{dealId}
+ * Returns the full interest statement for a participation, including first-month
+ * breakup via `updationParticiInterestStatement` on the first row.
+ */
+export async function getUserViewInterestStatement(dealId) {
+  const userId = getUserId();
+  return get(`/oxybrick-service/userViewInterestStatement/${userId}/${dealId}`);
+}
