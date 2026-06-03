@@ -296,9 +296,9 @@ function InterestStatementModal({ deal, onClose }) {
                   </div>
 
                   {/* ── Desktop table (hidden on mobile) ── */}
-                  <div className="hidden sm:block overflow-x-auto">
+                  <div className="hidden sm:block overflow-x-auto overflow-y-auto" style={{ maxHeight: "50vh" }}>
                     <table className="w-full text-sm" style={{ minWidth: 640 }}>
-                      <thead>
+                      <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                         <tr style={{ background: "var(--table-header-bg)" }}>
                           {["#", "Actual Int. Date", "Days", "Interest", "Paid Date", "Status"].map(h => (
                             <th key={h} className="text-left py-3 px-3 text-[11px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
@@ -350,8 +350,9 @@ function InterestStatementModal({ deal, onClose }) {
                                           First Month Participation Breakup — {row.updationParticiInterestStatement.length + 1} entries
                                         </p>
                                       </div>
+                                      <div className="overflow-x-auto overflow-y-auto" style={{ maxHeight: "200px" }}>
                                       <table className="w-full text-sm">
-                                        <thead>
+                                        <thead style={{ position: "sticky", top: 0, zIndex: 1 }}>
                                           <tr style={{ background: "var(--table-header-bg)" }}>
                                             {["#", "Participation Date", "Days", "Amount Invested", "Interest", "Status"].map(h => (
                                               <th key={h} className="text-left py-2 px-3 text-[10px] font-black uppercase tracking-wider whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{h}</th>
@@ -401,6 +402,7 @@ function InterestStatementModal({ deal, onClose }) {
                                           </tr>
                                         </tfoot>
                                       </table>
+                                      </div>
                                     </div>
                                   </td>
                                 </tr>
@@ -420,7 +422,7 @@ function InterestStatementModal({ deal, onClose }) {
                   </div>
 
                   {/* ── Mobile cards (shown only on mobile) ── */}
-                  <div className="sm:hidden divide-y" style={{ borderColor: "var(--border)" }}>
+                  <div className="sm:hidden divide-y overflow-y-auto" style={{ borderColor: "var(--border)", maxHeight: "55vh" }}>
                     {rows.map((row, idx) => {
                       const hasBreakup = Array.isArray(row?.updationParticiInterestStatement) && row.updationParticiInterestStatement.length > 0;
                       const isExpanded = expandedIdx === idx;
