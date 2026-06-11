@@ -250,11 +250,12 @@ export async function getAllMigratedUsers() {
  * POST /oxybrick-service/migrateApprovedAndRejection
  * Body: { approvedBy, migrationStatus, userId }
  */
-export async function approveMigratedUser(userId, approvedBy = '', migrationStatus = 'APPROVED') {
+export async function approveMigratedUser(userId, approvedBy = '', migrationStatus = 'APPROVED', id) {
   return post('/oxybrick-service/migrateApprovedAndRejection', {
     approvedBy:      approvedBy.toUpperCase(),
     migrationStatus,
     userId,
+    id
   });
 }
 

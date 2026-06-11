@@ -3,7 +3,7 @@ import { getAllMigratedUsers, approveMigratedUser } from '../../api/afterlogin-a
 
 const APPROVED_BY_OPTIONS = ['SUBBU', 'ADMIN'];
 const PAGE_SIZE = 20;
-const EXCLUDED_USER_IDS = new Set(['d70aeb27-9800-4a2a-ac56-54648554db92']);
+const EXCLUDED_USER_IDS = new Set(['']);
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const MigrateIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
@@ -179,11 +179,12 @@ function InlineApproveBtn({ user, onApproved }) {
   const handleConfirm = async (approvedBy, migrationStatus) => {
     setApproving(true);
     setApproveErr('');
+    console.log('Approving with:', { userId: user.userId, approvedBy, migrationStatus, id:user.id});
     try {
-      await approveMigratedUser(user.userId, approvedBy, migrationStatus);
+      await approveMigratedUser(user.userId, approvedBy, migrationStatus,user.id);
       setApproved(migrationStatus);
       setShowConfirm(false);
-      onApproved?.(user.userId, migrationStatus, approvedBy);
+      onApproved?.(user.userId, migrationStatus, approvedBy,user.id);
     } catch (e) {
       setApproveErr(e.message ?? 'Approval failed.');
     } finally {
@@ -252,11 +253,12 @@ function DetailDrawer({ user, onClose, onApproved }) {
   const handleConfirm = async (approvedBy, migrationStatus) => {
     setApproving(true);
     setApproveErr('');
+    console.log('Approving with:', { userId: user.userId, approvedBy, migrationStatus ,id:user.id});
     try {
-      await approveMigratedUser(user.userId, approvedBy, migrationStatus);
+      await approveMigratedUser(user.userId, approvedBy, migrationStatus,user.id);
       setApproved(migrationStatus);
       setShowConfirm(false);
-      onApproved?.(user.userId, migrationStatus, approvedBy);
+      onApproved?.(user.userId, migrationStatus, approvedBy,user.id);
       setTimeout(() => onClose(), 800);
     } catch (e) {
       setApproveErr(e.message ?? 'Approval failed. Please try again.');
