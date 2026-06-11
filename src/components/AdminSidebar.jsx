@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission, PERM, ADMIN_ROLES as ADMIN_ROLES_MAP } from '../config/adminRoles';
@@ -36,6 +36,12 @@ const walletSubItems = [
   { title: 'Wallet Approvals',   path: '/admin/wallet-approvals',   perm: PERM.WALLET },
   { title: 'Wallet Withdrawals', path: '/admin/wallet-withdrawals', perm: PERM.WALLET },
 ];
+const statsSubItems = [
+  { title: 'Funds Raised', path: '/admin/stats/funds-raised', perm: PERM.STATS },
+  { title: 'Top Lenders', path: '/admin/stats/top-lenders', perm: PERM.STATS },
+  { title: 'Total Assets',  path: '/admin/stats/total-assets',  perm: PERM.STATS },
+  { title: 'Interest/Principal',  path: '/admin/stats/interest-principal',  perm: PERM.STATS },
+];
 
 const UsersIcon2    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const MigrateIcon2  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
@@ -55,7 +61,6 @@ const navItemsAfter = [
   { title: 'Properties',       path: '/admin/properties',    Icon: BuildingIcon, perm: PERM.PROPERTIES    },
   { title: 'Bank Accounts',    path: '/admin/bank-accounts', Icon: BankIcon,     perm: PERM.BANK_ACCOUNTS },
   { title: 'Support',          path: '/admin/support',       Icon: SupportIcon,  perm: PERM.SUPPORT       },
-  { title: 'Stats',            path: '/admin/stats',         Icon: BarChartIcon, perm: PERM.STATS         },
 ];
 
 function AdminSidebarContent({ onClose }) {
@@ -71,17 +76,29 @@ function AdminSidebarContent({ onClose }) {
   const isInterestActive = location.pathname.startsWith('/admin/interest');
   const isMigratedActive = location.pathname.startsWith('/admin/migrated-');
   const isWalletActive   = location.pathname.startsWith('/admin/wallet-');
+  const isStatsActive    = location.pathname.startsWith('/admin/stats');
   const [openSection, setOpenSection] = useState(
     isAssetActive ? 'assets'
       : isInterestActive ? 'interest'
       : isMigratedActive ? 'migrated'
       : isWalletActive ? 'wallet'
+      : isStatsActive ? 'stats'
       : null
   );
   const assetOpen = openSection === 'assets';
   const interestOpen = openSection === 'interest';
   const migratedOpen = openSection === 'migrated';
   const walletOpen = openSection === 'wallet';
+  const statsOpen = openSection === 'stats';
+
+  useEffect(() => {
+    if (isAssetActive) return setOpenSection('assets');
+    if (isInterestActive) return setOpenSection('interest');
+    if (isMigratedActive) return setOpenSection('migrated');
+    if (isWalletActive) return setOpenSection('wallet');
+    if (isStatsActive) return setOpenSection('stats');
+    setOpenSection(null);
+  }, [isAssetActive, isInterestActive, isMigratedActive, isWalletActive, isStatsActive]);
 
   const toggleSection = (section) => {
     setOpenSection(current => current === section ? null : section);
@@ -215,6 +232,44 @@ function AdminSidebarContent({ onClose }) {
             {interestOpen && (
               <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
                 {interestSubItems.map(sub => (
+                  <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
+                    className="admin-sidebar-item text-xs"
+                    style={({ isActive }) => isActive
+                      ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
+                      : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+                    }>
+                    {({ isActive }) => (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
+                          style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
+                        <span className="admin-sidebar-label">{sub.title}</span>
+                        {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Stats accordion ── */}
+        {can(PERM.STATS) && (
+          <>
+            <button
+              onClick={() => toggleSection('stats')}
+              className="admin-sidebar-item w-full text-left"
+              style={isStatsActive
+                ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
+                : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
+              }>
+              <span className="admin-sidebar-icon" style={{ color: isStatsActive ? '#c084fc' : undefined }}><BarChartIcon /></span>
+              <span className="admin-sidebar-label">Stats</span>
+              <span className="ml-auto"><ChevronDown open={statsOpen} /></span>
+            </button>
+            {statsOpen && (
+              <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
+                {statsSubItems.map(sub => (
                   <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
                     className="admin-sidebar-item text-xs"
                     style={({ isActive }) => isActive

@@ -44,7 +44,7 @@ export const ADMIN_ROLES = {
   CEO: {
     label:       'CEO',
     color:       '#6366f1',
-    permissions: [PERM.DASHBOARD, PERM.STATS],
+    permissions: [ PERM.STATS],
   },
   ACCOUNTS_MANAGER: {
     label:       'Accounts Manager',
@@ -55,6 +55,11 @@ export const ADMIN_ROLES = {
     label:       'Wallet Ops Manager',
     color:       '#f59e0b',
     permissions: [PERM.WALLET],
+  },
+  HELPDESK: {
+    label:       'Helpdesk',
+    color:       '#0ea5e9',
+    permissions: [PERM.SUPPORT],
   },
 };
 

@@ -410,17 +410,17 @@ export default function AdminMigratedUsers() {
   const pageData   = filtered.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
 
   const handleSearch  = (val) => { setSearch(val); setPage(0); };
-  const handleApproved = (userId, migrationStatus, approvedBy) => {
+  const handleApproved = (userId, migrationStatus, approvedBy,id) => {
     setAllData(prev =>
       prev.map(u =>
         u.userId === userId
-          ? { ...u, migrationStatus, approvedBy: approvedBy ?? u.approvedBy }
+          ? { ...u, migrationStatus, approvedBy: approvedBy ?? u.approvedBy, id }
           : u
       )
     );
     setSelected(prev =>
       prev?.userId === userId
-        ? { ...prev, migrationStatus, approvedBy: approvedBy ?? prev.approvedBy }
+        ? { ...prev, migrationStatus, approvedBy: approvedBy ?? prev.approvedBy, id }
         : prev
     );
   };

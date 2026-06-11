@@ -296,7 +296,7 @@ function mapDeal(raw) {
     title:          raw.dealName,
     auctionType:    'Open',
     status,
-    tag:            status === 'Closed' ? 'Sold Out' : 'Live',
+    tag:            status === 'Closed' ? 'Achieved' : 'Live',
     tagColor:       status === 'Closed' ? '#64748b' : '#10b981',
     totalSize,
     raised:         participated,

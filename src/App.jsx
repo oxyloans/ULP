@@ -63,6 +63,10 @@ import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
 import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
 import AdminStats from './pages/admin/AdminStats.jsx';
 import AdminBorrowers from './pages/admin/AdminBorrowers.jsx';
+import FundsRaised from './pages/admin/stats/FundsRaised.jsx';
+import TopLenders from './pages/admin/stats/TopLenders.jsx';
+import TotalAssets from './pages/admin/stats/TotalAssets.jsx';
+import InterestPrincipal from './pages/admin/stats/InterestPrincipal.jsx';
 
 import { DEFAULT_ADMIN_ROLE, hasPermission, ROUTE_PERM_MAP } from './config/adminRoles.js';
 
@@ -219,7 +223,11 @@ function AdminLayout() {
             <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
             <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />
             <Route path="migrated-total-data"   element={<RequireAdminPerm routeKey="migrated-total-data"><AdminMigratedTotalData /></RequireAdminPerm>} />
-            <Route path="stats"                 element={<RequireAdminPerm routeKey="stats"><AdminStats /></RequireAdminPerm>} />
+            <Route path="stats"                 element={<Navigate replace to="stats/funds-raised" />} />
+            <Route path="stats/funds-raised"    element={<RequireAdminPerm routeKey="stats"><FundsRaised /></RequireAdminPerm>} />
+            <Route path="stats/top-lenders"    element={<RequireAdminPerm routeKey="stats"><TopLenders /></RequireAdminPerm>} />
+            <Route path="stats/total-assets"   element={<RequireAdminPerm routeKey="stats"><TotalAssets /></RequireAdminPerm>} />
+            <Route path="stats/interest-principal" element={<RequireAdminPerm routeKey="stats"><InterestPrincipal /></RequireAdminPerm>} />
             <Route path="borrowers"             element={<RequireAdminPerm routeKey="borrowers"><AdminBorrowers /></RequireAdminPerm>} />
             <Route path="*"                     element={<NotFound />} />
           </Routes>

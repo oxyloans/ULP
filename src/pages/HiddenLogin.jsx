@@ -13,13 +13,20 @@ const ShieldIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const FlashIcon  = ({ color }) => <svg viewBox="0 0 24 24" fill="none" stroke={color ?? 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>;
 
 // ─── Demo role cards (CEO, ACCOUNTS_MANAGER, WALLET_OPS) ─────────────────────
-const DEMO_ROLES = ['CEO', 'ACCOUNTS_MANAGER', 'WALLET_OPS'];
+const DEMO_ROLES = ['CEO', 'ACCOUNTS_MANAGER', 'WALLET_OPS', 'HELPDESK'];
+const DEMO_REDIRECT_PATH = {
+  CEO: '/admin/stats/funds-raised',
+  ACCOUNTS_MANAGER: '/admin/interest/sd-lot',
+  WALLET_OPS: '/admin/wallet-approvals',
+  HELPDESK: '/admin/support',
+};
 
 // Short description per role shown on the card
 const ROLE_DESC = {
   CEO:              'Dashboard & Stats only',
   ACCOUNTS_MANAGER: 'Interest payouts & Wallet',
   WALLET_OPS:       'Wallet approvals only',
+  HELPDESK:         'Support tickets only',
 };
 
 export default function HiddenLogin() {
@@ -61,7 +68,7 @@ export default function HiddenLogin() {
     setDemoLoading(roleKey);
     demoLogin(roleKey);
     // Small delay so the button shows feedback before navigating
-    setTimeout(() => navigate('/admin', { replace: true }), 300);
+    setTimeout(() => navigate(DEMO_REDIRECT_PATH[roleKey] ?? '/admin', { replace: true }), 300);
   };
 
   return (
