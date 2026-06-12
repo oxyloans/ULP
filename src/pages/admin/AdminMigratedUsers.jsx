@@ -48,6 +48,64 @@ function ConsentChip({ value }) {
   );
 }
 
+// ─── Alert Modal (Success/Error) ──────────────────────────────────────────────
+function AlertModal({ type, title, message, onClose }) {
+  const isSuccess = type === 'success';
+  const isError = type === 'error';
+  const isApprove = title?.includes('Approved');
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}>
+      <div className="rounded-2xl overflow-hidden w-full max-w-sm"
+        style={{ 
+          background: 'var(--surface-card)', 
+          border: `1px solid ${isError ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`,
+          boxShadow: '0 32px 80px rgba(0,0,0,0.4)' 
+        }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Icon + title */}
+        <div className="px-6 pt-6 pb-4 flex flex-col items-center text-center gap-3">
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+            style={{ 
+              background: isError ? 'rgba(239,68,68,0.1)' : 'rgba(16,185,129,0.1)',
+              border: `1px solid ${isError ? 'rgba(239,68,68,0.25)' : 'rgba(16,185,129,0.25)'}`
+            }}>
+            {isError ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="#10b981" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            )}
+          </div>
+          <div>
+            <h3 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>
+              {title}
+            </h3>
+            <p className="text-sm mt-2" style={{ color: 'var(--text-muted)' }}>
+              {message}
+            </p>
+          </div>
+        </div>
+
+        {/* Close button */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button onClick={onClose}
+            className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+            style={{
+              background: isError ? 'linear-gradient(135deg,#ef4444,#dc2626)' : 'linear-gradient(135deg,#10b981,#059669)',
+              color: '#fff',
+              boxShadow: isError ? '0 4px 14px rgba(239,68,68,0.35)' : '0 4px 14px rgba(16,185,129,0.35)',
+            }}>
+            Got it
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Approve / Reject confirmation modal ─────────────────────────────────────
 function ApproveConfirmModal({ user, onConfirm, onCancel, loading, error }) {
   const [approvedBy, setApprovedBy] = useState('');
@@ -60,6 +118,7 @@ function ApproveConfirmModal({ user, onConfirm, onCancel, loading, error }) {
     setTouched(true);
     if (!approvedBy) return;
     onConfirm(approvedBy, action);
+    
   };
 
   return (
@@ -175,6 +234,9 @@ function InlineApproveBtn({ user, onApproved }) {
   const [approving,   setApproving]   = useState(false);
   const [approveErr,  setApproveErr]  = useState('');
   const [approved,    setApproved]    = useState(false);
+  const [alertType,   setAlertType]   = useState('');
+  const [alertTitle,  setAlertTitle]  = useState('');
+  const [alertMsg,    setAlertMsg]    = useState('');
 
   const handleConfirm = async (approvedBy, migrationStatus) => {
     setApproving(true);
@@ -184,12 +246,29 @@ function InlineApproveBtn({ user, onApproved }) {
       await approveMigratedUser(user.userId, approvedBy, migrationStatus,user.id);
       setApproved(migrationStatus);
       setShowConfirm(false);
+      
+      // Show success alert
+      const isApprove = migrationStatus === 'APPROVED';
+      setAlertType('success');
+      setAlertTitle(isApprove ? '✓ Approved' : '✕ Rejected');
+      setAlertMsg(`User has been ${isApprove ? 'approved' : 'rejected'} by ${approvedBy}`);
+      
       onApproved?.(user.userId, migrationStatus, approvedBy,user.id);
     } catch (e) {
+      // Show error alert
+      setAlertType('error');
+      setAlertTitle('Error');
+      setAlertMsg(e.message ?? 'Approval failed.');
       setApproveErr(e.message ?? 'Approval failed.');
     } finally {
       setApproving(false);
     }
+  };
+
+  const closeAlert = () => {
+    setAlertType('');
+    setAlertTitle('');
+    setAlertMsg('');
   };
 
   if (approved) {
@@ -226,6 +305,14 @@ function InlineApproveBtn({ user, onApproved }) {
           error={approveErr}
         />
       )}
+      {alertType && (
+        <AlertModal
+          type={alertType}
+          title={alertTitle}
+          message={alertMsg}
+          onClose={closeAlert}
+        />
+      )}
     </>
   );
 }
@@ -236,6 +323,9 @@ function DetailDrawer({ user, onClose, onApproved }) {
   const [approving,   setApproving]   = useState(false);
   const [approveErr,  setApproveErr]  = useState('');
   const [approved,    setApproved]    = useState(false);
+  const [alertType,   setAlertType]   = useState('');
+  const [alertTitle,  setAlertTitle]  = useState('');
+  const [alertMsg,    setAlertMsg]    = useState('');
 
   if (!user) return null;
 
@@ -258,13 +348,30 @@ function DetailDrawer({ user, onClose, onApproved }) {
       await approveMigratedUser(user.userId, approvedBy, migrationStatus,user.id);
       setApproved(migrationStatus);
       setShowConfirm(false);
+      
+      // Show success alert
+      const isApprove = migrationStatus === 'APPROVED';
+      setAlertType('success');
+      setAlertTitle(isApprove ? '✓ Approved' : '✕ Rejected');
+      setAlertMsg(`User has been ${isApprove ? 'approved' : 'rejected'} by ${approvedBy}`);
+      
       onApproved?.(user.userId, migrationStatus, approvedBy,user.id);
-      setTimeout(() => onClose(), 800);
+      setTimeout(() => onClose(), 1200);
     } catch (e) {
+      // Show error alert
+      setAlertType('error');
+      setAlertTitle('Error');
+      setAlertMsg(e.message ?? 'Approval failed. Please try again.');
       setApproveErr(e.message ?? 'Approval failed. Please try again.');
     } finally {
       setApproving(false);
     }
+  };
+
+  const closeAlert = () => {
+    setAlertType('');
+    setAlertTitle('');
+    setAlertMsg('');
   };
 
   return (
@@ -351,6 +458,15 @@ function DetailDrawer({ user, onClose, onApproved }) {
           onCancel={() => { setShowConfirm(false); setApproveErr(''); }}
           loading={approving}
           error={approveErr}
+        />
+      )}
+      
+      {alertType && (
+        <AlertModal
+          type={alertType}
+          title={alertTitle}
+          message={alertMsg}
+          onClose={closeAlert}
         />
       )}
     </>
