@@ -1,21 +1,22 @@
 import { createContext, useContext, useState } from 'react';
 import { login as apiLogin, hiddenLogin as apiHiddenLogin, getUserMe, verifyLoginOtp } from '../api/beforelogin';
-import { clearSession, getToken, getUserId, getRole, getAdminRole, setSession } from '../api/client';
-import { DEFAULT_ADMIN_ROLE, ADMIN_ROLES } from '../config/adminRoles';
+import { clearSession, getToken, getUserId, getRoles, setSession } from '../api/client';
+import { hasPermission, ADMIN_ROLES } from '../config/adminRoles';
 
 const AuthContext = createContext(null);
 
-// Restore session from localStorage on page reload
+// Restore session from sessionStorage on page reload
 function restoreUser() {
-  const token     = getToken();
-  const userId    = getUserId();
-  const role      = getRole();
-  const adminRole = getAdminRole();
+  const token   = getToken();
+  const userId  = getUserId();
+  const roles   = getRoles(); // array of role strings from API
   if (!token || !userId) return null;
+  
+  const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
   return {
     userId,
-    role:      role === 'ADMIN' ? 'admin' : 'user',
-    adminRole: adminRole || DEFAULT_ADMIN_ROLE,
+    roles,
+    role:      isAdmin ? 'admin' : 'user',
     lrId:      userId,
     name:      '',
   };
@@ -24,36 +25,6 @@ function restoreUser() {
 export function AuthProvider({ children }) {
   const [user, setUser]       = useState(restoreUser);
   const [loading, setLoading] = useState(false);
-
-  // Update the admin sub-role at runtime (e.g. from the role-switcher UI)
-  const setAdminRole = (adminRole) => {
-    sessionStorage.setItem('adminRole', adminRole);
-    setUser(u => u ? { ...u, adminRole } : u);
-  };
-
-  /**
-   * demoLogin(adminRole)
-   * Instantly logs in as a demo admin with the given sub-role.
-   * No API call — purely local. Used for CEO / ACCOUNTS_MANAGER / WALLET_OPS demos.
-   */
-  const demoLogin = (adminRole) => {
-    const roleDef = ADMIN_ROLES[adminRole];
-    if (!roleDef) return;
-    // Store a fake session so restoreUser works on reload
-    sessionStorage.setItem('accessToken', 'demo-token');
-    sessionStorage.setItem('userId',      `demo-${adminRole.toLowerCase()}`);
-    sessionStorage.setItem('roles',       'ADMIN');
-    sessionStorage.setItem('adminRole',   adminRole);
-    setUser({
-      userId:    `demo-${adminRole.toLowerCase()}`,
-      name:      roleDef.label,
-      email:     `${adminRole.toLowerCase()}@demo.local`,
-      lrId:      `demo-${adminRole.toLowerCase()}`,
-      role:      'admin',
-      adminRole,
-      isDemo:    true,
-    });
-  };
 
   /**
    * login(credential, password)
@@ -65,16 +36,17 @@ export function AuthProvider({ children }) {
     try {
       const result = await apiLogin({ credential, password });
 
-      const role = result.role === 'ADMIN' ? 'admin' : 'user';
+      const roles = Array.isArray(result.roles) ? result.roles : (result.role ? [result.role] : []);
+      const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
       setUser({
         userId:    result.userId,
         name:      result.name,
         email:     result.email,
         lrId:      result.lrId,
-        role,
-        adminRole: role === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
+        role:      isAdmin ? 'admin' : 'user',
+        roles,
       });
-      return { success: true, role };
+      return { success: true, role: isAdmin ? 'admin' : 'user' };
 
     } catch (err) {
       let message = err.message ?? 'Login failed. Please try again.';
@@ -95,18 +67,21 @@ export function AuthProvider({ children }) {
     try {
       const me = await getUserMe(token);
       const userId = me.userId ?? me.user_id ?? me.id ?? '';
-      const role   = me.roles?.[0]?.name ?? me.role ?? 'INVESTOR';
-      setSession({ accessToken: token, userId, role });
-      const mappedRole = role === 'ADMIN' ? 'admin' : 'user';
+      const roles = Array.isArray(me.roles) 
+        ? me.roles.map(r => r.name).filter(Boolean) 
+        : (me.role ? [me.role] : []);
+      
+      setSession({ accessToken: token, userId, roles });
+      const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
       setUser({
         userId,
         name:      me.name ?? me.fullName ?? me.firstName ?? '',
         email:     me.email ?? '',
         lrId:      me.lrId ?? userId,
-        role:      mappedRole,
-        adminRole: mappedRole === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
+        role:      isAdmin ? 'admin' : 'user',
+        roles,
       });
-      return { success: true, role: mappedRole };
+      return { success: true, role: isAdmin ? 'admin' : 'user' };
     } catch (err) {
       return { success: false, error: err.message ?? 'Google login failed.' };
     } finally {
@@ -125,20 +100,19 @@ export function AuthProvider({ children }) {
    */
   const hiddenLogin = async (credential, password) => {
     setLoading(true);
-    console.log("hiddenLogin",credential,password)
     try {
       const result = await apiHiddenLogin({ credential, password });
-      console.log({result})
-      const role = result.role === 'ADMIN' ? 'admin' : 'user';
+      const roles = Array.isArray(result.roles) ? result.roles : (result.role ? [result.role] : []);
+      const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
       setUser({
         userId:    result.userId,
         name:      result.name,
         email:     result.email,
         lrId:      result.lrId,
-        role,
-        adminRole: role === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
+        role:      isAdmin ? 'admin' : 'user',
+        roles,
       });
-      return { success: true, role };
+      return { success: true, role: isAdmin ? 'admin' : 'user' };
     } catch (err) {
       let message = err.message ?? 'Hidden login failed.';
       if (err.status === 401) message = 'Invalid super password.';
@@ -158,16 +132,17 @@ export function AuthProvider({ children }) {
     setLoading(true);
     try {
       const result = await verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue });
-      const role = (Array.isArray(result.role) ? result.role[0] : result.role) === 'ADMIN' ? 'admin' : 'user';
+      const roles = Array.isArray(result.roles) ? result.roles : (result.role ? [result.role] : []);
+      const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
       setUser({
         userId:    result.userId,
         name:      result.name   ?? '',
         email:     result.email  ?? '',
         lrId:      result.lrId   ?? result.userId,
-        role,
-        adminRole: role === 'admin' ? (getAdminRole() || DEFAULT_ADMIN_ROLE) : undefined,
+        role:      isAdmin ? 'admin' : 'user',
+        roles,
       });
-      return { success: true, role };
+      return { success: true, role: isAdmin ? 'admin' : 'user' };
     } catch (err) {
       let message = err.message ?? 'OTP verification failed.';
       if (err.status === 401) message = 'Invalid or expired OTP.';
@@ -178,7 +153,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, otpLogin, setAdminRole, demoLogin, loading, isLoggedIn: !!user }}>
+    <AuthContext.Provider value={{ user, login, logout, hiddenLogin, googleLogin, otpLogin, loading, isLoggedIn: !!user }}>
       {children}
     </AuthContext.Provider>
   );

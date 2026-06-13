@@ -68,7 +68,7 @@ import TopLenders from './pages/admin/stats/TopLenders.jsx';
 import TotalAssets from './pages/admin/stats/TotalAssets.jsx';
 import InterestPrincipal from './pages/admin/stats/InterestPrincipal.jsx';
 
-import { DEFAULT_ADMIN_ROLE, hasPermission, ROUTE_PERM_MAP } from './config/adminRoles.js';
+import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -143,14 +143,14 @@ function RequireAuth({ children, role }) {
 }
 
 // ─── Admin permission guard ───────────────────────────────────────────────────
-// Wraps a single admin route. If the current adminRole lacks the required
-// permission, redirects to /admin/dashboard (the one page all roles can see).
+// Wraps a single admin route. If the current user's roles lack the required
+// permission, redirects to the first accessible route for their roles.
 function RequireAdminPerm({ routeKey, children }) {
   const { user } = useAuth();
-  const adminRole = user?.adminRole ?? DEFAULT_ADMIN_ROLE;
+  const roles = user?.roles ?? [];
   const perm = ROUTE_PERM_MAP[routeKey];
-  if (perm && !hasPermission(adminRole, perm)) {
-    return <Navigate replace to="/admin/dashboard" />;
+  if (perm && !hasPermission(roles, perm)) {
+    return <Navigate replace to={getDefaultAdminRoute(roles)} />;
   }
   return children;
 }
@@ -244,9 +244,9 @@ function AppRoutes() {
   return (
     <Routes>
       {/* Public routes */}
-      <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <Login />} />
-      <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <LoginOTP />} />
-      <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? '/admin' : '/dashboard'} /> : <HiddenLogin />} />
+      <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <Login />} />
+      <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
+      <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
       <Route path="/oauth/callback" element={<OAuthCallback />} />
       <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />
       <Route path="/support"  element={<PreLoginContact />} />

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { hasPermission, PERM, ADMIN_ROLES as ADMIN_ROLES_MAP } from '../config/adminRoles';
+import { hasPermission, PERM, ADMIN_ROLES } from '../config/adminRoles';
 
 const HomeIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
 const CheckIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>;
@@ -67,10 +67,20 @@ function AdminSidebarContent({ onClose }) {
   const { logout, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const adminRole = user?.adminRole ?? 'SUPERADMIN';
+  const roles = user?.roles ?? [];
 
   // Permission helper scoped to current user
-  const can = (perm) => hasPermission(adminRole, perm);
+  const can = (perm) => hasPermission(roles, perm);
+
+  // Determine the primary display role (first matching admin role, or ADMIN if present)
+  const getPrimaryRole = () => {
+    if (roles.includes('ADMIN')) return 'ADMIN';
+    for (const role of roles) {
+      if (ADMIN_ROLES[role]) return role;
+    }
+    return null;
+  };
+  const primaryRole = getPrimaryRole();
 
   const isAssetActive    = location.pathname.startsWith('/admin/assets');
   const isInterestActive = location.pathname.startsWith('/admin/interest');
@@ -111,8 +121,8 @@ function AdminSidebarContent({ onClose }) {
       <div className="px-5 pt-5 pb-2 flex items-center justify-between">
         <span className="admin-sidebar-section-label">Admin Panel</span>
         {/* Role badge */}
-        {user?.adminRole && user.adminRole !== 'SUPERADMIN' && (() => {
-          const def = ADMIN_ROLES_MAP[user.adminRole];
+        {primaryRole && primaryRole !== 'ADMIN' && (() => {
+          const def = ADMIN_ROLES[primaryRole];
           return def ? (
             <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
               style={{ background: `${def.color}18`, color: def.color, border: `1px solid ${def.color}30` }}>

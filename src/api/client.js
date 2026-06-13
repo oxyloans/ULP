@@ -4,10 +4,10 @@
  * Central axios client.
  * Base URL: https://meta.oxyloans.com/api
  *
- * Storage keys (mirrors legacy app):
- *   ACCESS_TOKEN  → localStorage
- *   USERID        → localStorage
- *   ROLES         → localStorage  (e.g. "INVESTOR" | "ADMIN")
+ * Storage keys:
+ *   ACCESS_TOKEN  → sessionStorage
+ *   USERID        → sessionStorage
+ *   ROLES         → sessionStorage  (array of role strings, e.g. ["ADMIN"], ["CEO", "ACCOUNTS_MANAGER"])
  */
 
 import axios from 'axios';
@@ -17,24 +17,24 @@ export const BASE_URL    = 'https://meta.oxyloans.com/api';
 export const ACCESS_TOKEN = 'accessToken';
 export const USERID       = 'userId';
 export const ROLES        = 'roles';
-export const ADMIN_ROLE   = 'adminRole';
 
 // ─── Token helpers ────────────────────────────────────────────────────────────
 export const getToken      = ()      => sessionStorage.getItem(ACCESS_TOKEN) ?? '';
 export const getUserId     = ()      => sessionStorage.getItem(USERID) ?? '';
-export const getRole       = ()      => sessionStorage.getItem(ROLES) ?? '';
-export const getAdminRole  = ()      => sessionStorage.getItem(ADMIN_ROLE) ?? '';
-export const setSession = ({ accessToken, userId, role, adminRole }) => {
+export const getRoles      = ()      => {
+  const raw = sessionStorage.getItem(ROLES);
+  if (!raw) return [];
+  try { return JSON.parse(raw); } catch { return raw ? [raw] : []; }
+};
+export const setSession = ({ accessToken, userId, roles }) => {
   sessionStorage.setItem(ACCESS_TOKEN, accessToken);
   sessionStorage.setItem(USERID,       userId);
-  sessionStorage.setItem(ROLES,        role);
-  if (adminRole) sessionStorage.setItem(ADMIN_ROLE, adminRole);
+  sessionStorage.setItem(ROLES,        JSON.stringify(roles ?? []));
 };
 export const clearSession = () => {
   sessionStorage.removeItem(ACCESS_TOKEN);
   sessionStorage.removeItem(USERID);
   sessionStorage.removeItem(ROLES);
-  sessionStorage.removeItem(ADMIN_ROLE);
 };
 
 // ─── Axios instance ───────────────────────────────────────────────────────────

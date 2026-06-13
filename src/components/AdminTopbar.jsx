@@ -1,7 +1,7 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
 import { useAuth } from '../context/AuthContext';
-import { ADMIN_ROLES } from '../config/adminRoles';
+import { hasPermission, ADMIN_ROLES, PERM } from '../config/adminRoles';
 import logo from '../assets/WULP.png';
 
 const MenuIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>;
@@ -15,13 +15,26 @@ function getGreeting() {
   return 'Evening';
 }
 
+// Determine the primary role for display
+function getPrimaryRole(roles) {
+  if (!roles || !roles.length) return null;
+  if (roles.includes('ADMIN')) return 'ADMIN';
+  for (const role of roles) {
+    if (ADMIN_ROLES[role]) return role;
+  }
+  return null;
+}
+
 export default function AdminTopbar({ onMenuClick }) {
   const navigate = useNavigate();
   const { logout, user } = useAuth();
-  const adminRole = user?.adminRole ?? 'SUPERADMIN';
-  const roleDef   = ADMIN_ROLES[adminRole];
-  const isSuperAdmin = adminRole === 'SUPERADMIN';
-  const displayName  = user?.name || (isSuperAdmin ? 'Admin' : roleDef?.label ?? 'Admin');
+  const roles = user?.roles ?? [];
+  const primaryRole = getPrimaryRole(roles);
+  const roleDef   = primaryRole ? ADMIN_ROLES[primaryRole] : null;
+  const isSuperAdmin = primaryRole === 'SUPERADMIN';
+  const canManageAssets = hasPermission(roles, PERM.ASSETS);
+  const canManageInterest = hasPermission(roles, PERM.INTEREST);
+  const displayName  = user?.name || (primaryRole ? roleDef?.label : 'Admin');
   const initial = displayName.charAt(0).toUpperCase();
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); };
 
@@ -49,22 +62,6 @@ export default function AdminTopbar({ onMenuClick }) {
           {/* <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>{displayName}</span> */}
         </span>
 
-        {/* Role badge — always visible, colored per role */}
-        {/* <span className="hidden sm:inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold flex-shrink-0"
-          style={{
-            background: `${roleDef?.color ?? '#a855f7'}18`,
-            border: `1px solid ${roleDef?.color ?? '#a855f7'}35`,
-            color: roleDef?.color ?? '#c084fc',
-          }}>
-          {roleDef?.label ?? 'Admin'}
-          {user?.isDemo && (
-            <span className="ml-0.5 px-1 py-px rounded text-xs font-black"
-              style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', fontSize: 9 }}>
-              DEMO
-            </span>
-          )}
-        </span> */}
-
         <div className="flex items-center gap-1 px-2 py-0.5 rounded-full flex-shrink-0"
           style={{ background: 'rgba(255,255,255,0.16)', border: '1px solid rgba(255,255,255,0.34)' }}>
           <span className="rounded-full" style={{ width: 5, height: 5, background: '#22c55e', display: 'inline-block', animation: 'livePulse 2s infinite' }} />
@@ -75,28 +72,32 @@ export default function AdminTopbar({ onMenuClick }) {
       {/* Right: actions */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
         {/* Quick-links only for roles that have access */}
-        {isSuperAdmin && (
+        {(isSuperAdmin || canManageAssets || canManageInterest) && (
           <>
-            <NavLink to="/admin/assets/load"
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
-              style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'rgba(255,255,255,0.16)',
-                border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
-                color: '#fff',
-                boxShadow: isActive ? '0 4px 12px rgba(37,99,235,0.35)' : 'none',
-              })}>
-              Load Asset
-            </NavLink>
-            <NavLink to="/admin/interest/sd-lot"
-              className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
-              style={({ isActive }) => ({
-                background: isActive ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(255,255,255,0.16)',
-                border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
-                color: '#fff',
-              })}>
-              <ShieldIcon />
-              Interest Payout
-            </NavLink>
+            {(isSuperAdmin || canManageAssets) && (
+              <NavLink to="/admin/assets/load"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                style={({ isActive }) => ({
+                  background: isActive ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'rgba(255,255,255,0.16)',
+                  border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
+                  color: '#fff',
+                  boxShadow: isActive ? '0 4px 12px rgba(37,99,235,0.35)' : 'none',
+                })}>
+                Load Asset
+              </NavLink>
+            )}
+            {(isSuperAdmin || canManageInterest) && (
+              <NavLink to="/admin/interest/sd-lot"
+                className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                style={({ isActive }) => ({
+                  background: isActive ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(255,255,255,0.16)',
+                  border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
+                  color: '#fff',
+                })}>
+                <ShieldIcon />
+                Interest Payout
+              </NavLink>
+            )}
           </>
         )}
         <ThemeToggle />

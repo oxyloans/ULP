@@ -7,7 +7,7 @@
  * Real endpoint:
  *   POST https://meta.oxyloans.com/api/auth-service/auth/sign-in
  *   Body:     { email, password }
- *   Response: { accessToken, userId, roles: [{ name: 'INVESTOR' | 'ADMIN' }] }
+ *   Response: { accessToken, userId, roles: [{ name: 'INVESTOR' | 'ADMIN' | 'CEO' | 'ACCOUNTS_MANAGER' | 'WALLET_OPS' | 'HELPDESK' }] }
  *
  * Demo credentials (USE_DUMMY path):
  *   User  → LR-1001 / pass123
@@ -20,8 +20,8 @@ const SIGN_IN = '/auth-service/auth/sign-in';
 
 // ─── Demo users (shown when USE_DUMMY = true) ─────────────────────────────────
 const DEMO_USERS = {
-  'LR-1001': { password: 'pass123',  name: 'Rajesh Varma', role: 'INVESTOR', userId: 'USR-001', email: 'rajesh@example.com', lrId: 'LR-1001' },
-  'ADMIN':   { password: 'admin123', name: 'Admin',         role: 'ADMIN',    userId: 'ADMIN',   email: 'admin@oxyloans.com', lrId: 'ADMIN'   },
+  'LR-1001': { password: 'pass123',  name: 'Rajesh Varma', roles: ['INVESTOR'], userId: 'USR-001', email: 'rajesh@example.com', lrId: 'LR-1001' },
+  'ADMIN':   { password: 'admin123', name: 'Admin',         roles: ['ADMIN'],    userId: 'ADMIN',   email: 'admin@oxyloans.com', lrId: 'ADMIN'   },
 };
 
 // ─── Login (user + admin) ─────────────────────────────────────────────────────
@@ -33,7 +33,7 @@ const DEMO_USERS = {
  * - Email   → POST { email, password }
  * - Mobile  → POST { mobileNumber, password }
  *
- * Returns: { accessToken, userId, role, name, email, lrId }
+ * Returns: { accessToken, userId, roles: string[], name, email, lrId }
  * Throws:  Error with .status on failure
  */
 
@@ -50,8 +50,8 @@ export async function login({ credential, password }) {
       const err = new Error('Invalid credentials'); err.status = 401; throw err;
     }
     const accessToken = `demo-token-${Date.now()}`;
-    setSession({ accessToken, userId: u.userId, role: u.role });
-    return { accessToken, userId: u.userId, role: u.role, name: u.name, email: u.email, lrId: u.lrId };
+    setSession({ accessToken, userId: u.userId, roles: u.roles });
+    return { accessToken, userId: u.userId, roles: u.roles, name: u.name, email: u.email, lrId: u.lrId };
   }
 
   // ── Real API path ───────────────────────────────────────────────────────────
@@ -71,18 +71,18 @@ export async function login({ credential, password }) {
 
   const accessToken = response.accessToken ?? response.access_token ?? '';
   const userId      = response.userId      ?? response.user_id      ?? '';
-  const role        = response.roles?.[0]?.name ?? 'INVESTOR';
+  const roles       = response.roles?.map(r => r.name).filter(Boolean) ?? [];
 
   if (!accessToken) {
     const err = new Error('Login failed — no token received.'); err.status = 500; throw err;
   }
 
-  setSession({ accessToken, userId, role });
+  setSession({ accessToken, userId, roles });
 
   return {
     accessToken,
     userId,
-    role,
+    roles,
     name:  response.name ?? response.fullName ?? credential,
     email: response.email ?? credential,
     lrId:  response.lrId  ?? userId,
@@ -96,7 +96,7 @@ export async function login({ credential, password }) {
  * Uses hardcoded super password. Accepts email or mobile number.
  * Calls: POST /auth-service/auth/registerwith_MobileAndEmail_HiddenLogin
  *
- * Returns: { accessToken, userId, role, name, email, lrId }
+ * Returns: { accessToken, userId, roles: string[], name, email, lrId }
  */
 const SUPER_PASSWORD = 'SUPERPASSWORD';
 
@@ -123,18 +123,18 @@ export async function hiddenLogin({ credential, password }) {
 
   const accessToken = response.accessToken ?? response.access_token ?? '';
   const userId      = response.userId      ?? response.user_id      ?? '';
-  const role        = response.roles?.[0]?.name ?? 'INVESTOR';
+  const roles       = response.roles?.map(r => r.name).filter(Boolean) ?? [];
 
   if (!accessToken) {
     const err = new Error('Hidden login failed — no token received.'); err.status = 500; throw err;
   }
 
-  setSession({ accessToken, userId, role });
+  setSession({ accessToken, userId, roles });
 
   return {
     accessToken,
     userId,
-    role,
+    roles,
     name:  response.name ?? response.fullName ?? credential,
     email: response.email ?? credential,
     lrId:  response.lrId  ?? userId,
@@ -233,7 +233,7 @@ export async function sendLoginOtp({ countryCode, mobileNumber }) {
 /**
  * verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue })
  * POST /auth-service/auth/registerwithMobileAndWhatsappNumber
- * Returns: { accessToken, userId, roles, ... }
+ * Returns: { accessToken, userId, roles: string[], ... }
  */
 export async function verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue }) {
   const response = await post(
@@ -252,13 +252,13 @@ export async function verifyLoginOtp({ countryCode, mobileNumber, otpSession, ot
 
   const accessToken = data?.accessToken ?? '';
   const userId      = data?.userId      ?? '';
-  const role        = data?.roles ?? data?.role ?? 'INVESTOR';
+  const roles       = data?.roles?.map(r => r.name).filter(Boolean) ?? (data?.role ? [data.role] : []);
 
   if (!accessToken) {
     const err = new Error('OTP verification failed — no token received.');
     err.status = 401; throw err;
   }
 
-  setSession({ accessToken, userId, role: Array.isArray(role) ? role[0] : role });
-  return { accessToken, userId, role: Array.isArray(role) ? role[0] : role };
+  setSession({ accessToken, userId, roles: Array.isArray(roles) ? roles : [roles] });
+  return { accessToken, userId, roles: Array.isArray(roles) ? roles : [roles] };
 }
