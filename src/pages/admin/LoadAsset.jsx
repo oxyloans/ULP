@@ -1,13 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { saveAssetBasedInfo, uploadSaleDeedDocument, getAllBorrowers } from '../../api/afterlogin-admin';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const REGISTRATION_TYPES = ['SALEDEED', 'AGPA'];
 const ASSET_TYPES        = ['PLOT', 'FLAT', 'ACRE'];
 
+// ─── Helper: parse projectName into string[] ──────────────────────────────────
+// API returns: [{ projectName: "string" }]  OR  a comma-separated string (legacy)
+const parseProjects = (projectName) => {
+  if (Array.isArray(projectName)) {
+    return projectName.map(p => (typeof p === 'object' ? p.projectName : p)).filter(Boolean);
+  }
+  return (projectName ?? '').split(',').map(s => s.trim()).filter(Boolean);
+};
+
+// ─── Helper: get today's date in yyyy-mm-dd format ───────────────────────────
+const getTodayDate = () => {
+  const now = new Date();
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const EMPTY = {
   borrowerId: '', borrowerName: '', projectName: '', documentNumber: '',
-  dateOfExecution: '', typeOfRegistration: '',
+  dateOfExecution: getTodayDate(), typeOfRegistration: '',
   documentValue: '', actualAssetValue: '', takenAssetValue: '',
   assetType: 'PLOT', plotNumber: '',
   assetUnit: '', assetArea: '', surveyNo: '', flatNumber: '',
@@ -29,6 +47,12 @@ const inputStyle = (err) => ({
   outline: 'none',
   fontFamily: 'inherit',
   transition: 'border-color 0.15s',
+});
+
+// Number input without spinner arrows (hides up/down arrows in Firefox)
+const numberInputStyle = (err) => ({
+  ...inputStyle(err),
+  MozAppearance: 'textfield', // Firefox
 });
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -118,6 +142,12 @@ export default function LoadAsset() {
       .finally(() => setBorrowersLoading(false));
   }, []);
 
+  // Computed: projects for the selected borrower
+  const projects = useMemo(() => {
+    const b = borrowers.find(x => x.id === form.borrowerId);
+    return b ? parseProjects(b.projectName) : [];
+  }, [form.borrowerId, borrowers]);
+
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => {
@@ -129,13 +159,14 @@ export default function LoadAsset() {
   // Each borrower is one record (projectName is comma-separated inside it)
   const handleBorrowerSelect = (borrowerId) => {
     const b = borrowers.find(x => x.id === borrowerId);
+    const projList = b ? parseProjects(b.projectName) : [];
     setForm(f => ({
       ...f,
       borrowerId,
       borrowerName: b?.borrowerName ?? '',
-      projectName:  f.projectName, // keep whatever the user typed
+      projectName:  projList[0] ?? '',
     }));
-    setErrors(e => ({ ...e, borrowerId: '', borrowerName: '' }));
+    setErrors(e => ({ ...e, borrowerId: '', projectName: '', borrowerName: '' }));
   };
 
   const validate = () => {
@@ -300,7 +331,7 @@ export default function LoadAsset() {
                   </option>
                   {borrowers.map(b => (
                     <option key={b.id} value={b.id}>
-                      {b.borrowerName}{b.projectName ? ` (${b.projectName})` : ''}
+                      {b.borrowerName}{parseProjects(b.projectName).length > 0 ? ` (${parseProjects(b.projectName).join(', ')})` : ''}
                     </option>
                   ))}
                 </select>
@@ -329,9 +360,44 @@ export default function LoadAsset() {
           </div>
 
           <Field label="Project Name" required error={errors.projectName}>
-            <input type="text" placeholder="Enter project name"
-              value={form.projectName} onChange={e => set('projectName', e.target.value)}
-              style={inputStyle(errors.projectName)} />
+            {projects.length > 0 ? (
+              <div className="relative">
+                <select
+                  value={form.projectName}
+                  onChange={e => set('projectName', e.target.value)}
+                  style={{
+                    ...inputStyle(errors.projectName),
+                    appearance: 'none',
+                    cursor: 'pointer',
+                    paddingRight: 36,
+                  }}
+                >
+                  <option value="">— Select project —</option>
+                  {projects.map((p, idx) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+                {/* chevron */}
+                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+                  style={{ color: 'var(--text-muted)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
+                    strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                    <polyline points="6 9 12 15 18 9"/>
+                  </svg>
+                </span>
+              </div>
+            ) : (
+              <input type="text" placeholder="Enter project name"
+                value={form.projectName} onChange={e => set('projectName', e.target.value)}
+                style={inputStyle(errors.projectName)} />
+            )}
+            {projects.length > 0 && (
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                {projects.length} project{projects.length !== 1 ? 's' : ''} available for this borrower
+              </p>
+            )}
           </Field>
 
           <Field label="Document Number" required error={errors.documentNumber}>
@@ -520,6 +586,18 @@ export default function LoadAsset() {
         </div>
 
       </form>
+      <style jsx global>{`
+        /* Hide number input spinners in WebKit browsers (Chrome, Edge, Safari) */
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+        /* Firefox */
+        input[type="number"] {
+          -moz-appearance: textfield;
+        }
+      `}</style>
     </div>
   );
 }

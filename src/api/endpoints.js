@@ -85,6 +85,12 @@ export const EP = {
   ADMIN_SUPPORT_REPLY:   (id) => `/admin-service/support/tickets/${id}/reply`,
 
   // ── Admin — Reports ────────────────────────────────────────────────────────
-  ADMIN_REVENUE_REPORT: '/admin-service/reports/revenue',
-  ADMIN_PLATFORM_STATS: '/admin-service/reports/platform-stats',
-};
+    ADMIN_REVENUE_REPORT: '/admin-service/reports/revenue',
+    ADMIN_PLATFORM_STATS: '/admin-service/reports/platform-stats',
+
+    // ── Admin — Funds Raised (OxyBrick) ──────────────────────────────────────
+    ADMIN_DEAL_WALLET_INFO: '/oxybrick-service/getAllDealAndWalletInfo',
+
+    // ── Admin — Top Lenders (OxyBrick) ───────────────────────────────────────
+    ADMIN_TOP_PARTICIPATION_LENDERS: '/oxybrick-service/topParticipationLenders',
+    };

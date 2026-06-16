@@ -216,6 +216,44 @@ export async function getPlatformStats() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// FUNDS RAISED (OxyBrick Deal & Wallet Info)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/getAllDealAndWalletInfo
+ * Returns: {
+ *   noOfParticipation: number,
+ *   noOfActiveDeals: number,
+ *   noOfRegisteredUsers: number | null,
+ *   migratedAmount: number,
+ *   systemAmount: number,
+ *   totalParticipatedAmount: number | null,
+ *   totalWalletAmount: number,
+ *   unUsedWalletAmount: number | null
+ * }
+ */
+export async function getAllDealAndWalletInfo() {
+  return get('/oxybrick-service/getAllDealAndWalletInfo');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// TOP PARTICIPATION LENDERS (OxyBrick)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/topParticipationLenders
+ * Returns: Array of {
+ *   participationAmount: number,
+ *   totalParticipationCount: number,
+ *   name: string,
+ *   userId: string
+ * }
+ */
+export async function getTopParticipationLenders() {
+  return get('/oxybrick-service/topParticipationLenders');
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // TOTAL USERS
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -311,6 +349,23 @@ export async function submitInterestApprovals(payload) {
  */
 export async function updateLenderInterestPayments(payload) {
   return patch('/api/oxybrick-service/updateLenderInterestPayments', payload);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ADMIN FY DATA (Interest/Principal)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/getAdminFyData?startDate={yyyy-mm-dd}&endDate={yyyy-mm-dd}
+ * Returns monthly lending and paid interest data for a financial year.
+ * Example response:
+ * [
+ *   { "totalPaidInterestAmount": 0, "totalLendingAmount": 2324000, "year": "2026", "monthName": "april" },
+ *   ...
+ * ]
+ */
+export async function getAdminFyData(startDate, endDate) {
+  return get(`/oxybrick-service/getAdminFyData?startDate=${startDate}&endDate=${endDate}`);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useRoleTheme } from '../context/RoleThemeContext';
 import { hasPermission, PERM, ADMIN_ROLES } from '../config/adminRoles';
 
 const HomeIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>;
@@ -65,6 +66,7 @@ const navItemsAfter = [
 
 function AdminSidebarContent({ onClose }) {
   const { logout, user } = useAuth();
+  const { theme } = useRoleTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const roles = user?.roles ?? [];
@@ -72,15 +74,17 @@ function AdminSidebarContent({ onClose }) {
   // Permission helper scoped to current user
   const can = (perm) => hasPermission(roles, perm);
 
-  // Determine the primary display role (first matching admin role, or ADMIN if present)
-  const getPrimaryRole = () => {
-    if (roles.includes('ADMIN')) return 'ADMIN';
-    for (const role of roles) {
-      if (ADMIN_ROLES[role]) return role;
-    }
-    return null;
-  };
-  const primaryRole = getPrimaryRole();
+  // Theme colors for consistent styling
+  const sidebarText = theme.sidebarText;
+  const sidebarHoverBg = theme.sidebarHoverBg;
+  const sidebarHoverColor = theme.sidebarHoverColor;
+  const sidebarBorder = theme.sidebarBorder;
+  const activeBg = theme.activeBg;
+  const activeIndicator = theme.activeIndicator;
+  const activeColor = theme.activeColor;
+  const primaryColor = theme.primary;
+  const gradient = theme.gradient;
+  const sidebarBg = theme.sidebarBg;
 
   const isAssetActive    = location.pathname.startsWith('/admin/assets');
   const isInterestActive = location.pathname.startsWith('/admin/interest');
@@ -114,36 +118,68 @@ function AdminSidebarContent({ onClose }) {
     setOpenSection(current => current === section ? null : section);
   };
 
+  // Primary role for display
+  const getPrimaryRole = () => {
+    if (roles.includes('ADMIN')) return 'ADMIN';
+    if (roles.includes('SUPERADMIN')) return 'SUPERADMIN';
+    for (const role of roles) {
+      if (ADMIN_ROLES[role]) return role;
+    }
+    return 'ADMIN';
+  };
+  const primaryRole = getPrimaryRole();
+  const roleDef = ADMIN_ROLES[primaryRole];
+
   const handleLogout = () => { logout(); navigate('/login', { replace: true }); onClose?.(); };
 
   return (
     <>
-      <div className="px-5 pt-5 pb-2 flex items-center justify-between">
-        <span className="admin-sidebar-section-label">Admin Panel</span>
-        {/* Role badge */}
-        {primaryRole && primaryRole !== 'ADMIN' && (() => {
-          const def = ADMIN_ROLES[primaryRole];
-          return def ? (
-            <span className="text-xs font-bold px-2 py-0.5 rounded-lg"
-              style={{ background: `${def.color}18`, color: def.color, border: `1px solid ${def.color}30` }}>
-              {def.label}
-            </span>
-          ) : null;
-        })()}
+      <div className="px-5 pt-5 pb-2 flex items-center justify-between" style={{ borderBottom: `1px solid ${sidebarBorder}`, paddingBottom: 12 }}>
+        <div className="flex flex-col gap-1">
+          <span className="admin-sidebar-section-label" style={{ color: sidebarText }}>Admin Panel</span>
+          {/* Role badge - always visible */}
+          <span className="text-xs font-bold px-2 py-0.5 rounded-lg w-fit"
+            style={{ 
+              background: gradient, 
+              color: '#ffffff', 
+              border: 'none',
+              boxShadow: `0 2px 8px ${primaryColor}40`,
+            }}>
+            {roleDef?.label ?? 'Admin'}
+          </span>
+        </div>
       </div>
-      <nav className="flex-1 px-3 pb-3 flex flex-col gap-0.5 overflow-y-auto">
+      <nav className="flex-1 px-3 pb-3 py-4 flex flex-col gap-0.5 overflow-y-auto">
         {navItemsBefore.filter(item => can(item.perm)).map(item => (
           <NavLink key={item.path} to={item.path} onClick={() => onClose?.()}
             className="admin-sidebar-item"
-            style={({ isActive }) => isActive
-              ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-              : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-            }>
+            style={({ isActive }) => ({
+              ...(isActive
+                ? {
+                    background: activeBg,
+                    borderLeft: `3px solid ${activeIndicator}`,
+                    color: activeColor,
+                    fontWeight: 700,
+                  }
+                : {
+                    background: 'transparent',
+                    borderLeft: '3px solid transparent',
+                    color: sidebarText,
+                  }),
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+            })}
+          >
             {({ isActive }) => (
               <>
-                <span className="admin-sidebar-icon" style={{ color: isActive ? '#c084fc' : undefined }}><item.Icon /></span>
-                <span className="admin-sidebar-label">{item.title}</span>
-                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: '#c084fc', boxShadow: '0 0 6px #c084fc' }} />}
+                <span className="admin-sidebar-icon" style={{ 
+                  color: isActive ? activeIndicator : sidebarText,
+                  fontWeight: isActive ? 700 : 400,
+                }}><item.Icon /></span>
+                <span className="admin-sidebar-label" style={{ 
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? activeColor : 'inherit',
+                }}>{item.title}</span>
               </>
             )}
           </NavLink>
@@ -155,12 +191,31 @@ function AdminSidebarContent({ onClose }) {
             <button
               onClick={() => toggleSection('migrated')}
               className="admin-sidebar-item w-full text-left"
-              style={isMigratedActive
-                ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-                : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-              }>
-              <span className="admin-sidebar-icon" style={{ color: isMigratedActive ? '#c084fc' : undefined }}><MigrateIcon2 /></span>
-              <span className="admin-sidebar-label">Migrated</span>
+              style={{
+                ...(isMigratedActive
+                  ? {
+                      background: activeBg,
+                      borderLeft: `3px solid ${activeIndicator}`,
+                      color: activeColor,
+                      fontWeight: 700,
+                    }
+                  : {
+                      background: 'transparent',
+                      borderLeft: '3px solid transparent',
+                      color: sidebarText,
+                    }),
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="admin-sidebar-icon" style={{ 
+                color: isMigratedActive ? activeIndicator : sidebarText,
+                fontWeight: isMigratedActive ? 700 : 400,
+              }}><MigrateIcon2 /></span>
+              <span className="admin-sidebar-label" style={{ 
+                fontWeight: isMigratedActive ? 700 : 500,
+                color: isMigratedActive ? activeColor : 'inherit',
+              }}>Migrated</span>
               <span className="ml-auto"><ChevronDown open={migratedOpen} /></span>
             </button>
             {migratedOpen && (
@@ -168,16 +223,22 @@ function AdminSidebarContent({ onClose }) {
                 {migratedSubItems.map(sub => (
                   <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
                     className="admin-sidebar-item text-xs"
-                    style={({ isActive }) => isActive
-                      ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
-                      : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-                    }>
+                    style={({ isActive }) => ({
+                      background: isActive ? activeBg : 'transparent',
+                      borderRadius: '6px',
+                      color: isActive ? activeColor : sidebarText,
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                    })}
+                  >
                     {({ isActive }) => (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
-                          style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
-                        <span className="admin-sidebar-label">{sub.title}</span>
-                        {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                          style={{ background: isActive ? activeIndicator : sidebarBorder }} />
+                        <span className="admin-sidebar-label" style={{ 
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? activeColor : 'inherit',
+                        }}>{sub.title}</span>
                       </>
                     )}
                   </NavLink>
@@ -193,12 +254,31 @@ function AdminSidebarContent({ onClose }) {
             <button
               onClick={() => toggleSection('wallet')}
               className="admin-sidebar-item w-full text-left"
-              style={isWalletActive
-                ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-                : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-              }>
-              <span className="admin-sidebar-icon" style={{ color: isWalletActive ? '#c084fc' : undefined }}><WalletIcon /></span>
-              <span className="admin-sidebar-label">Wallet</span>
+              style={{
+                ...(isWalletActive
+                  ? {
+                      background: activeBg,
+                      borderLeft: `3px solid ${activeIndicator}`,
+                      color: activeColor,
+                      fontWeight: 700,
+                    }
+                  : {
+                      background: 'transparent',
+                      borderLeft: '3px solid transparent',
+                      color: sidebarText,
+                    }),
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="admin-sidebar-icon" style={{ 
+                color: isWalletActive ? activeIndicator : sidebarText,
+                fontWeight: isWalletActive ? 700 : 400,
+              }}><WalletIcon /></span>
+              <span className="admin-sidebar-label" style={{ 
+                fontWeight: isWalletActive ? 700 : 500,
+                color: isWalletActive ? activeColor : 'inherit',
+              }}>Wallet</span>
               <span className="ml-auto"><ChevronDown open={walletOpen} /></span>
             </button>
             {walletOpen && (
@@ -206,16 +286,22 @@ function AdminSidebarContent({ onClose }) {
                 {walletSubItems.map(sub => (
                   <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
                     className="admin-sidebar-item text-xs"
-                    style={({ isActive }) => isActive
-                      ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
-                      : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-                    }>
+                    style={({ isActive }) => ({
+                      background: isActive ? activeBg : 'transparent',
+                      borderRadius: '6px',
+                      color: isActive ? activeColor : sidebarText,
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                    })}
+                  >
                     {({ isActive }) => (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
-                          style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
-                        <span className="admin-sidebar-label">{sub.title}</span>
-                        {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                          style={{ background: isActive ? activeIndicator : sidebarBorder }} />
+                        <span className="admin-sidebar-label" style={{ 
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? activeColor : 'inherit',
+                        }}>{sub.title}</span>
                       </>
                     )}
                   </NavLink>
@@ -231,12 +317,31 @@ function AdminSidebarContent({ onClose }) {
             <button
               onClick={() => toggleSection('interest')}
               className="admin-sidebar-item w-full text-left"
-              style={isInterestActive
-                ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-                : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-              }>
-              <span className="admin-sidebar-icon" style={{ color: isInterestActive ? '#c084fc' : undefined }}><CoinIcon /></span>
-              <span className="admin-sidebar-label">Interest Payout</span>
+              style={{
+                ...(isInterestActive
+                  ? {
+                      background: activeBg,
+                      borderLeft: `3px solid ${activeIndicator}`,
+                      color: activeColor,
+                      fontWeight: 700,
+                    }
+                  : {
+                      background: 'transparent',
+                      borderLeft: '3px solid transparent',
+                      color: sidebarText,
+                    }),
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="admin-sidebar-icon" style={{ 
+                color: isInterestActive ? activeIndicator : sidebarText,
+                fontWeight: isInterestActive ? 700 : 400,
+              }}><CoinIcon /></span>
+              <span className="admin-sidebar-label" style={{ 
+                fontWeight: isInterestActive ? 700 : 500,
+                color: isInterestActive ? activeColor : 'inherit',
+              }}>Interest Payout</span>
               <span className="ml-auto"><ChevronDown open={interestOpen} /></span>
             </button>
             {interestOpen && (
@@ -244,16 +349,22 @@ function AdminSidebarContent({ onClose }) {
                 {interestSubItems.map(sub => (
                   <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
                     className="admin-sidebar-item text-xs"
-                    style={({ isActive }) => isActive
-                      ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
-                      : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-                    }>
+                    style={({ isActive }) => ({
+                      background: isActive ? activeBg : 'transparent',
+                      borderRadius: '6px',
+                      color: isActive ? activeColor : sidebarText,
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                    })}
+                  >
                     {({ isActive }) => (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
-                          style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
-                        <span className="admin-sidebar-label">{sub.title}</span>
-                        {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                          style={{ background: isActive ? activeIndicator : sidebarBorder }} />
+                        <span className="admin-sidebar-label" style={{ 
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? activeColor : 'inherit',
+                        }}>{sub.title}</span>
                       </>
                     )}
                   </NavLink>
@@ -269,12 +380,31 @@ function AdminSidebarContent({ onClose }) {
             <button
               onClick={() => toggleSection('stats')}
               className="admin-sidebar-item w-full text-left"
-              style={isStatsActive
-                ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-                : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-              }>
-              <span className="admin-sidebar-icon" style={{ color: isStatsActive ? '#c084fc' : undefined }}><BarChartIcon /></span>
-              <span className="admin-sidebar-label">Stats</span>
+              style={{
+                ...(isStatsActive
+                  ? {
+                      background: activeBg,
+                      borderLeft: `3px solid ${activeIndicator}`,
+                      color: activeColor,
+                      fontWeight: 700,
+                    }
+                  : {
+                      background: 'transparent',
+                      borderLeft: '3px solid transparent',
+                      color: sidebarText,
+                    }),
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="admin-sidebar-icon" style={{ 
+                color: isStatsActive ? activeIndicator : sidebarText,
+                fontWeight: isStatsActive ? 700 : 400,
+              }}><BarChartIcon /></span>
+              <span className="admin-sidebar-label" style={{ 
+                fontWeight: isStatsActive ? 700 : 500,
+                color: isStatsActive ? activeColor : 'inherit',
+              }}>Stats</span>
               <span className="ml-auto"><ChevronDown open={statsOpen} /></span>
             </button>
             {statsOpen && (
@@ -282,16 +412,22 @@ function AdminSidebarContent({ onClose }) {
                 {statsSubItems.map(sub => (
                   <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
                     className="admin-sidebar-item text-xs"
-                    style={({ isActive }) => isActive
-                      ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
-                      : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-                    }>
+                    style={({ isActive }) => ({
+                      background: isActive ? activeBg : 'transparent',
+                      borderRadius: '6px',
+                      color: isActive ? activeColor : sidebarText,
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                    })}
+                  >
                     {({ isActive }) => (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
-                          style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
-                        <span className="admin-sidebar-label">{sub.title}</span>
-                        {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                          style={{ background: isActive ? activeIndicator : sidebarBorder }} />
+                        <span className="admin-sidebar-label" style={{ 
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? activeColor : 'inherit',
+                        }}>{sub.title}</span>
                       </>
                     )}
                   </NavLink>
@@ -307,12 +443,31 @@ function AdminSidebarContent({ onClose }) {
             <button
               onClick={() => toggleSection('assets')}
               className="admin-sidebar-item w-full text-left"
-              style={isAssetActive
-                ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-                : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-              }>
-              <span className="admin-sidebar-icon" style={{ color: isAssetActive ? '#c084fc' : undefined }}><AssetIcon /></span>
-              <span className="admin-sidebar-label">Assets</span>
+              style={{
+                ...(isAssetActive
+                  ? {
+                      background: activeBg,
+                      borderLeft: `3px solid ${activeIndicator}`,
+                      color: activeColor,
+                      fontWeight: 700,
+                    }
+                  : {
+                      background: 'transparent',
+                      borderLeft: '3px solid transparent',
+                      color: sidebarText,
+                    }),
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="admin-sidebar-icon" style={{ 
+                color: isAssetActive ? activeIndicator : sidebarText,
+                fontWeight: isAssetActive ? 700 : 400,
+              }}><AssetIcon /></span>
+              <span className="admin-sidebar-label" style={{ 
+                fontWeight: isAssetActive ? 700 : 500,
+                color: isAssetActive ? activeColor : 'inherit',
+              }}>Assets</span>
               <span className="ml-auto"><ChevronDown open={assetOpen} /></span>
             </button>
             {assetOpen && (
@@ -320,16 +475,22 @@ function AdminSidebarContent({ onClose }) {
                 {assetSubItems.map(sub => (
                   <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
                     className="admin-sidebar-item text-xs"
-                    style={({ isActive }) => isActive
-                      ? { background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }
-                      : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-                    }>
+                    style={({ isActive }) => ({
+                      background: isActive ? activeBg : 'transparent',
+                      borderRadius: '6px',
+                      color: isActive ? activeColor : sidebarText,
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                    })}
+                  >
                     {({ isActive }) => (
                       <>
                         <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
-                          style={{ background: isActive ? '#c084fc' : 'rgba(168,85,247,0.35)' }} />
-                        <span className="admin-sidebar-label">{sub.title}</span>
-                        {isActive && <span className="ml-auto w-1 h-1 rounded-full" style={{ background: '#c084fc' }} />}
+                          style={{ background: isActive ? activeIndicator : sidebarBorder }} />
+                        <span className="admin-sidebar-label" style={{ 
+                          fontWeight: isActive ? 600 : 400,
+                          color: isActive ? activeColor : 'inherit',
+                        }}>{sub.title}</span>
                       </>
                     )}
                   </NavLink>
@@ -342,15 +503,33 @@ function AdminSidebarContent({ onClose }) {
         {navItemsAfter.filter(item => can(item.perm)).map(item => (
           <NavLink key={item.path} to={item.path} onClick={() => onClose?.()}
             className="admin-sidebar-item"
-            style={({ isActive }) => isActive
-              ? { background: 'linear-gradient(135deg,rgba(168,85,247,0.2),rgba(168,85,247,0.08))', border: '1px solid rgba(168,85,247,0.35)', color: '#c084fc', boxShadow: '0 2px 12px rgba(168,85,247,0.15)' }
-              : { background: 'transparent', border: '1px solid transparent', color: 'var(--admin-sidebar-text)' }
-            }>
+            style={({ isActive }) => ({
+              ...(isActive
+                ? {
+                    background: activeBg,
+                    borderLeft: `3px solid ${activeIndicator}`,
+                    color: activeColor,
+                    fontWeight: 700,
+                  }
+                : {
+                    background: 'transparent',
+                    borderLeft: '3px solid transparent',
+                    color: sidebarText,
+                  }),
+              borderRadius: '8px',
+              transition: 'all 0.2s ease',
+            })}
+          >
             {({ isActive }) => (
               <>
-                <span className="admin-sidebar-icon" style={{ color: isActive ? '#c084fc' : undefined }}><item.Icon /></span>
-                <span className="admin-sidebar-label">{item.title}</span>
-                {isActive && <span className="ml-auto w-1.5 h-1.5 rounded-full" style={{ background: '#c084fc', boxShadow: '0 0 6px #c084fc' }} />}
+                <span className="admin-sidebar-icon" style={{ 
+                  color: isActive ? activeIndicator : sidebarText,
+                  fontWeight: isActive ? 700 : 400,
+                }}><item.Icon /></span>
+                <span className="admin-sidebar-label" style={{ 
+                  fontWeight: isActive ? 700 : 500,
+                  color: isActive ? activeColor : 'inherit',
+                }}>{item.title}</span>
               </>
             )}
           </NavLink>
@@ -367,6 +546,7 @@ function AdminSidebarContent({ onClose }) {
 }
 
 export default function AdminSidebar({ mobileOpen, onClose }) {
+  const { theme } = useRoleTheme();
   return (
     <>
       {/* Desktop */}
@@ -379,10 +559,18 @@ export default function AdminSidebar({ mobileOpen, onClose }) {
         <div className="lg:hidden fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
           <aside className="relative flex flex-col w-[260px] h-full z-10"
-            style={{ background: 'var(--admin-sidebar-bg)', borderRight: '1px solid var(--admin-sidebar-border)', boxShadow: '4px 0 32px rgba(0,0,0,0.5)' }}>
+            style={{ 
+              background: theme.sidebarBg, 
+              borderRight: `1px solid ${theme.sidebarBorder}`, 
+              boxShadow: '4px 0 32px rgba(0,0,0,0.5)' 
+            }}>
             <button onClick={onClose}
               className="absolute top-4 right-4 w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(168,85,247,0.1)', border: '1px solid rgba(168,85,247,0.2)', color: '#c084fc' }}>
+              style={{ 
+                background: `${theme.primary}10`, 
+                border: `1px solid ${theme.primary}20`, 
+                color: theme.primary 
+              }}>
               <CloseIcon />
             </button>
             <AdminSidebarContent onClose={onClose} />

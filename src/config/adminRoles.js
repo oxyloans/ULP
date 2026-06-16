@@ -58,6 +58,11 @@ export const ADMIN_ROLES = {
     color:       '#10b981',
     permissions: [ PERM.INTEREST, PERM.WALLET ],
   },
+  ASSET_MANAGER: {
+    label:       'Asset Manager',
+    color:       '#8b5cf6',
+    permissions: [ PERM.ASSETS, PERM.BORROWERS ],
+  },
   WALLET_OPS: {
     label:       'Wallet Ops Manager',
     color:       '#f59e0b',
@@ -144,6 +149,7 @@ export const ROUTE_PERM_MAP = {
   'wallet-withdrawals':  PERM.WALLET,
   'interest/sd-lot':     PERM.INTEREST,
   'interest/asset':      PERM.INTEREST,
+
   'assets/load':         PERM.ASSETS,
   'assets/view':         PERM.ASSETS,
   'assets/allocated':    PERM.ASSETS,

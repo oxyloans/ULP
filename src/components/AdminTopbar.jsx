@@ -78,26 +78,27 @@ export default function AdminTopbar({ onMenuClick }) {
               <NavLink to="/admin/assets/load"
                 className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
                 style={({ isActive }) => ({
-                  background: isActive ? 'linear-gradient(135deg,#3b82f6,#2563eb)' : 'rgba(255,255,255,0.16)',
+                  background: isActive ? 'var(--role-gradient)' : 'rgba(255,255,255,0.16)',
                   border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
                   color: '#fff',
-                  boxShadow: isActive ? '0 4px 12px rgba(37,99,235,0.35)' : 'none',
-                })}>
-                Load Asset
-              </NavLink>
-            )}
+                  boxShadow: isActive ? '0 4px 12px var(--role-primary)' : 'none',
+                })}> 
+              Load Asset
+            </NavLink>
+          )}
             {(isSuperAdmin || canManageInterest) && (
               <NavLink to="/admin/interest/sd-lot"
                 className="hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
                 style={({ isActive }) => ({
-                  background: isActive ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(255,255,255,0.16)',
+                  background: isActive ? 'var(--role-gradient)' : 'rgba(255,255,255,0.16)',
                   border: isActive ? '1px solid transparent' : '1px solid rgba(255,255,255,0.32)',
                   color: '#fff',
-                })}>
-                <ShieldIcon />
-                Interest Payout
-              </NavLink>
-            )}
+                  boxShadow: isActive ? '0 4px 12px var(--role-primary)' : 'none',
+                })}> 
+              <ShieldIcon />
+              Interest Payout
+            </NavLink>
+          )}
           </>
         )}
         <ThemeToggle />
