@@ -401,7 +401,7 @@ export default function LoadAsset() {
           </Field>
 
           <Field label="Document Number" required error={errors.documentNumber}>
-            <input type="number" min="0" placeholder="0"
+            <input type="text" min="0" placeholder="0"
               value={form.documentNumber} onChange={e => set('documentNumber', e.target.value)}
               style={inputStyle(errors.documentNumber)} />
           </Field>
