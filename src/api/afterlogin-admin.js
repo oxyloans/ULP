@@ -419,3 +419,22 @@ export async function getAllBorrowers() {
 export async function saveBorrower(payload) {
   return patch('/oxybrick-service/saveBorrowerAssetDetails', payload);
 }
+
+/**
+ * POST /oxybrick-service/principalReturned
+ * Body: {
+ *   dealId: string,
+ *   userPrincipalRequest: [{ principalReturnedAmount: number, userId: string }]
+ * }
+ */
+export async function returnPrincipal(payload) {
+  return post('/oxybrick-service/principalReturned', payload);
+}
+
+/**
+ * GET /oxybrick-service/getPrincipalInterestInitiatedUsers
+ * Params: dealId, fileType (principal | principalinterest)
+ */
+export async function getPrincipalInterestInitiatedUsers(dealId, fileType) {
+  return get(`/oxybrick-service/getPrincipalInterestInitiatedUsers?dealId=${dealId}&fileType=${fileType}`);
+}

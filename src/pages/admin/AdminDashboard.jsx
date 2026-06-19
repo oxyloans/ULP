@@ -1,6 +1,6 @@
-﻿import { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getPlatformStats, getAdminDeals, getPendingApprovals, getAllUsers, getAdminOfflinePayments, getAdminOxyLoansDeals, getAdminProperties } from "../../api/afterlogin-admin";
+import { getPlatformStats, getAdminDeals, getPendingApprovals, getAllUsers, getAdminOfflinePayments, getAdminOxyLoansDeals, getAdminProperties, getAllDealAndWalletInfo } from "../../api/afterlogin-admin";
 import { formatINR } from "../../utils/currency";
 
 
@@ -51,7 +51,7 @@ function MiniBar({ data, color }) {
 
 function KpiCard({ label, value, sub, trend, color, Icon, chart }) {
   return (
-    <div className="relative rounded-2xl p-5 overflow-hidden cursor-default"
+    <div className="relative rounded-2xl p-3.5 overflow-hidden cursor-default"
       style={{
         background: `linear-gradient(135deg,${color}0e 0%,rgba(255,255,255,0.01) 100%)`,
         border: `1px solid ${color}22`,
@@ -67,22 +67,22 @@ function KpiCard({ label, value, sub, trend, color, Icon, chart }) {
       <div className="absolute top-0 left-0 right-0 h-px"
         style={{ background: `linear-gradient(90deg,transparent,${color}30,transparent)` }} />
       <div className="relative z-10">
-        <div className="flex items-start justify-between mb-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center"
+        <div className="flex items-center justify-between mb-2">
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center"
             style={{ background: `${color}14`, border: `1px solid ${color}25`, color }}>
             <Icon />
           </div>
           {trend && (
-            <div className="flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full"
+            <div className="flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full"
               style={{ background: 'rgba(16,185,129,0.1)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
               <I.TrendUp /><span>{trend}</span>
             </div>
           )}
         </div>
-        <p className="text-2xl font-extrabold tracking-tight mb-0.5" style={{ color: 'var(--text-primary)' }}>{value}</p>
-        <p className="text-xs font-semibold uppercase tracking-wider" style={{ color }}>{label}</p>
-        {sub && <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
-        {chart && <div className="mt-3"><MiniBar data={chart} color={color} /></div>}
+        <p className="text-xl font-extrabold tracking-tight mb-0.5" style={{ color: 'var(--text-primary)' }}>{value}</p>
+        <p className="text-[10px] font-bold uppercase tracking-wider" style={{ color }}>{label}</p>
+        {sub && <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{sub}</p>}
+        {chart && <div className="mt-2"><MiniBar data={chart} color={color} /></div>}
       </div>
     </div>
   );
@@ -134,6 +134,14 @@ function TableHead({ cols, accent = '#a855f7' }) {
 export default function AdminDashboard() {
   const navigate = useNavigate();
 
+  const getTodayString = () => {
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
   const [users,       setUsers]       = useState([]);
   const [deals,       setDeals]       = useState([]);
   const [testDeal,    setTestDeal]    = useState([]);
@@ -142,6 +150,8 @@ export default function AdminDashboard() {
   const [olDeals,     setOlDeals]     = useState([]);
   const [props,       setProps]       = useState([]);
   const [propSummary, setPropSummary] = useState({ total: 0, plots: { count: 0 }, flats: { count: 0 }, acres: { count: 0 }, villas: { count: 0 } });
+  const [sdSearch,    setSdSearch]    = useState('');
+  const [walletStats, setWalletStats] = useState(null);
 
   useEffect(() => {
     getAllUsers().then(d => { if (Array.isArray(d)) setUsers(d); }).catch(() => {});
@@ -154,6 +164,7 @@ export default function AdminDashboard() {
       if (d?.properties) setProps(d.properties);
       if (d?.summary)    setPropSummary(d.summary);
     }).catch(() => {});
+    getAllDealAndWalletInfo().then(d => setWalletStats(d)).catch(() => {});
   }, []);
 
   
@@ -165,10 +176,18 @@ export default function AdminDashboard() {
   const verifiedPay     = offPay.filter(p => p.status === 'Verified');
   const pendingPay      = offPay.filter(p => p.status === 'Pending');
 
-  const openLots    = deals.filter(l => l.dealStatus !== 'ACHIEVED');
-  const closedLots  = deals.filter(l => l.dealStatus === 'ACHIEVED');
   const totalRaised = 0; // not in API response
   const fmtINR = (n) => formatINR(n ?? 0);
+
+  const filteredSdDeals = deals.filter(lot => {
+    const todayStr = getTodayString();
+    const activeDate = lot.loanActiveDate ?? '';
+    const isToday = activeDate.startsWith(todayStr);
+    if (sdSearch) {
+      return isToday && lot.dealName?.toLowerCase().includes(sdSearch.toLowerCase());
+    }
+    return isToday;
+  });
 
   const olChart   = [0,0,0,0,0,0,0,0,0,0,0, olDeals.length];
   const offChart  = [0,0,0,0,0,0,0,0,0,0,0, offPay.length];
@@ -229,18 +248,89 @@ export default function AdminDashboard() {
       <div>
         <p className="text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Platform Metrics</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <KpiCard label="Total Members"    value={String(approvedMembers.length)} sub={`${pendingMembers.length} pending approval`}  trend="+3 this month" color="#a855f7" Icon={I.Users}    chart={userChart} />
-          <KpiCard label="OxyLoans Active"  value={String(activeDeals.length)}     sub={`${closedDeals.length} closed deals`}          trend="+12%"          color="#6366f1" Icon={I.Bank}     chart={olChart}   />
-          <KpiCard label="Offline Payments" value={String(verifiedPay.length)}     sub={`${pendingPay.length} pending review`}         trend="+5%"           color="#f59e0b" Icon={I.Package}  chart={offChart}  />
-          <KpiCard label="SD Lots Open"     value={String(openLots.length)}        sub={`${fmtINR(totalRaised)} raised total`}         trend="+2 this month" color="#10b981" Icon={I.SDLot}    chart={sdChart}   />
+          <KpiCard label="Total Members"    value={String(approvedMembers.length)} sub={`${pendingMembers.length} pending approval`}  trend="+3 this month" color="#a855f7" Icon={I.Users} />
+          <KpiCard label="OxyLoans Active"  value={String(activeDeals.length)}     sub={`${closedDeals.length} closed deals`}          trend="+12%"          color="#6366f1" Icon={I.Bank}  />
+          <KpiCard label="Offline Payments" value={String(verifiedPay.length)}     sub={`${pendingPay.length} pending review`}         trend="+5%"           color="#f59e0b" Icon={I.Package} />
+          <KpiCard label="SD Lots Open"     value={String(deals.filter(l => l.dealStatus !== 'ACHIEVED').length)} sub={`${fmtINR(totalRaised)} raised total`}         trend="+2 this month" color="#10b981" Icon={I.SDLot} />
+        </div>
+      </div>
+
+      {/* ── Admin Quick Access ── */}
+      <div>
+        <p className="text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Quick Actions</p>
+        <div className="grid gap-3 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          {[
+            { label: 'Create Deal', path: '/admin/create-deal', color: '#6366f1', desc: 'Launch new deals', icon: <I.Plus /> },
+            { label: 'P&I Returns', path: '/admin/interest/principal-interest', color: '#a855f7', desc: 'Process user returns', icon: <I.Rupee /> },
+            { label: 'Offline Deals', path: '/admin/offline', color: '#10b981', desc: 'View offline investors', icon: <I.Package /> },
+            { label: 'Wallet Approvals', path: '/admin/wallet-approvals', color: '#f59e0b', desc: 'Manage funds request', icon: <I.Clock /> },
+            { label: 'Properties', path: '/admin/properties', color: '#10b981', desc: 'OxyBricks listings', icon: <I.Building /> },
+            { label: 'Platform Stats', path: '/admin/stats/funds-raised', color: '#6366f1', desc: 'Analyze funds metrics', icon: <I.BarChart /> },
+          ].map(action => (
+            <button
+              key={action.label}
+              onClick={() => navigate(action.path)}
+              className="group p-3.5 rounded-2xl text-left border transition-all hover:scale-[1.03] active:scale-95 flex flex-col justify-between"
+              style={{
+                background: 'var(--surface-card)',
+                borderColor: 'var(--border)',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.03)',
+                height: '110px'
+              }}
+            >
+              <div className="flex items-center justify-between w-full mb-1">
+                <div className="w-8 h-8 rounded-xl flex items-center justify-center transition-all group-hover:scale-110"
+                  style={{ background: `${action.color}15`, color: action.color }}>
+                  {action.icon}
+                </div>
+                <span className="text-[10px] font-bold opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: action.color }}>
+                  Go &rarr;
+                </span>
+              </div>
+              <div>
+                <p className="text-[12px] font-black leading-tight" style={{ color: 'var(--text-primary)' }}>{action.label}</p>
+                <p className="text-[9px] mt-0.5" style={{ color: 'var(--text-muted)' }}>{action.desc}</p>
+              </div>
+            </button>
+          ))}
         </div>
       </div>
 
       {/* ── SD Lot Running Deals ── */}
       <div>
         <div className="flex items-center justify-between mb-3 flex-wrap gap-3">
-          <div>
-            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>SD Lot Deals</p>
+          <div className="flex items-center gap-4 flex-wrap flex-1">
+            <div>
+              <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: 'var(--text-muted)' }}>Today SD Lot Deals</p>
+            </div>
+            <div className="relative max-w-xs flex-1">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Search deal name..."
+                value={sdSearch}
+                onChange={e => setSdSearch(e.target.value)}
+                className="w-full text-xs font-semibold rounded-xl outline-none"
+                style={{
+                  padding: '7px 10px 7px 30px',
+                  background: 'var(--input-bg)',
+                  border: '1px solid var(--border)',
+                  color: 'var(--text-primary)'
+                }}
+              />
+            </div>
+            {/* {!sdSearch && (
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {deals.length} Total
+              </span>
+            )} */}
+            {sdSearch && (
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {filteredSdDeals.length} Found
+              </span>
+            )}
           </div>
           <button
             onClick={() => navigate('/admin/create-deal')}
@@ -249,8 +339,11 @@ export default function AdminDashboard() {
             <I.Plus /> Create New Deal
           </button>
         </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4">
-          {deals.map(lot => {
+
+        {/* Scrollable Container to prevent excessive vertical scrolling */}
+        <div className="max-h-[440px] overflow-y-auto pr-1.5 grid gap-4 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-4 custom-scrollbar"
+          style={{ scrollbarWidth: 'thin' }}>
+          {filteredSdDeals.map(lot => {
             const isOpen = lot.dealStatus !== 'ACHIEVED';
             return (
               <div key={lot.id ?? lot.dealName} className="rounded-2xl p-4 flex flex-col gap-3"
@@ -318,8 +411,141 @@ export default function AdminDashboard() {
               </div>
             );
           })}
+          {filteredSdDeals.length === 0 && (
+            <div className="col-span-full py-16 text-center rounded-2xl"
+              style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              No deals launched today
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Financial Health & Wallet Stats ── */}
+      {walletStats && (
+        <div>
+          <p className="text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Platform Financial Health</p>
+          <div className="grid lg:grid-cols-2 gap-5">
+            {/* Card 1: Fund Allocation */}
+            <div className="rounded-2xl p-5 border flex flex-col justify-between"
+              style={{ background: 'var(--surface-card)', borderColor: 'var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-black text-purple-400 uppercase tracking-widest">Fund Allocation Split</h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                    style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.25)' }}>
+                    System vs Migrated
+                  </span>
+                </div>
+                
+                <div className="grid gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-neutral-400">TOTAL FUNDS RAISED</p>
+                    <p className="text-2xl font-black text-purple-500 font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      {fmtINR((walletStats.migratedAmount || 0) + (walletStats.systemAmount || 0))}
+                    </p>
+                  </div>
+
+                  {/* Progress bar split */}
+                  {(() => {
+                    const migrated = walletStats.migratedAmount || 0;
+                    const system = walletStats.systemAmount || 0;
+                    const total = migrated + system || 1;
+                    const migPct = Math.round((migrated / total) * 100);
+                    const sysPct = Math.round((system / total) * 100);
+
+                    return (
+                      <div className="grid gap-2">
+                        <div className="h-2.5 rounded-full overflow-hidden flex" style={{ background: 'var(--border)' }}>
+                          <div style={{ width: `${migPct}%`, background: '#a855f7' }} title={`Migrated: ${migPct}%`} />
+                          <div style={{ width: `${sysPct}%`, background: '#10b981' }} title={`System: ${sysPct}%`} />
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs mt-1 flex-wrap gap-2">
+                          <div className="flex items-center gap-1.5 font-semibold">
+                            <span className="w-2 h-2 rounded-full" style={{ background: '#a855f7' }} />
+                            <span style={{ color: 'var(--text-muted)' }}>Migrated ({migPct}%):</span>
+                            <span className="font-mono text-purple-400">{fmtINR(migrated)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 font-semibold">
+                            <span className="w-2 h-2 rounded-full" style={{ background: '#10b981' }} />
+                            <span style={{ color: 'var(--text-muted)' }}>System ({sysPct}%):</span>
+                            <span className="font-mono text-emerald-400">{fmtINR(system)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="pt-4 mt-4 border-t flex justify-between items-center text-xs" style={{ borderColor: 'var(--border)' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Total Participations: <strong style={{ color: 'var(--text-primary)' }}>{walletStats.noOfParticipation ?? 0}</strong></span>
+                <span style={{ color: 'var(--text-muted)' }}>Active Deals: <strong style={{ color: 'var(--text-primary)' }}>{walletStats.noOfActiveDeals ?? 0}</strong></span>
+              </div>
+            </div>
+
+            {/* Card 2: Wallet Capitalization */}
+            <div className="rounded-2xl p-5 border flex flex-col justify-between"
+              style={{ background: 'var(--surface-card)', borderColor: 'var(--border)', boxShadow: '0 4px 20px rgba(0,0,0,0.05)' }}>
+              <div>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-xs font-black text-emerald-400 uppercase tracking-widest">Wallet Capitalization</h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold"
+                    style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
+                    Utilization Rate
+                  </span>
+                </div>
+                
+                <div className="grid gap-4">
+                  <div>
+                    <p className="text-[10px] font-bold text-neutral-400">TOTAL WALLET CASH BALANCE</p>
+                    <p className="text-2xl font-black text-emerald-500 font-mono mt-0.5" style={{ fontFamily: "'JetBrains Mono', monospace" }}>
+                      {fmtINR(walletStats.totalWalletAmount || 0)}
+                    </p>
+                  </div>
+
+                  {/* Progress bar split */}
+                  {(() => {
+                    const totalWallet = walletStats.totalWalletAmount || 0;
+                    const unusedWallet = walletStats.unUsedWalletAmount || 0;
+                    const usedWallet = Math.max(0, totalWallet - unusedWallet);
+                    const total = totalWallet || 1;
+                    const usedPct = Math.round((usedWallet / total) * 100);
+                    const unusedPct = Math.round((unusedWallet / total) * 100);
+
+                    return (
+                      <div className="grid gap-2">
+                        <div className="h-2.5 rounded-full overflow-hidden flex" style={{ background: 'var(--border)' }}>
+                          <div style={{ width: `${usedPct}%`, background: '#6366f1' }} title={`Used: ${usedPct}%`} />
+                          <div style={{ width: `${unusedPct}%`, background: '#f59e0b' }} title={`Unused: ${unusedPct}%`} />
+                        </div>
+
+                        <div className="flex justify-between items-center text-xs mt-1 flex-wrap gap-2">
+                          <div className="flex items-center gap-1.5 font-semibold">
+                            <span className="w-2 h-2 rounded-full" style={{ background: '#6366f1' }} />
+                            <span style={{ color: 'var(--text-muted)' }}>Invested ({usedPct}%):</span>
+                            <span className="font-mono text-indigo-400">{fmtINR(usedWallet)}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 font-semibold">
+                            <span className="w-2 h-2 rounded-full" style={{ background: '#f59e0b' }} />
+                            <span style={{ color: 'var(--text-muted)' }}>Unused ({unusedPct}%):</span>
+                            <span className="font-mono text-amber-500">{fmtINR(unusedWallet)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+
+              <div className="pt-4 mt-4 border-t flex justify-between items-center text-xs" style={{ borderColor: 'var(--border)' }}>
+                <span style={{ color: 'var(--text-muted)' }}>Registered Lenders: <strong style={{ color: 'var(--text-primary)' }}>{walletStats.noOfRegisteredUsers ?? 0}</strong></span>
+                <span style={{ color: 'var(--text-muted)' }}>Avg Ticket Size: <strong style={{ color: 'var(--text-primary)' }}>{fmtINR(Math.round((walletStats.totalParticipatedAmount || 0) / (walletStats.noOfParticipation || 1)))}</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── 2-col: Pending approvals + Recent activity ── */}
       <div className="grid lg:grid-cols-2 gap-5">

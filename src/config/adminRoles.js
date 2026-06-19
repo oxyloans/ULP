@@ -149,6 +149,7 @@ export const ROUTE_PERM_MAP = {
   'wallet-withdrawals':  PERM.WALLET,
   'interest/sd-lot':     PERM.INTEREST,
   'interest/asset':      PERM.INTEREST,
+  'interest/principal-interest': PERM.INTEREST,
 
   'assets/load':         PERM.ASSETS,
   'assets/view':         PERM.ASSETS,

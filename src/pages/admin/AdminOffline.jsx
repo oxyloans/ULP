@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRunningClosedDeals, getDealParticipants, getAdminDeals } from '../../api/afterlogin-admin';
+import { getRunningClosedDeals, getDealParticipants, getAdminDeals, returnPrincipal } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -23,11 +23,88 @@ const TABS = [
   { key: 'TEST',    label: 'Test',    color: '#f59e0b' },
 ];
 
+// ─── Feedback modal for success / error messages ──────────────────────────────
+function FeedbackModal({ message, onClose }) {
+  if (!message || !message.text) return null;
+
+  const isSuccess = message.type === 'success';
+  const accentColor = isSuccess ? '#10b981' : '#ef4444';
+  const bgAccent = isSuccess ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+  const borderAccent = isSuccess ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)';
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)' }}
+      onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl overflow-hidden text-center p-6 transition-all"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}
+        onClick={e => e.stopPropagation()}>
+        
+        {/* Status Icon */}
+        <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+          style={{ background: bgAccent, border: `2px solid ${borderAccent}`, color: accentColor }}>
+          {isSuccess ? (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          ) : (
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="12" y1="8" x2="12" y2="12" />
+              <line x1="12" y1="16" x2="12.01" y2="16" />
+            </svg>
+          )}
+        </div>
+
+        {/* Title */}
+        <h3 className="text-base font-black mb-2" style={{ color: 'var(--text-primary)' }}>
+          {isSuccess ? 'Success' : 'Message'}
+        </h3>
+
+        {/* Message */}
+        <p className="text-xs font-semibold mb-6 leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--text-muted)' }}>
+          {message.text}
+        </p>
+
+        {/* Action button */}
+        <button
+          onClick={onClose}
+          className="w-full py-2.5 rounded-xl text-xs font-black transition-all hover:scale-[1.02] active:scale-95"
+          style={{
+            background: isSuccess ? 'linear-gradient(135deg,#10b981,#059669)' : 'linear-gradient(135deg,#ef4444,#dc2626)',
+            color: '#fff',
+            boxShadow: `0 4px 14px ${isSuccess ? 'rgba(16,185,129,0.35)' : 'rgba(239,68,68,0.35)'}`
+          }}
+        >
+          OK
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Helper to check if API text response indicates error
+const isTextSuccess = (text) => {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  if (lower.includes('greater than') || lower.includes('error') || lower.includes('fail') || lower.includes('invalid') || lower.includes('not found') || lower.includes('exception')) {
+    return false;
+  }
+  return true;
+};
+
 // ─── Participants panel (lazy-loaded per deal) ────────────────────────────────
 function ParticipantsPanel({ dealId }) {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState('');
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
+  const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
+  
+  // Confirmation state
+  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
+  const [amountsMap, setAmountsMap] = useState({});
 
   useEffect(() => {
     setLoading(true); setError('');
@@ -51,29 +128,141 @@ function ParticipantsPanel({ dealId }) {
   const participants = data?.investoresParticipationDetails ?? [];
   const totalAmt     = data?.totalParticipationByInvestores ?? 0;
 
+  const handleToggleSelect = (userId) => {
+    if (!userId) return;
+    setSelectedUserIds(prev =>
+      prev.includes(userId)
+        ? prev.filter(id => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleToggleSelectAll = () => {
+    const allIds = participants.map(p => p.userId).filter(Boolean);
+    if (selectedUserIds.length === allIds.length) {
+      setSelectedUserIds([]);
+    } else {
+      setSelectedUserIds(allIds);
+    }
+  };
+
+  const openConfirmModal = () => {
+    const newMap = {};
+    selectedUserIds.forEach(uid => {
+      const p = participants.find(part => part.userId === uid);
+      const cleanAmt = p ? String(p.participationAmount || 0).replace(/,/g, '') : '0';
+      newMap[uid] = cleanAmt;
+    });
+    setAmountsMap(newMap);
+    setConfirmModalOpen(true);
+  };
+
+  const handlePrincipalReturn = async () => {
+    if (selectedUserIds.length === 0) return;
+    setSubmitting(true);
+    setActionMessage({ type: '', text: '' });
+
+    const userPrincipalRequest = selectedUserIds.map(uid => {
+      const enteredVal = amountsMap[uid];
+      const amt = enteredVal !== undefined && enteredVal !== '' ? Number(enteredVal) : 0;
+      return {
+        userId: uid,
+        principalReturnedAmount: amt
+      };
+    });
+
+    try {
+      const res = await returnPrincipal({
+        dealId,
+        userPrincipalRequest
+      });
+      
+      let successMsg = 'Principal returned successfully!';
+      if (typeof res === 'string' && res.trim()) {
+        successMsg = res;
+      } else if (res) {
+        successMsg = res.message || res.data?.message || res.data || successMsg;
+      }
+      const msgText = typeof successMsg === 'string' ? successMsg : JSON.stringify(successMsg);
+      const isOk = isTextSuccess(msgText);
+      
+      setActionMessage({
+        type: isOk ? 'success' : 'error',
+        text: msgText
+      });
+      
+      if (isOk) {
+        setSelectedUserIds([]);
+      }
+      setConfirmModalOpen(false);
+      
+      // Refresh participants
+      getDealParticipants(dealId)
+        .then(res => setData(res))
+        .catch(() => {});
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to return principal';
+      const msgText = typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg);
+      setActionMessage({
+        type: 'error',
+        text: msgText
+      });
+      setConfirmModalOpen(false);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
     <div className="px-5 py-4" style={{ background: 'rgba(168,85,247,0.03)', borderTop: '1px solid var(--border)' }}>
       {/* Summary row */}
-      <div className="flex items-center gap-4 mb-3 flex-wrap">
-        <div className="flex items-center gap-1.5">
-          <UsersIcon />
-          <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-            {participants.length} Participant{participants.length !== 1 ? 's' : ''}
-          </span>
+      <div className="flex items-center justify-between flex-wrap gap-4 mb-3">
+        <div className="flex items-center gap-4 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <UsersIcon />
+            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+              {participants.length} Participant{participants.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Participation:</span>
+            <span className="text-xs font-black" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalAmt)}</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Participation:</span>
-          <span className="text-xs font-black" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalAmt)}</span>
-        </div>
+
+        {participants.length > 0 && (
+          <button
+            onClick={openConfirmModal}
+            disabled={selectedUserIds.length === 0 || submitting}
+            className="px-4 py-1.5 rounded-xl text-xs font-black transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+            style={{
+              background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+              color: '#fff',
+              boxShadow: selectedUserIds.length > 0 ? '0 4px 14px rgba(168, 85, 247, 0.35)' : 'none',
+              opacity: selectedUserIds.length === 0 || submitting ? 0.6 : 1,
+              cursor: selectedUserIds.length === 0 || submitting ? 'not-allowed' : 'pointer'
+            }}
+          >
+            Principal ({selectedUserIds.length})
+          </button>
+        )}
       </div>
 
       {participants.length === 0 ? (
         <p className="text-xs py-3 text-center" style={{ color: 'var(--text-muted)' }}>No participants yet</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border)' }}>
+        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border)', background: 'var(--surface-card)' }}>
           <table className="w-full text-xs">
             <thead>
               <tr style={{ background: 'var(--input-bg)', borderBottom: '1px solid var(--border)' }}>
+                <th className="py-2.5 px-3 text-left whitespace-nowrap" style={{ width: 40 }}>
+                  <input
+                    type="checkbox"
+                    checked={participants.length > 0 && selectedUserIds.length === participants.filter(p => p.userId).length}
+                    onChange={handleToggleSelectAll}
+                    className="w-3.5 h-3.5 cursor-pointer accent-purple-500 rounded border-gray-300 focus:ring-purple-500"
+                  />
+                </th>
                 {['#', 'Investor Name', 'Amount', 'ROI', 'Payout', 'Duration'].map(h => (
                   <th key={h} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider whitespace-nowrap"
                     style={{ color: 'var(--text-muted)', fontSize: 10 }}>{h}</th>
@@ -86,6 +275,20 @@ function ParticipantsPanel({ dealId }) {
                   style={{ borderBottom: i < participants.length - 1 ? '1px solid var(--border)' : 'none' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                  
+                  <td className="py-2.5 px-3">
+                    {p.userId ? (
+                      <input
+                        type="checkbox"
+                        checked={selectedUserIds.includes(p.userId)}
+                        onChange={() => handleToggleSelect(p.userId)}
+                        className="w-3.5 h-3.5 cursor-pointer accent-purple-500 rounded border-gray-300 focus:ring-purple-500"
+                      />
+                    ) : (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
+                    )}
+                  </td>
+                  
                   <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
                   <td className="py-2.5 px-3">
                     <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{p.userName ?? '—'}</p>
@@ -106,16 +309,104 @@ function ParticipantsPanel({ dealId }) {
                   <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)' }}>
                     {p.dealDuration ? `${p.dealDuration} mo` : '—'}
                   </td>
-                  {/* <td className="py-2.5 px-3 font-mono" style={{ color: 'var(--text-primary)' }}>
-                    {p.bankAccountNo ?? '—'}
-                  </td>
-                  <td className="py-2.5 px-3 font-mono" style={{ color: 'var(--text-muted)' }}>
-                    {p.ifscCode ?? '—'}
-                  </td> */}
                 </tr>
               ))}
             </tbody>
           </table>
+        </div>
+      )}
+      
+      {/* Alert / Feedback Modal */}
+      <FeedbackModal message={actionMessage} onClose={() => setActionMessage({ type: '', text: '' })} />
+
+      {/* Confirm Modal */}
+      {confirmModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)' }}
+          onClick={() => setConfirmModalOpen(false)}>
+          <div className="w-full max-w-lg rounded-2xl overflow-hidden animate-fade-in"
+            style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
+            onClick={e => e.stopPropagation()}>
+            
+            {/* Header */}
+            <div className="px-6 py-4 flex items-center justify-between"
+              style={{ borderBottom: '1px solid var(--border)', background: 'rgba(168,85,247,0.06)' }}>
+              <div>
+                <h3 className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>
+                  Confirm Principal Return
+                </h3>
+                <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                  Specify principal return amounts for {selectedUserIds.length} selected investor(s)
+                </p>
+              </div>
+              <button
+                onClick={() => setConfirmModalOpen(false)}
+                className="w-7 h-7 rounded-lg flex items-center justify-center"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              >
+                <CloseIcon />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 py-4 max-h-[50vh] overflow-y-auto grid gap-3">
+              {selectedUserIds.map((uid) => {
+                const p = participants.find(part => part.userId === uid);
+                if (!p) return null;
+                return (
+                  <div key={uid} className="flex items-center justify-between gap-4 p-3 rounded-xl border"
+                    style={{ borderColor: 'var(--border)', background: 'var(--input-bg)' }}>
+                    <div className="grid gap-0.5">
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+                        {p.userName || '—'}
+                      </span>
+                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
+                        ID: {uid.slice(0, 8)}… | Max: {fmtINR(p.participationAmount)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 font-bold">
+                      <span className="text-xs" style={{ color: 'var(--text-primary)' }}>₹</span>
+                      <input
+                        type="number"
+                        value={amountsMap[uid] ?? ''}
+                        onChange={(e) => setAmountsMap(prev => ({ ...prev, [uid]: e.target.value }))}
+                        className="w-28 px-2.5 py-1.5 text-xs font-bold rounded-lg outline-none"
+                        style={{
+                          background: 'var(--surface-card)',
+                          border: '1.5px solid var(--border)',
+                          color: 'var(--text-primary)'
+                        }}
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer */}
+            <div className="px-6 py-4 flex gap-3" style={{ borderTop: '1px solid var(--border)' }}>
+              <button
+                onClick={() => setConfirmModalOpen(false)}
+                className="flex-1 py-2 rounded-xl text-xs font-bold"
+                style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handlePrincipalReturn}
+                disabled={submitting}
+                className="flex-1 py-2 rounded-xl text-xs font-black text-white transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5"
+                style={{
+                  background: 'linear-gradient(135deg, #a855f7, #7c3aed)',
+                  boxShadow: '0 4px 14px rgba(168, 85, 247, 0.35)',
+                  cursor: submitting ? 'not-allowed' : 'pointer'
+                }}
+              >
+                {submitting ? 'Sending...' : 'Confirm & Send'}
+              </button>
+            </div>
+
+          </div>
         </div>
       )}
     </div>
@@ -129,7 +420,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
 
   const total      = deal.dealValue ?? deal.dealAmount ?? 0;
   const invested   = deal.totalParticipationAmount ?? deal.dealParticipationValue ?? 0;
-  const remaining  = deal.currentDealValue ?? Math.max(0, total - invested);
+  const remaining  = deal.remainingDealValue ?? deal.currentDealValue ?? Math.max(0, total - invested);
   const fillPct    = total > 0 ? Math.min(Math.round((invested / total) * 100), 100) : 0;
   const isAchieved = deal.dealStatus === 'ACHIEVED';
 
@@ -299,7 +590,7 @@ export default function AdminOffline() {
   // KPIs
   const totalDealValue   = deals.reduce((s, d) => s + (d.dealValue ?? d.dealAmount ?? 0), 0);
   const totalParticipated = deals.reduce((s, d) => s + (d.totalParticipationAmount ?? d.dealParticipationValue ?? 0), 0);
-  const totalRemaining   = deals.reduce((s, d) => s + (d.currentDealValue ?? d.remainingDealValue ?? 0), 0);
+  const totalRemaining   = deals.reduce((s, d) => s + (d.remainingDealValue ?? d.currentDealValue ?? 0), 0);
   const avgRoi           = deals.length
     ? (deals.reduce((s, d) => s + (d.rateofinterest ?? d.monthlyInterest ?? 0), 0) / deals.length).toFixed(2)
     : '—';

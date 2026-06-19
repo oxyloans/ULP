@@ -58,6 +58,7 @@ import ViewAssets from './pages/admin/ViewAssets.jsx';
 import AllocatedAssets from './pages/admin/AllocatedAssets.jsx';
 import AdminInterestPayments from './pages/admin/AdminInterestPayments.jsx';
 import AdminAssetPayouts from './pages/admin/AdminAssetPayouts.jsx';
+import AdminPrincipalInterest from './pages/admin/AdminPrincipalInterest.jsx';
 import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
 import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
@@ -222,6 +223,7 @@ function AdminLayout() {
               <Route path="assets/allocated"      element={<RequireAdminPerm routeKey="assets/allocated"><AllocatedAssets /></RequireAdminPerm>} />
               <Route path="interest/sd-lot"       element={<RequireAdminPerm routeKey="interest/sd-lot"><AdminInterestPayments /></RequireAdminPerm>} />
               <Route path="interest/asset"        element={<RequireAdminPerm routeKey="interest/asset"><AdminAssetPayouts /></RequireAdminPerm>} />
+              <Route path="interest/principal-interest" element={<RequireAdminPerm routeKey="interest/principal-interest"><AdminPrincipalInterest /></RequireAdminPerm>} />
               <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
               <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />
               <Route path="migrated-total-data"   element={<RequireAdminPerm routeKey="migrated-total-data"><AdminMigratedTotalData /></RequireAdminPerm>} />
