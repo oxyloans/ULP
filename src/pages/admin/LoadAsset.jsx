@@ -31,6 +31,7 @@ const EMPTY = {
   assetUnit: '', assetArea: '', surveyNo: '', flatNumber: '',
   size: '', othersComments: '',
   saleDeedDoc: null, ownerName: '', onLenderName: false,
+  lenderName: '', companyRepresentative: '',
 };
 
 const toNumber = (value) => Number(String(value ?? '').replace(/,/g, '')) || 0;
@@ -219,6 +220,8 @@ export default function LoadAsset() {
         surveyNumber:     form.surveyNo.trim(),
         takenAssetValue:  toNumber(form.takenAssetValue),
         typeOfRegistration: form.typeOfRegistration,
+        lenderName:       form.lenderName.trim(),
+        companyRepresentative: form.companyRepresentative.trim(),
       });
 
       const assetId = saveResponse?.id ?? saveResponse?.assetId ?? saveResponse?.data?.id;
@@ -494,16 +497,52 @@ export default function LoadAsset() {
             />
           </Field>
 
-          <div>
+          <div className="sm:col-span-2 pt-2">
             <label className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
               <input
                 type="checkbox"
                 checked={form.onLenderName}
-                onChange={e => set('onLenderName', e.target.checked)}
+                onChange={e => {
+                  const val = e.target.checked;
+                  setForm(f => ({
+                    ...f,
+                    onLenderName: val,
+                    lenderName: val ? f.lenderName : '',
+                    companyRepresentative: val ? '' : f.companyRepresentative,
+                  }));
+                  setErrors(errs => ({
+                    ...errs,
+                    onLenderName: '',
+                    lenderName: '',
+                    companyRepresentative: '',
+                  }));
+                }}
               />
               <span>it is on lender name</span>
             </label>
           </div>
+
+          {form.onLenderName ? (
+            <Field label="Lender Name" error={errors.lenderName}>
+              <input
+                type="text"
+                placeholder="Enter lender name"
+                value={form.lenderName}
+                onChange={e => set('lenderName', e.target.value)}
+                style={inputStyle(errors.lenderName)}
+              />
+            </Field>
+          ) : (
+            <Field label="Company Representative" error={errors.companyRepresentative}>
+              <input
+                type="text"
+                placeholder="Enter company representative"
+                value={form.companyRepresentative}
+                onChange={e => set('companyRepresentative', e.target.value)}
+                style={inputStyle(errors.companyRepresentative)}
+              />
+            </Field>
+          )}
         </Section>
 
         {/* ── Plot & Area ── */}

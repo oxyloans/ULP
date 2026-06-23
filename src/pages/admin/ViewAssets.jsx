@@ -146,6 +146,8 @@ function EditAssetModal({ asset, borrowers, borrowersLoading, onClose, onSaved }
     othersComments:   a.othersComments ?? '',
     ownerName:        a.ownerName ?? '',
     onLenderName:     a.onLenderName ?? false,
+    lenderName:       a.lenderName ?? '',
+    companyRepresentative: a.companyRepresentative ?? '',
   });
 
   const [form,        setForm]        = useState(() => initForm(asset));
@@ -208,6 +210,8 @@ function EditAssetModal({ asset, borrowers, borrowersLoading, onClose, onSaved }
         othersComments:   form.othersComments.trim(),
         ownerName:        form.ownerName.trim(),
         onLenderName:     form.onLenderName,
+        lenderName:       form.lenderName.trim(),
+        companyRepresentative: form.companyRepresentative.trim(),
       });
       onSaved();
       onClose();
@@ -321,13 +325,40 @@ function EditAssetModal({ asset, borrowers, borrowersLoading, onClose, onSaved }
               <input type="text" value={form.ownerName} onChange={e => set('ownerName', e.target.value)}
                 style={inputStyle(errors.ownerName)} />
             </Field>
-            <div className="flex items-center gap-2 pt-5">
+
+            <div className="flex items-center gap-2 pt-5 sm:col-span-2">
               <input type="checkbox" id="edit-lender-name" checked={form.onLenderName}
-                onChange={e => set('onLenderName', e.target.checked)} />
+                onChange={e => {
+                  const val = e.target.checked;
+                  setForm(f => ({
+                    ...f,
+                    onLenderName: val,
+                    lenderName: val ? f.lenderName : '',
+                    companyRepresentative: val ? '' : f.companyRepresentative,
+                  }));
+                  setErrors(errs => ({
+                    ...errs,
+                    onLenderName: '',
+                    lenderName: '',
+                    companyRepresentative: '',
+                  }));
+                }} />
               <label htmlFor="edit-lender-name" className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
                 It is on lender name
               </label>
             </div>
+
+            {form.onLenderName ? (
+              <Field label="Lender Name" error={errors.lenderName}>
+                <input type="text" value={form.lenderName} onChange={e => set('lenderName', e.target.value)}
+                  style={inputStyle(errors.lenderName)} />
+              </Field>
+            ) : (
+              <Field label="Company Representative" error={errors.companyRepresentative}>
+                <input type="text" value={form.companyRepresentative} onChange={e => set('companyRepresentative', e.target.value)}
+                  style={inputStyle(errors.companyRepresentative)} />
+              </Field>
+            )}
           </SectionBox>
 
           {/* Plot & Area */}
@@ -441,6 +472,9 @@ function DetailModal({ asset: a, lenders, onClose }) {
             ['Size',                a.size],
             ['Survey No.',          a.surveyNumber],
             ['Owner Name',          a.ownerName],
+            ...(a.onLenderName
+              ? [['Lender Name',         a.lenderName]]
+              : [['Company Representative', a.companyRepresentative]]),
             ['Others / Comments',   a.othersComments],
           ].map(([k, v]) => (
             <div key={k}>
