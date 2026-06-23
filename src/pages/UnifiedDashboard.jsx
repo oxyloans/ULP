@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
-import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getGoldGrowthDetail } from '../api/afterlogin-user';
+import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getGoldGrowthDetail} from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 import ProfileWarningBanner from '../components/ProfileWarningBanner';
 
@@ -2623,7 +2623,7 @@ function MemberDashboard({ memberId, mode }) {
       .finally(() => setLoading(false));
 
     getUserProfile()
-      .then(p => { console.log('User profile:', p); if (p) setProfile(p); })
+      .then(p => { if (p) setProfile(p); })
       .catch(() => {});
 
     getUserOfflineParticipationDealsInfo()
@@ -2654,7 +2654,6 @@ function MemberDashboard({ memberId, mode }) {
   const showOff  = mode === 'A' || mode === 'C';
   const showBoth = mode === 'C';
   const isOwn = !fin || memberId === user?.userId || memberId === 'self';
-  console.log('Financial data for member', memberId, profile);
 
   return (
     <div className="grid gap-7">
@@ -2713,6 +2712,16 @@ function MemberDashboard({ memberId, mode }) {
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
 export default function UnifiedDashboard() {
+  const [dismissed, setDismissed] = useState(false);
+
+  useEffect(() => {
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const d = new Date();
+    const day = String(d.getDate()).padStart(2, '0');
+    const monthNo = String(d.getMonth() + 1).padStart(2, '0');
+    const year = String(d.getFullYear());
+    const dateStr = `${day}-${monthNo}-${year}`;
+  }, []);
   const { mode } = useMode();
   const { selectedMemberId, membersLoading, hasFamily, userId } = useFamily();
 

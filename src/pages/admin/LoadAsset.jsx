@@ -206,7 +206,7 @@ export default function LoadAsset() {
         assetType:        form.assetType,
         borrowerName:     form.borrowerName.trim(),
         dateOfExecution:  form.dateOfExecution,
-        documentNumber:   toNumber(form.documentNumber),
+        documentNumber:   form.documentNumber,
         documentValue:    toNumber(form.documentValue),
         id:               form.id,
         ownerName:        form.ownerName.trim(),

@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getPlatformStats, getAdminDeals, getPendingApprovals, getAllUsers, getAdminOfflinePayments, getAdminOxyLoansDeals, getAdminProperties, getAllDealAndWalletInfo } from "../../api/afterlogin-admin";
+import { getAllLoanActiveDeals } from "../../api/afterlogin-user";
 import { formatINR } from "../../utils/currency";
 
 
@@ -152,6 +153,8 @@ export default function AdminDashboard() {
   const [propSummary, setPropSummary] = useState({ total: 0, plots: { count: 0 }, flats: { count: 0 }, acres: { count: 0 }, villas: { count: 0 } });
   const [sdSearch,    setSdSearch]    = useState('');
   const [walletStats, setWalletStats] = useState(null);
+  const [interestAlertCount, setInterestAlertCount] = useState(0);
+  const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     getAllUsers().then(d => { if (Array.isArray(d)) setUsers(d); }).catch(() => {});
@@ -165,6 +168,26 @@ export default function AdminDashboard() {
       if (d?.summary)    setPropSummary(d.summary);
     }).catch(() => {});
     getAllDealAndWalletInfo().then(d => setWalletStats(d)).catch(() => {});
+
+    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const dDate = new Date();
+    const startDayStr = String(dDate.getDate()).padStart(2, '0');
+    const monthNoStr = String(dDate.getMonth() + 1).padStart(2, '0');
+    const yearStr = String(dDate.getFullYear());
+    const dateStrToday = `${startDayStr}`;
+
+    getAllLoanActiveDeals({
+      monthName: MONTHS[dDate.getMonth()],
+      year: yearStr,
+      startDate: dateStrToday,
+      endDate: dateStrToday
+    })
+      .then(res => {
+        if (Array.isArray(res) && res.length > 0) {
+          setInterestAlertCount(res.length);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   
@@ -243,6 +266,47 @@ export default function AdminDashboard() {
           </div>
         </div>
       </div>
+
+      {/* Interest Payout Alert Banner */}
+      {interestAlertCount > 0 && !dismissed && (
+        <div className="rounded-2xl p-4 flex items-center justify-between border animate-fade-in"
+          style={{
+            background: 'linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.05))',
+            borderColor: 'rgba(239, 68, 68, 0.25)',
+            boxShadow: '0 4px 14px rgba(239, 68, 68, 0.05)'
+          }}>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl flex items-center justify-center bg-red-500/10 text-red-500 border border-red-500/20">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            </div>
+            <div>
+              <p className="text-xs font-black text-red-500 uppercase tracking-wider">Interest Payout Scheduled</p>
+              <p className="text-xs font-bold text-neutral-400 mt-0.5">
+                There are {interestAlertCount} active deals with interest payouts scheduled for today.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => navigate('/admin/interest/sd-lot')}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-black text-white transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
+              style={{
+                background: 'linear-gradient(135deg, #ef4444, #f97316)',
+                boxShadow: '0 4px 12px rgba(239, 68, 68, 0.25)'
+              }}
+            >
+              Process Payouts
+            </button>
+            <button
+              onClick={() => setDismissed(true)}
+              className="w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:bg-neutral-500/10"
+              style={{ color: 'var(--text-muted)' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── Platform KPI cards ── */}
       <div>
