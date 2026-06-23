@@ -671,7 +671,12 @@ function AllocationModal({ asset, existingLenders, onSave, onClose }) {
    Main page
 ══════════════════════════════════════════════════════════════════════════════ */
 export default function ViewAssets() {
-  const [search,      setSearch]      = useState('');
+  const [search,            setSearch]            = useState('');
+  const [selectedBorrower,  setSelectedBorrower]  = useState('');
+  const [selectedProject,   setSelectedProject]   = useState('');
+  const [currentPage,       setCurrentPage]       = useState(1);
+  const [itemsPerPage,      setItemsPerPage]      = useState(10);
+
   const [assets,      setAssets]      = useState([]);
   const [loading,     setLoading]     = useState(true);
   const [error,       setError]       = useState('');
@@ -700,20 +705,62 @@ export default function ViewAssets() {
       .finally(() => setBorrowersLoading(false));
   }, []);
 
-  const filtered = assets.filter(a =>
-    String(a.borrowerName  ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    String(a.projectName   ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    String(a.documentNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
-    String(a.assetType     ?? '').toLowerCase().includes(search.toLowerCase())
-  );
+  // Filter options derived from assets data
+  const uniqueBorrowerNames = Array.from(
+    new Set(assets.map(a => a.borrowerName).filter(Boolean))
+  ).sort();
+
+  const projectOptions = selectedBorrower
+    ? Array.from(
+        new Set(
+          assets
+            .filter(a => a.borrowerName === selectedBorrower)
+            .map(a => a.projectName)
+            .filter(Boolean)
+        )
+      ).sort()
+    : [];
+
+  // Filtered Assets
+  const filtered = assets.filter(a => {
+    const matchesSearch = !search ||
+      String(a.borrowerName  ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(a.projectName   ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(a.documentNumber ?? '').toLowerCase().includes(search.toLowerCase()) ||
+      String(a.assetType     ?? '').toLowerCase().includes(search.toLowerCase());
+
+    const matchesBorrower = !selectedBorrower || a.borrowerName === selectedBorrower;
+    const matchesProject = !selectedProject || a.projectName === selectedProject;
+
+    return matchesSearch && matchesBorrower && matchesProject;
+  });
+
+  // Reset to page 1 when filter conditions change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [search, selectedBorrower, selectedProject, itemsPerPage]);
+
+  // Statistics
+  const totalDocValue = filtered.reduce((sum, a) => sum + toNumber(a.documentValue), 0);
+  const totalActualAssetValue = filtered.reduce((sum, a) => sum + toNumber(a.actualAssetValue), 0);
+  const totalTakenAssetValue = filtered.reduce((sum, a) => sum + toNumber(a.takenAssetValue), 0);
+
+  const overallDocValue = assets.reduce((sum, a) => sum + toNumber(a.documentValue), 0);
+  const overallActualAssetValue = assets.reduce((sum, a) => sum + toNumber(a.actualAssetValue), 0);
+  const overallTakenAssetValue = assets.reduce((sum, a) => sum + toNumber(a.takenAssetValue), 0);
+
+  // Pagination Slice
+  const totalPages = Math.ceil(filtered.length / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const paginatedAssets = filtered.slice(startIndex, startIndex + itemsPerPage);
 
   const saveAllocation = (assetId, lenders) => setAllocations(prev => ({ ...prev, [assetId]: lenders }));
 
   const TABLE_HEADERS = [
-    'Asset ID','Borrower','Project','Doc No.','Date','Reg. Type',
+    'S.No', 'Asset ID','Borrower','Project','Owner','Doc No.','Date','Reg. Type',
     'Doc Value','Asset Value','Taken Value','Asset Type',
-    'Asset No.','Size','Survey No.','Owner',
-    'Sale Deed','Lenders','Actions',
+    'Asset No.','Size','Survey No.',
+    'Documents','Lenders','Actions',
   ];
 
   // Returns the relevant number value based on asset type
@@ -738,15 +785,134 @@ export default function ViewAssets() {
         <p className="text-3xl font-bold" style={{ color: '#c084fc' }}>{assets.length}</p>
       </div>
 
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+        {/* Total Doc Value */}
+        <div className="rounded-2xl p-5 flex flex-col justify-between"
+          style={{ background: 'linear-gradient(135deg,rgba(129,140,248,0.12),rgba(129,140,248,0.04))', border: '1px solid rgba(129,140,248,0.25)' }}>
+          <div>
+            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: '#818cf8' }}>Total Doc Value</p>
+            <h3 className="text-2xl font-black mt-2" style={{ color: 'var(--text-primary)' }}>{fmt(totalDocValue)}</h3>
+          </div>
+          <p className="text-xs mt-3 flex items-center justify-between" style={{ color: 'var(--text-muted)' }}>
+            <span>Filtered ({filtered.length})</span>
+            <span>Overall: {fmt(overallDocValue)} ({assets.length})</span>
+          </p>
+        </div>
+
+        {/* Total Asset Value */}
+        <div className="rounded-2xl p-5 flex flex-col justify-between"
+          style={{ background: 'linear-gradient(135deg,rgba(16,185,129,0.12),rgba(16,185,129,0.04))', border: '1px solid rgba(16,185,129,0.25)' }}>
+          <div>
+            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: '#10b981' }}>Total Asset Value</p>
+            <h3 className="text-2xl font-black mt-2" style={{ color: 'var(--text-primary)' }}>{fmt(totalActualAssetValue)}</h3>
+          </div>
+          <p className="text-xs mt-3 flex items-center justify-between" style={{ color: 'var(--text-muted)' }}>
+            <span>Filtered ({filtered.length})</span>
+            <span>Overall: {fmt(overallActualAssetValue)} ({assets.length})</span>
+          </p>
+        </div>
+
+        {/* Total Taken Value */}
+        <div className="rounded-2xl p-5 flex flex-col justify-between"
+          style={{ background: 'linear-gradient(135deg,rgba(245,158,11,0.12),rgba(245,158,11,0.04))', border: '1px solid rgba(245,158,11,0.25)' }}>
+          <div>
+            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: '#f59e0b' }}>Total Taken Value</p>
+            <h3 className="text-2xl font-black mt-2" style={{ color: 'var(--text-primary)' }}>{fmt(totalTakenAssetValue)}</h3>
+          </div>
+          <p className="text-xs mt-3 flex items-center justify-between" style={{ color: 'var(--text-muted)' }}>
+            <span>Filtered ({filtered.length})</span>
+            <span>Overall: {fmt(overallTakenAssetValue)} ({assets.length})</span>
+          </p>
+        </div>
+      </div>
+
+      {/* Filters Bar */}
+      <div className="rounded-2xl p-5 flex flex-wrap items-end gap-4"
+        style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+        
+        {/* Borrower Filter */}
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Filter by Borrower
+          </label>
+          <div className="relative">
+            <select
+              value={selectedBorrower}
+              onChange={e => {
+                setSelectedBorrower(e.target.value);
+                setSelectedProject('');
+              }}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none theme-input w-full cursor-pointer appearance-none pr-8"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="">All Borrowers</option>
+              {uniqueBorrowerNames.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+          </div>
+        </div>
+
+        {/* Project Filter */}
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Filter by Project
+          </label>
+          <div className="relative">
+            <select
+              value={selectedProject}
+              onChange={e => setSelectedProject(e.target.value)}
+              disabled={!selectedBorrower}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none theme-input w-full cursor-pointer appearance-none pr-8 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="">{selectedBorrower ? 'All Projects' : 'Select borrower first'}</option>
+              {projectOptions.map(proj => (
+                <option key={proj} value={proj}>{proj}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Search Keyword
+          </label>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search borrower, project, doc no…"
+            className="px-3 py-2.5 rounded-xl text-sm outline-none theme-input w-full"
+            style={{ color: 'var(--text-primary)', background: 'var(--input-bg)', border: '1px solid var(--border)' }}
+          />
+        </div>
+
+        {/* Clear Filters */}
+        {(selectedBorrower || selectedProject || search) && (
+          <button
+            onClick={() => {
+              setSelectedBorrower('');
+              setSelectedProject('');
+              setSearch('');
+            }}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 whitespace-nowrap"
+            style={{ background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
+            Clear Filters
+          </button>
+        )}
+      </div>
+
       {/* Table */}
       <div className="rounded-2xl overflow-hidden" style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
         <div className="flex items-center justify-between gap-3 px-5 py-4 flex-wrap"
           style={{ borderBottom: '1px solid var(--border)' }}>
-          <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>All Assets</h3>
-          <input value={search} onChange={e => setSearch(e.target.value)}
-            placeholder="Search borrower, project, doc no…"
-            className="px-3 py-2 rounded-xl text-sm outline-none theme-input w-56"
-            style={{ color: 'var(--text-primary)' }} />
+          <h3 className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>Asset Records</h3>
         </div>
 
         <div className="overflow-x-auto">
@@ -764,19 +930,23 @@ export default function ViewAssets() {
                 <tr><td colSpan={TABLE_HEADERS.length} className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>Loading assets...</td></tr>
               ) : error ? (
                 <tr><td colSpan={TABLE_HEADERS.length} className="py-10 text-center text-sm" style={{ color: '#f87171' }}>{error}</td></tr>
-              ) : filtered.length === 0 ? (
+              ) : paginatedAssets.length === 0 ? (
                 <tr><td colSpan={TABLE_HEADERS.length} className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No assets found.</td></tr>
-              ) : filtered.map(a => {
+              ) : paginatedAssets.map((a, index) => {
                 const lenders  = allocations[a.id] ?? [];
                 const saleDeed = a.saleDeedDocumentsDto?.[0];
+                const sNo      = startIndex + index + 1;
+                const shortId  = String(a.id ?? '').slice(-6);
                 return (
                   <tr key={a.id} className="table-row-hover transition-colors"
                     style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td className="py-3 px-4 text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{sNo}</td>
                     <td className="py-3 px-4 font-mono text-xs cursor-pointer" style={{ color: '#c084fc' }}
-                      onClick={() => setDetailAsset(a)}>{a.id}</td>
+                      onClick={() => setDetailAsset(a)}>{shortId}</td>
                     <td className="py-3 px-4 font-medium whitespace-nowrap cursor-pointer" style={{ color: 'var(--text-primary)' }}
                       onClick={() => setDetailAsset(a)}>{a.borrowerName}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.projectName}</td>
+                    <td className="py-3 px-4 text-xs whitespace-nowrap font-medium" style={{ color: 'var(--text-primary)' }}>{a.ownerName || '—'}</td>
                     <td className="py-3 px-4 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{a.documentNumber}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{formatDate(a.dateOfExecution)}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.typeOfRegistration}</td>
@@ -799,7 +969,6 @@ export default function ViewAssets() {
                     </td>
                     <td className="py-3 px-4 text-xs" style={{ color: 'var(--text-muted)' }}>{a.size || '—'}</td>
                     <td className="py-3 px-4 font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{a.surveyNumber}</td>
-                    <td className="py-3 px-4 text-xs whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{a.ownerName}</td>
                     <td className="py-3 px-4 text-xs whitespace-nowrap">
                       {saleDeed?.documentPath
                         ? <a href={saleDeed.documentPath} download={saleDeed.documentName}
@@ -840,6 +1009,110 @@ export default function ViewAssets() {
             </tbody>
           </table>
         </div>
+
+        {/* Pagination controls */}
+        {filtered.length > 0 && (
+          <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-4"
+            style={{ borderTop: '1px solid var(--border)', background: 'var(--surface-elevated)' }}>
+            <div className="flex items-center gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <span>Show</span>
+              <select
+                value={itemsPerPage}
+                onChange={e => {
+                  setItemsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 rounded-lg text-xs outline-none theme-input cursor-pointer"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                {[5, 10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+              <span>entries</span>
+              <span className="mx-2">|</span>
+              <span>
+                Showing {Math.min(filtered.length, startIndex + 1)} to{' '}
+                {Math.min(filtered.length, startIndex + itemsPerPage)} of {filtered.length} entries
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              {/* First */}
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(1)}
+                className="p-1.5 rounded-lg border text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-purple-500/10"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                &laquo;
+              </button>
+
+              {/* Prev */}
+              <button
+                disabled={currentPage === 1}
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                className="px-2.5 py-1.5 rounded-lg border text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-purple-500/10"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                Prev
+              </button>
+
+              {/* Page numbers */}
+              {Array.from({ length: totalPages }, (_, i) => i + 1)
+                .filter(page => {
+                  // Only show current page, plus one page before/after, and first/last page
+                  return (
+                    page === 1 ||
+                    page === totalPages ||
+                    Math.abs(page - currentPage) <= 1
+                  );
+                })
+                .map((page, idx, arr) => {
+                  const showEllipsis = idx > 0 && page - arr[idx - 1] > 1;
+                  return (
+                    <div key={page} className="flex items-center gap-1.5">
+                      {showEllipsis && <span className="text-xs" style={{ color: 'var(--text-muted)' }}>...</span>}
+                      <button
+                        onClick={() => setCurrentPage(page)}
+                        className="w-8 h-8 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                        style={
+                          currentPage === page
+                            ? {
+                                background: 'linear-gradient(135deg,#a855f7,#7c3aed)',
+                                color: '#fff',
+                                border: '1px solid #a855f7',
+                                boxShadow: '0 2px 8px rgba(168,85,247,0.3)',
+                              }
+                            : {
+                                background: 'var(--input-bg)',
+                                color: 'var(--text-muted)',
+                                border: '1px solid var(--border)',
+                              }
+                        }>
+                        {page}
+                      </button>
+                    </div>
+                  );
+                })}
+
+              {/* Next */}
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                className="px-2.5 py-1.5 rounded-lg border text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-purple-500/10"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                Next
+              </button>
+
+              {/* Last */}
+              <button
+                disabled={currentPage === totalPages}
+                onClick={() => setCurrentPage(totalPages)}
+                className="p-1.5 rounded-lg border text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-purple-500/10"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+                &raquo;
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Detail modal */}
