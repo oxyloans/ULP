@@ -504,7 +504,6 @@ export default function SDLots() {
   const { user } = useAuth();
   const [lots, setLots]           = useState([]);
   const [loading, setLoading]     = useState(true);
-  const [statusFilter, setStatusFilter] = useState('All');
   const [roiFilter,    setRoiFilter]    = useState('All');
   const [payoutFilter, setPayoutFilter] = useState('All');
   const [feeFilter,    setFeeFilter]    = useState('All');
@@ -521,12 +520,14 @@ export default function SDLots() {
   const feeOptions    = ['All', 'Zero Fee', 'Has Fee'];
 
   const filtered = lots.filter(l => {
+    // Only show running (Open) deals
+    if (l.status !== 'Open') return false;
+
     // If deal has a userIds restriction, only show to included users
     if (l.userIds && l.userIds.trim()) {
       const allowed = l.userIds.split(',').map(id => id.trim()).filter(Boolean);
       if (allowed.length > 0 && !allowed.includes(user?.userId ?? '')) return false;
     }
-    if (statusFilter !== 'All' && l.status !== statusFilter) return false;
     if (roiFilter === '< 1.5%'  && l.roiMonthly >= 1.5) return false;
     if (roiFilter === '1.5–2%'  && (l.roiMonthly < 1.5 || l.roiMonthly > 2)) return false;
     if (roiFilter === '> 2%'    && l.roiMonthly <= 2) return false;
@@ -555,7 +556,7 @@ export default function SDLots() {
     </div>
   );
 
-  const hasActiveFilters = statusFilter !== 'All' || roiFilter !== 'All' || payoutFilter !== 'All' || feeFilter !== 'All';
+  const hasActiveFilters = roiFilter !== 'All' || payoutFilter !== 'All' || feeFilter !== 'All';
 
   return (
     <div className="grid gap-6">
@@ -573,7 +574,7 @@ export default function SDLots() {
         <div className="flex items-center justify-between">
           <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text-primary)' }}>Filters</span>
           {hasActiveFilters && (
-            <button onClick={() => { setStatusFilter('All'); setRoiFilter('All'); setPayoutFilter('All'); setFeeFilter('All'); }}
+            <button onClick={() => { setRoiFilter('All'); setPayoutFilter('All'); setFeeFilter('All'); }}
               className="text-xs font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
               style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
               Clear All
@@ -581,7 +582,6 @@ export default function SDLots() {
           )}
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-          <FilterGroup label="Status"  options={['All','Open','Closed']}  value={statusFilter} onChange={setStatusFilter} />
           <FilterGroup label="ROI"     options={roiOptions}               value={roiFilter}    onChange={setRoiFilter}    />
           <FilterGroup label="Payout"  options={payoutOptions}            value={payoutFilter} onChange={setPayoutFilter} />
           {/* <FilterGroup label="Fee"     options={feeOptions}               value={feeFilter}    onChange={setFeeFilter}    /> */}

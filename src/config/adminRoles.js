@@ -51,7 +51,7 @@ export const ADMIN_ROLES = {
   CEO: {
     label:       'CEO',
     color:       '#6366f1',
-    permissions: [ PERM.STATS ],
+    permissions: [ PERM.STATS],
   },
   ACCOUNTS_MANAGER: {
     label:       'Accounts Manager',
@@ -152,7 +152,7 @@ export const ROUTE_PERM_MAP = {
   'interest/principal-interest': PERM.INTEREST,
 
   'assets/load':         PERM.ASSETS,
-  'assets/view':         PERM.ASSETS,
+  'assets/view':         [PERM.ASSETS, PERM.STATS],
   'assets/allocated':    PERM.ASSETS,
   'approvals':           PERM.APPROVALS,
   'properties':          PERM.PROPERTIES,

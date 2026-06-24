@@ -151,7 +151,10 @@ function RequireAdminPerm({ routeKey, children }) {
   const { user } = useAuth();
   const roles = user?.roles ?? [];
   const perm = ROUTE_PERM_MAP[routeKey];
-  if (perm && !hasPermission(roles, perm)) {
+  const hasAccess = Array.isArray(perm)
+    ? perm.some(p => hasPermission(roles, p))
+    : !perm || hasPermission(roles, perm);
+  if (!hasAccess) {
     return <Navigate replace to={getDefaultAdminRoute(roles)} />;
   }
   return children;
