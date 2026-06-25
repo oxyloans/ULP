@@ -438,3 +438,15 @@ export async function returnPrincipal(payload) {
 export async function getPrincipalInterestInitiatedUsers(dealId, fileType) {
   return get(`/oxybrick-service/getPrincipalInterestInitiatedUsers?dealId=${dealId}&fileType=${fileType}`);
 }
+
+/**
+ * POST /oxybrick-service/fileGenerationPriInterest
+ * Body: { dealId, fileType, getPrinciInterestUsers }
+ * Returns: blob (Excel sheet)
+ */
+export async function downloadPrincipalInterestExcel(payload) {
+  return post('/oxybrick-service/fileGenerationPriInterest', payload, {
+    responseType: 'blob',
+  });
+}
+

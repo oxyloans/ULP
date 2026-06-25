@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { formatINR } from '../../utils/currency';
-import { getAdminDeals, getPrincipalInterestInitiatedUsers } from '../../api/afterlogin-admin';
+import { getAdminDeals, getPrincipalInterestInitiatedUsers, downloadPrincipalInterestExcel } from '../../api/afterlogin-admin';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
@@ -30,6 +30,7 @@ export default function AdminPrincipalInterest() {
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [usersError, setUsersError] = useState('');
+  const [exportingExcel, setExportingExcel] = useState(false);
 
   // Filtering state
   const [searchTerm, setSearchTerm] = useState('');
@@ -148,6 +149,57 @@ export default function AdminPrincipalInterest() {
     a.download = `${selectedDeal.dealName}_Initiated_${fileType}_Report.csv`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = async () => {
+    if (!selectedDeal) return;
+    const dealId = selectedDeal.dealId || selectedDeal.id;
+
+    setExportingExcel(true);
+    setUsersError('');
+
+    try {
+      const mappedUsers = filteredUsers.map(row => {
+        const base = {
+          accNo: row.accNo ? String(row.accNo) : '',
+          bankName: row.bankName ? String(row.bankName) : '',
+          ifsc: row.ifsc ? String(row.ifsc) : '',
+          userId: row.userId ? String(row.userId) : '',
+          userName: row.userName ? String(row.userName) : ''
+        };
+
+        if (fileType === 'principal') {
+          return {
+            ...base,
+            principalAmount: Number(row.principalAmount) || 0
+          };
+        } else {
+          return {
+            ...base,
+            diferenceDays: Number(row.diferenceDays) || 0,
+            princInterestAmount: Number(row.princInterestAmount) || 0
+          };
+        }
+      });
+
+      const payload = {
+        dealId: String(dealId),
+        fileType,
+        getPrinciInterestUsers: mappedUsers
+      };
+
+      const blob = await downloadPrincipalInterestExcel(payload);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${selectedDeal.dealName}_Initiated_${fileType}_Report.xlsx`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (err) {
+      setUsersError(err.message || 'Failed to download Excel sheet.');
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   const handleSelectDeal = (deal, type) => {
@@ -317,17 +369,41 @@ export default function AdminPrincipalInterest() {
             />
           </div>
 
-          {/* <button
-            onClick={handleExportCSV}
-            disabled={filteredUsers.length === 0}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-white"
-            style={{
-              background: 'var(--role-gradient)',
-              boxShadow: '0 4px 14px var(--role-primary)'
-            }}
-          >
-            <DownloadIcon /> Export CSV
-          </button> */}
+          <div className="flex gap-2">
+            {/* <button
+              onClick={handleExportCSV}
+              disabled={filteredUsers.length === 0}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{
+                background: 'var(--input-bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)'
+              }}
+            >
+              <DownloadIcon /> Export CSV
+            </button> */}
+            <button
+              onClick={handleExportExcel}
+              disabled={filteredUsers.length === 0 || exportingExcel}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-black transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed text-white"
+              style={{
+                background: 'linear-gradient(135deg, #10b981, #059669)',
+                boxShadow: '0 4px 14px rgba(16,185,129,0.3)'
+              }}
+            >
+              {exportingExcel ? (
+                <>
+                  <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  <span>Exporting...</span>
+                </>
+              ) : (
+                <>
+                  <DownloadIcon />
+                  <span>Export Excel</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
         {/* Details Table */}

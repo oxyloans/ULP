@@ -34,7 +34,7 @@ function VirtualCard({ data }) {
         <p className="text-4xl font-black text-white" style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", letterSpacing: '-0.02em' }}>{fmtINR(data.availableBalance)}</p>
       </div>
       <div className="relative grid grid-cols-3 gap-3">
-        {[{ label: 'Total Deposited', value: fmtINR(data.totalDeposited) }, { label: 'Total Earnings', value: fmtINR(data.totalEarnings) }, { label: 'Pending Credit', value: fmtINR(data.pendingCredits) }].map(s => (
+        {[{ label: 'Total Deposited', value: fmtINR(data.totalDeposited) },].map(s => (
           <div key={s.label}><p className="text-xs text-white opacity-50 mb-0.5" style={{ fontSize: 9 }}>{s.label}</p><p className="text-sm font-bold text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p></div>
         ))}
       </div>
@@ -243,11 +243,11 @@ export default function WalletDashboard() {
       <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
         <div className="grid gap-5 content-start">
           {balanceLoading ? <div className="rounded-2xl shimmer-bg" style={{ minHeight: 200 }} /> : <VirtualCard data={data} />}
-          <div className="grid grid-cols-2 gap-4">
+          {/* <div className="grid grid-cols-2 gap-4">
             {[{ label: 'Available Balance', value: balanceLoading ? '…' : fmtINR(data.availableBalance), color: '#6366f1', Icon: WalletIcon }, { label: 'Total Deposited', value: balanceLoading ? '…' : fmtINR(data.totalDeposited), color: '#10b981', Icon: TrendUp }].map(s => (
               <div key={s.label} className="rounded-2xl p-4" style={{ background: 'var(--surface-card)', border: `1px solid ${s.color}18`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><div className="w-8 h-8 rounded-xl flex items-center justify-center mb-3" style={{ background: `${s.color}14`, border: `1px solid ${s.color}25`, color: s.color }}><s.Icon /></div><p className="text-xl font-extrabold" style={{ color: s.color, fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p><p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p></div>
             ))}
-          </div>
+          </div> */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button onClick={() => navigate('/wallet/history')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'var(--surface-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><HistoryIcon />Transaction History</button>
             <button onClick={() => setWithdrawModalOpen(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'linear-gradient(135deg,#0ea5e9,#2563eb)', color: '#fff', border: '1px solid rgba(37,99,235,0.4)', boxShadow: '0 8px 20px rgba(37,99,235,0.28)' }}><WalletIcon />Wallet Withdraw</button>
