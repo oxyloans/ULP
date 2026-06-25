@@ -41,7 +41,7 @@ const walletSubItems = [
 const statsSubItems = [
   { title: 'Funds Raised', path: '/admin/stats/funds-raised', perm: PERM.STATS },
   { title: 'Top Lenders', path: '/admin/stats/top-lenders', perm: PERM.STATS },
-  { title: 'Total Assets',  path: '/admin/stats/total-assets',  perm: PERM.STATS },
+  // { title: 'Total Assets',  path: '/admin/stats/total-assets',  perm: PERM.STATS },
   { title: 'Interest/Principal',  path: '/admin/stats/interest-principal',  perm: PERM.STATS },
   { title: 'View Assets',  path: '/admin/assets/view',  perm: PERM.STATS },
 ];

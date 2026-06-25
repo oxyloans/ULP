@@ -572,6 +572,7 @@ export default function AdminDashboard() {
                   {(() => {
                     const totalWallet = walletStats.totalWalletAmount || 0;
                     const unusedWallet = walletStats.unUsedWalletAmount || 0;
+                    const system = walletStats.systemAmount || 0;
                     const usedWallet = Math.max(0, totalWallet - unusedWallet);
                     const total = totalWallet || 1;
                     const usedPct = Math.round((usedWallet / total) * 100);
@@ -593,7 +594,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-1.5 font-semibold">
                             <span className="w-2 h-2 rounded-full" style={{ background: '#f59e0b' }} />
                             <span style={{ color: 'var(--text-muted)' }}>Unused ({unusedPct}%):</span>
-                            <span className="font-mono text-amber-500">{fmtINR(unusedWallet)}</span>
+                            <span className="font-mono text-amber-500">{fmtINR(system - usedWallet)}</span>
                           </div>
                         </div>
                       </div>

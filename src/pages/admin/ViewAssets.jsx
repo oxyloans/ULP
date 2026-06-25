@@ -708,6 +708,7 @@ export default function ViewAssets() {
   const [search,            setSearch]            = useState('');
   const [selectedBorrower,  setSelectedBorrower]  = useState('');
   const [selectedProject,   setSelectedProject]   = useState('');
+  const [selectedOwner,     setSelectedOwner]     = useState('');
   const [currentPage,       setCurrentPage]       = useState(1);
   const [itemsPerPage,      setItemsPerPage]      = useState(10);
 
@@ -744,6 +745,10 @@ export default function ViewAssets() {
     new Set(assets.map(a => a.borrowerName).filter(Boolean))
   ).sort();
 
+  const uniqueOwnerNames = Array.from(
+    new Set(assets.map(a => a.ownerName).filter(Boolean))
+  ).sort();
+
   const projectOptions = selectedBorrower
     ? Array.from(
         new Set(
@@ -765,14 +770,15 @@ export default function ViewAssets() {
 
     const matchesBorrower = !selectedBorrower || a.borrowerName === selectedBorrower;
     const matchesProject = !selectedProject || a.projectName === selectedProject;
+    const matchesOwner = !selectedOwner || a.ownerName === selectedOwner;
 
-    return matchesSearch && matchesBorrower && matchesProject;
+    return matchesSearch && matchesBorrower && matchesProject && matchesOwner;
   });
 
   // Reset to page 1 when filter conditions change
   useEffect(() => {
     setCurrentPage(1);
-  }, [search, selectedBorrower, selectedProject, itemsPerPage]);
+  }, [search, selectedBorrower, selectedProject, selectedOwner, itemsPerPage]);
 
   // Statistics
   const totalDocValue = filtered.reduce((sum, a) => sum + toNumber(a.documentValue), 0);
@@ -913,6 +919,28 @@ export default function ViewAssets() {
           </div>
         </div>
 
+        {/* Owner Filter */}
+        <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+            Filter by Owner
+          </label>
+          <div className="relative">
+            <select
+              value={selectedOwner}
+              onChange={e => setSelectedOwner(e.target.value)}
+              className="px-3 py-2.5 rounded-xl text-sm outline-none theme-input w-full cursor-pointer appearance-none pr-8"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+              <option value="">All Owners</option>
+              {uniqueOwnerNames.map(name => (
+                <option key={name} value={name}>{name}</option>
+              ))}
+            </select>
+            <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-muted)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>
+            </span>
+          </div>
+        </div>
+
         {/* Search Input */}
         <div className="flex flex-col gap-1.5 flex-1 min-w-[200px]">
           <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
@@ -928,11 +956,12 @@ export default function ViewAssets() {
         </div>
 
         {/* Clear Filters */}
-        {(selectedBorrower || selectedProject || search) && (
+        {(selectedBorrower || selectedProject || selectedOwner || search) && (
           <button
             onClick={() => {
               setSelectedBorrower('');
               setSelectedProject('');
+              setSelectedOwner('');
               setSearch('');
             }}
             className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 whitespace-nowrap"

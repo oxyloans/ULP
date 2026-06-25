@@ -93,7 +93,7 @@ export default function FundsRaised() {
   const walletStats = [
     { label: "Total Wallet Loaded", value: data?.totalWalletAmount || 0 },
     { label: "Total Participations", value: data?.noOfParticipation || 0 },
-    { label: "Unused Wallet Amount", value: data?.unUsedWalletAmount || 0 },
+    { label: "Unused Wallet Amount", value: data?.systemAmount - data?.totalWalletAmount || 0 },
   ];
 
   return (
