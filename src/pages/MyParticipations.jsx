@@ -1,4 +1,4 @@
-﻿import { Fragment, useMemo, useState, useEffect } from "react";
+import { Fragment, useMemo, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
@@ -227,7 +227,7 @@ function InterestStatementModal({ deal, onClose }) {
           </button>
         </div>
 
-        <div className="overflow-y-auto p-5 grid gap-4">
+        <div className="overflow-y-auto p-3 sm:p-5 grid gap-4">
           {loading && (
             <div className="py-14 text-center text-sm font-bold" style={{ color: "var(--text-muted)" }}>
               Loading interest statement...
@@ -250,39 +250,35 @@ function InterestStatementModal({ deal, onClose }) {
 
           {!loading && !error && (
             <>
-              {/* Top info bar — Amount Invested + Participation Date always visible */}
-              <div className="flex flex-wrap gap-2">
-                <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[140px]" style={{ background: `${INDIGO}0f`, border: `1px solid ${INDIGO}28` }}>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Amount Invested</p>
-                    <p className="text-base font-black tabular-nums" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
-                      {participationAmount != null ? fmtINR(participationAmount) : "-"}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 rounded-xl px-3 py-2 flex-1 min-w-[140px]" style={{ background: `${GREEN}0f`, border: `1px solid ${GREEN}28` }}>
-                  <div>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Participation Date</p>
-                    <p className="text-base font-black" style={{ color: GREEN }}>
-                      {participationDate ?? "-"}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              {/* 4 Summary KPI cards */}
+              {/* Summary KPIs Row — all in a single row */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {[
-                  // { label: "Total Participation",     value: participationAmount != null ? fmtINR(participationAmount) : "-", color: INDIGO },
-                  { label: "Total Interest",           value: fmtINR(totalInterest),                                          color: AMBER  },
-                  { label: "ROI",                      value: data?.roi != null ? `${data.roi}%` : "-",                       color: GREEN  },
-                  { label: "Return Type",              value: data?.returnType ?? "-",                                         color: PURPLE },
-                ].map(s => (
-                  <div key={s.label} className="rounded-xl px-3 py-3" style={{ border: `1px solid ${s.color}28`, background: `${s.color}0f` }}>
-                    <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>{s.label}</p>
-                    <p className="text-lg font-black mt-1 truncate" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</p>
-                  </div>
-                ))}
+                <div className="rounded-xl px-3 py-2" style={{ background: `${INDIGO}0f`, border: `1px solid ${INDIGO}28` }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Amount Invested</p>
+                  <p className="text-sm font-black tabular-nums mt-0.5" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {participationAmount != null ? fmtINR(participationAmount) : "-"}
+                  </p>
+                </div>
+
+                <div className="rounded-xl px-3 py-2" style={{ background: `${GREEN}0f`, border: `1px solid ${GREEN}28` }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Participation Date</p>
+                  <p className="text-sm font-black mt-0.5" style={{ color: GREEN }}>
+                    {participationDate ?? "-"}
+                  </p>
+                </div>
+
+                <div className="rounded-xl px-3 py-2" style={{ background: `${AMBER}0f`, border: `1px solid ${AMBER}28` }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Total Interest</p>
+                  <p className="text-sm font-black mt-0.5" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {fmtINR(totalInterest)}
+                  </p>
+                </div>
+
+                <div className="rounded-xl px-3 py-2" style={{ background: `${GREEN}0f`, border: `1px solid ${GREEN}28` }}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>ROI</p>
+                  <p className="text-sm font-black mt-0.5" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>
+                    {data?.roi != null ? `${data.roi}%` : "-"}
+                  </p>
+                </div>
               </div>
 
               {/* Statement — desktop table / mobile cards */}
@@ -295,8 +291,8 @@ function InterestStatementModal({ deal, onClose }) {
                     </span>
                   </div>
 
-                  {/* ── Desktop table (hidden on mobile) ── */}
-                  <div className="hidden sm:block overflow-x-auto overflow-y-auto" style={{ maxHeight: "50vh" }}>
+                  {/* ── Table (always visible, scrollable horizontally on mobile) ── */}
+                  <div className="overflow-x-auto w-full">
                     <table className="w-full text-sm" style={{ minWidth: 640 }}>
                       <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
                         <tr style={{ background: "var(--table-header-bg)" }}>
@@ -343,7 +339,7 @@ function InterestStatementModal({ deal, onClose }) {
                               {/* Breakup sub-table */}
                               {isExpanded && hasBreakup && (
                                 <tr style={{ borderTop: "1px solid var(--border)", background: "var(--table-header-bg)" }}>
-                                  <td colSpan={8} className="p-3">
+                                  <td colSpan={6} className="p-3">
                                     <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${PURPLE}30` }}>
                                       <div className="px-3 py-2" style={{ background: `${PURPLE}10`, borderBottom: `1px solid ${PURPLE}20` }}>
                                         <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: PURPLE }}>
@@ -413,103 +409,12 @@ function InterestStatementModal({ deal, onClose }) {
                       </tbody>
                       <tfoot>
                         <tr style={{ borderTop: `2px solid var(--border)`, background: `${AMBER}18` }}>
-                          <td colSpan={5} className="py-3 px-3 text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total Interest</td>
+                          <td colSpan={3} className="py-3 px-3 text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total Interest</td>
                           <td className="py-3 px-3 font-black tabular-nums" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalInterest)}</td>
                           <td colSpan={2} />
                         </tr>
                       </tfoot>
                     </table>
-                  </div>
-
-                  {/* ── Mobile cards (shown only on mobile) ── */}
-                  <div className="sm:hidden divide-y overflow-y-auto" style={{ borderColor: "var(--border)", maxHeight: "55vh" }}>
-                    {rows.map((row, idx) => {
-                      const hasBreakup = Array.isArray(row?.updationParticiInterestStatement) && row.updationParticiInterestStatement.length > 0;
-                      const isExpanded = expandedIdx === idx;
-                      return (
-                        <div key={idx} className="p-3 grid gap-2">
-                          {/* Row header */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-[10px] font-black uppercase tracking-wider" style={{ color: "var(--text-muted)" }}>Month {idx + 1}</span>
-                            {interestStatusChip(row?.status)}
-                          </div>
-
-                          {/* Primary info grid */}
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-lg px-3 py-2" style={{ background: `${AMBER}0f`, border: `1px solid ${AMBER}20` }}>
-                              <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>Interest</p>
-                              <p className="text-base font-black tabular-nums" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(row?.interestAmount ?? 0)}</p>
-                            </div>
-                            <div className="rounded-lg px-3 py-2" style={{ background: `${INDIGO}0f`, border: `1px solid ${INDIGO}20` }}>
-                              <p className="text-[10px] font-semibold" style={{ color: "var(--text-muted)" }}>Invested</p>
-                              <p className="text-base font-black tabular-nums" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>
-                                {row?.participationAmount != null ? fmtINR(row.participationAmount) : "-"}
-                              </p>
-                            </div>
-                          </div>
-
-                          {/* Secondary details */}
-                          <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
-                            <div className="flex justify-between">
-                              <span style={{ color: "var(--text-muted)" }}>Interest Date</span>
-                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.actualInterestDate ?? "-"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span style={{ color: "var(--text-muted)" }}>Part. Date</span>
-                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.participationDate ?? "-"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span style={{ color: "var(--text-muted)" }}>Days</span>
-                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.days ?? "-"}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span style={{ color: "var(--text-muted)" }}>Paid Date</span>
-                              <span className="font-semibold" style={{ color: "var(--text-primary)" }}>{row?.paidDate ?? "-"}</span>
-                            </div>
-                          </div>
-
-                          {/* BreakUp toggle */}
-                          {hasBreakup && (
-                            <button
-                              type="button"
-                              onClick={() => setExpandedIdx(isExpanded ? null : idx)}
-                              className="w-full py-1.5 rounded-lg text-xs font-bold transition-all"
-                              style={{ border: `1px solid ${PURPLE}40`, background: isExpanded ? `${PURPLE}18` : `${PURPLE}0a`, color: PURPLE }}
-                            >
-                              {isExpanded ? "Close Breakup" : `View First-Month Breakup (${row.updationParticiInterestStatement.length + 1} entries)`}
-                            </button>
-                          )}
-
-                          {isExpanded && hasBreakup && (
-                            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${PURPLE}30` }}>
-                              <div className="px-3 py-2" style={{ background: `${PURPLE}10`, borderBottom: `1px solid ${PURPLE}20` }}>
-                                <p className="text-[10px] font-black uppercase tracking-wider" style={{ color: PURPLE }}>Breakup</p>
-                              </div>
-                              <div className="divide-y" style={{ borderColor: `${PURPLE}20` }}>
-                                {[
-                                  { date: row?.participationDate, days: row?.days, amount: row?.participationAmount, interest: row?.interestAmount, status: row?.status },
-                                  ...row.updationParticiInterestStatement.map(u => ({ date: u?.participationDate, days: u?.days, amount: u?.participationAmount, interest: u?.interestAmount, status: u?.status })),
-                                ].map((entry, eIdx) => (
-                                  <div key={eIdx} className="px-3 py-2 grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
-                                    <span className="col-span-2 text-[10px] font-bold uppercase tracking-wider" style={{ color: PURPLE }}>Entry {eIdx + 1}</span>
-                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Date</span><span className="font-semibold" style={{ color: "var(--text-primary)" }}>{entry.date ?? "-"}</span></div>
-                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Days</span><span className="font-semibold" style={{ color: "var(--text-primary)" }}>{entry.days ?? "-"}</span></div>
-                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Invested</span><span className="font-bold tabular-nums" style={{ color: INDIGO }}>{entry.amount != null ? fmtINR(entry.amount) : "-"}</span></div>
-                                    <div className="flex justify-between"><span style={{ color: "var(--text-muted)" }}>Interest</span><span className="font-bold tabular-nums" style={{ color: AMBER }}>{fmtINR(entry.interest ?? 0)}</span></div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-
-                    {/* Mobile total footer */}
-                    <div className="px-3 py-3 flex justify-between items-center" style={{ background: `${AMBER}10` }}>
-                      <span className="text-xs font-black uppercase tracking-wider" style={{ color: AMBER }}>Total Interest</span>
-                      <span className="font-black tabular-nums" style={{ color: AMBER, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalInterest)}</span>
-                    </div>
                   </div>
                 </div>
               ) : (

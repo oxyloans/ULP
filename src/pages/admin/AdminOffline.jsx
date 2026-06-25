@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getRunningClosedDeals, getDealParticipants, getAdminDeals, returnPrincipal } from '../../api/afterlogin-admin';
+import { getRunningClosedDeals, getDealParticipants, getAdminDeals, returnPrincipal, closeDealManually } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -414,7 +414,7 @@ function ParticipantsPanel({ dealId }) {
 }
 
 // ─── Deal row ─────────────────────────────────────────────────────────────────
-function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
+function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, onDeactivate }) {
   const dealKey = deal.dealId ?? deal.id;
   const expanded = expandedId === dealKey;
 
@@ -512,12 +512,23 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle }) {
 
         {/* Status */}
         <td className="py-3.5 px-4">
-          <span className="text-xs px-2.5 py-1 rounded-full font-bold"
-            style={isAchieved
-              ? { background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }
-              : { background: `${tabColor}15`, color: tabColor, border: `1px solid ${tabColor}30` }}>
-            {isAchieved ? '✓ Achieved' : '● Active'}
-          </span>
+          {isAchieved ? (
+            <span className="text-xs px-2.5 py-1 rounded-full font-bold whitespace-nowrap"
+              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+              ✓ Achieved
+            </span>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeactivate(deal);
+              }}
+              className="text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
+              style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}
+            >
+              Close Manually
+            </button>
+          )}
         </td>
 
         {/* Expand toggle */}
@@ -562,6 +573,8 @@ export default function AdminOffline() {
   const [error, setError]           = useState('');
   const [search, setSearch]         = useState('');
   const [expandedDealId, setExpandedDealId] = useState(null);
+  const [dealToClose, setDealToClose] = useState(null);
+  const [closingDealLoader, setClosingDealLoader] = useState(false);
 
   const handleToggle = (dealId) => {
     setExpandedDealId(prev => prev === dealId ? null : dealId);
@@ -580,6 +593,29 @@ export default function AdminOffline() {
   };
 
   useEffect(() => { setExpandedDealId(null); load(activeTab); }, [activeTab]);
+
+  const confirmManualCloseDeal = () => {
+    if (!dealToClose) return;
+    const dealId = dealToClose.dealId || dealToClose.id;
+    const dealName = dealToClose.dealName || 'this deal';
+
+    setClosingDealLoader(true);
+    setError('');
+
+    closeDealManually(dealId)
+      .then(() => {
+        setDealToClose(null);
+        alert(`Deal "${dealName}" has been deactivated successfully.`);
+        load(activeTab);
+      })
+      .catch(err => {
+        setError(err.message || `Failed to close "${dealName}" manually.`);
+        setDealToClose(null);
+      })
+      .finally(() => {
+        setClosingDealLoader(false);
+      });
+  };
 
   const tabColor = TABS.find(t => t.key === activeTab)?.color ?? '#10b981';
 
@@ -722,13 +758,64 @@ export default function AdminOffline() {
                     </td>
                   </tr>
                 ) : filtered.map((deal, idx) => (
-                  <DealRow key={deal.dealId ?? deal.id ?? idx} deal={deal} idx={idx} tabColor={tabColor} expandedId={expandedDealId} onToggle={handleToggle} />
+                  <DealRow
+                    key={deal.dealId ?? deal.id ?? idx}
+                    deal={deal}
+                    idx={idx}
+                    tabColor={tabColor}
+                    expandedId={expandedDealId}
+                    onToggle={handleToggle}
+                    showDeactivate={activeTab !== 'closed'}
+                    onDeactivate={setDealToClose}
+                  />
                 ))}
               </tbody>
             </table>
           </div>
         </div>
       )}
+
+      {/* Confirm Manual Deal Closure Modal */}
+      {dealToClose && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md p-6 rounded-2xl border shadow-2xl animate-scale-up"
+            style={{ background: 'var(--surface-card)', borderColor: 'var(--border)' }}>
+            <h3 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              Confirm Deal Closure
+            </h3>
+            <p className="text-xs mt-2 font-medium leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+              Are you sure you want to close the deal <strong className="text-red-500">"{dealToClose.dealName}"</strong> manually? This will make the deal inactive.
+            </p>
+
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => setDealToClose(null)}
+                disabled={closingDealLoader}
+                className="px-4 py-2 rounded-xl text-xs font-bold transition-all hover:bg-neutral-500/10"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmManualCloseDeal}
+                disabled={closingDealLoader}
+                className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all hover:scale-105 text-white disabled:opacity-50"
+                style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 4px 14px rgba(239,68,68,0.25)' }}
+              >
+                {closingDealLoader ? (
+                  <>
+                    <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    <span>Closing...</span>
+                  </>
+                ) : (
+                  <span>Close </span>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

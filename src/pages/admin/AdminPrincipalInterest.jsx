@@ -618,7 +618,6 @@ export default function AdminPrincipalInterest() {
           </tbody>
         </table>
       </div>
-
     </div>
   );
 }
