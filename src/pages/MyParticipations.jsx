@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
+import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
 import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
@@ -193,41 +194,39 @@ function InterestStatementModal({ deal, onClose }) {
   const participationDate   = firstRow?.participationDate ?? null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: "rgba(0,0,0,0.55)", backdropFilter: "blur(6px)" }}
-      onClick={onClose}
-    >
-      <div
-        className="rounded-2xl overflow-hidden w-full flex flex-col"
-        style={{
+    <Modal
+      open={true}
+      onCancel={onClose}
+      footer={null}
+      title={
+        <div className="pr-6">
+          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: AMBER, margin: 0 }}>Interest Statement</p>
+          <h2 className="text-base sm:text-xl font-black truncate mt-0.5" style={{ color: "var(--text-primary)", margin: 0 }}>{deal?.dealName ?? "SD Deal"}</h2>
+        </div>
+      }
+      styles={{
+        content: {
           background: "var(--surface-card)",
           border: "1px solid var(--border)",
           boxShadow: "0 32px 80px rgba(0,0,0,0.35)",
-          maxHeight: "92vh",
-          maxWidth: "min(960px, 96vw)",
-          width: "100%",
-        }}
-        onClick={e => e.stopPropagation()}
-      >
-        {/* Header */}
-        <div className="px-4 py-3 flex items-start justify-between gap-3 flex-shrink-0" style={{ borderBottom: "1px solid var(--border)" }}>
-          <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: AMBER }}>Interest Statement</p>
-            <h2 className="text-base sm:text-xl font-black truncate" style={{ color: "var(--text-primary)" }}>{deal?.dealName ?? "SD Deal"}</h2>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-110 flex-shrink-0 mt-0.5"
-            style={{ background: "var(--input-bg)", border: "1px solid var(--border)", color: "var(--text-muted)" }}
-            aria-label="Close interest statement modal"
-          >
-            <CloseIcon />
-          </button>
-        </div>
-
-        <div className="overflow-y-auto p-3 sm:p-5 grid gap-4">
+          borderRadius: "16px",
+        },
+        header: {
+          background: 'transparent',
+          borderBottom: '1px solid var(--border)',
+          paddingBottom: '12px',
+        },
+        body: {
+          padding: '16px 0 0 0',
+        },
+        close: {
+          color: 'var(--text-muted)',
+        }
+      }}
+      width="min(960px, 96vw)"
+      centered
+    >
+      <div className="overflow-y-auto p-3 sm:p-5 grid gap-4 pr-1" style={{ maxHeight: "68vh" }}>
           {loading && (
             <div className="py-14 text-center text-sm font-bold" style={{ color: "var(--text-muted)" }}>
               Loading interest statement...
@@ -424,9 +423,8 @@ function InterestStatementModal({ deal, onClose }) {
               )}
             </>
           )}
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 

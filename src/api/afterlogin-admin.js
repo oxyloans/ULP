@@ -458,4 +458,17 @@ export async function closeDealManually(dealId) {
   return patch(`/oxybrick-service/dealClosedManually?dealI=${dealId}`, {});
 }
 
+/**
+ * GET https://fintech.oxyloans.com/oxyloans/v1/user/adminoxyloansDealsStats
+ * Returns OxyLoans deal statistics.
+ */
+export async function getAdminOxyLoansDealsStats() {
+  const response = await fetch('https://fintech.oxyloans.com/oxyloans/v1/user/adminoxyloansDealsStats');
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+
 

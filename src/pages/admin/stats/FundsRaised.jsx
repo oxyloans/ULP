@@ -1,10 +1,19 @@
 import { useEffect, useState } from "react";
 import { formatINR } from "../../../utils/currency";
-import { getAllDealAndWalletInfo } from "../../../api/afterlogin-admin";
-import { StatCard, Section, icons } from "../AdminStats";
+import { getAllDealAndWalletInfo, getAdminDeals, getAdminOxyLoansDealsStats } from "../../../api/afterlogin-admin";
+import { StatCard, Section, TableShell, TableHead, icons } from "../AdminStats";
+
+const fmtAmount = (val) => {
+  return val ? formatINR(val) : "₹0";
+};
+
+const fmtCount = (val) => {
+  return val?.toLocaleString("en-IN") ?? "0";
+};
 
 export default function FundsRaised() {
   const [data, setData] = useState(null);
+  const [dealStats, setDealStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -12,8 +21,62 @@ export default function FundsRaised() {
     async function fetchData() {
       try {
         setLoading(true);
-        const response = await getAllDealAndWalletInfo();
+        setError(null);
+        const [
+          response,
+          oxyStats,
+          runningOffline,
+          closedOffline
+        ] = await Promise.all([
+          getAllDealAndWalletInfo(),
+          getAdminOxyLoansDealsStats().catch(() => null),
+          getAdminDeals('NORMAL').catch(() => ({})),
+          getAdminDeals('closed').catch(() => ({}))
+        ]);
         setData(response);
+
+        // Parse OxyLoans Deals Stats from API
+        const olRunning = oxyStats?.runningDeals ?? 0;
+        const olRunningAmt = oxyStats?.runningDealsAmount ?? 0;
+        const olClosed = oxyStats?.closedDeals ?? 0;
+        const olClosedAmt = oxyStats?.closedDealsAmount ?? 0;
+        const olTotal = oxyStats?.totalDeals ?? 0;
+        const olTotalAmt = oxyStats?.totalDealsAmount ?? 0;
+        
+        const parseAmount = (val) => {
+          if (typeof val === 'number') return val;
+          if (!val) return 0;
+          return Number(String(val).replace(/[^0-9.-]/g, '')) || 0;
+        };
+
+        // Parse Offline Deals
+        const getDealsList = (res) => {
+          return res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
+        };
+        const offRunningList = getDealsList(runningOffline);
+        const offClosedList = getDealsList(closedOffline);
+
+        const offRunningAmt = offRunningList.reduce((sum, d) => sum + parseAmount(d.dealValue ?? d.dealAmount), 0);
+        const offClosedAmt = offClosedList.reduce((sum, d) => sum + parseAmount(d.dealValue ?? d.dealAmount), 0);
+
+        setDealStats({
+          oxyloans: {
+            runningDeals: olRunning,
+            runningAmount: olRunningAmt,
+            closedDeals: olClosed,
+            closedAmount: olClosedAmt,
+            totalDeals: olTotal,
+            totalAmount: olTotalAmt
+          },
+          offline: {
+            runningDeals: offRunningList.length,
+            runningAmount: offRunningAmt,
+            closedDeals: offClosedList.length,
+            closedAmount: offClosedAmt,
+            totalDeals: offRunningList.length + offClosedList.length,
+            totalAmount: offRunningAmt + offClosedAmt
+          }
+        });
       } catch (err) {
         console.error("Failed to fetch deal and wallet info:", err);
         setError("Failed to load funds data");
@@ -189,6 +252,108 @@ export default function FundsRaised() {
             </div>
           ))}
         </div>
+      </Section>
+
+      <Section title="Platform Deal Summary" subtitle="Breakdown of running, closed, and total deals for OxyLoans and Offline platforms">
+        {dealStats ? (
+          <TableShell>
+            <table className="w-full text-sm">
+              <TableHead
+                columns={[
+                  "Platform",
+                  "Running Deals",
+                  "Running Amount",
+                  "Closed Deals",
+                  "Closed Amount",
+                  "Total Deals",
+                  "Total Amount"
+                ]}
+              />
+              <tbody>
+                {[
+                  {
+                    platform: "OxyLoans",
+                    runningDeals: dealStats.oxyloans.runningDeals,
+                    runningAmount: dealStats.oxyloans.runningAmount,
+                    closedDeals: dealStats.oxyloans.closedDeals,
+                    closedAmount: dealStats.oxyloans.closedAmount,
+                    totalDeals: dealStats.oxyloans.totalDeals,
+                    totalAmount: dealStats.oxyloans.totalAmount
+                  },
+                  {
+                    platform: "Offline",
+                    runningDeals: dealStats.offline.runningDeals,
+                    runningAmount: dealStats.offline.runningAmount,
+                    closedDeals: dealStats.offline.closedDeals,
+                    closedAmount: dealStats.offline.closedAmount,
+                    totalDeals: dealStats.offline.totalDeals,
+                    totalAmount: dealStats.offline.totalAmount
+                  }
+                ].map((row) => (
+                  <tr
+                    key={row.platform}
+                    style={{ borderBottom: "1px solid var(--border)" }}
+                    className="transition-colors hover:bg-neutral-500/5"
+                  >
+                    <td className="py-3.5 px-4 font-bold" style={{ color: "var(--text-primary)" }}>
+                      {row.platform}
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold font-mono" style={{ color: "var(--text-muted)" }}>
+                      {fmtCount(row.runningDeals)}
+                    </td>
+                    <td className="py-3.5 px-4 font-black font-mono text-emerald-500">
+                      {fmtAmount(row.runningAmount)}
+                    </td>
+                    <td className="py-3.5 px-4 font-semibold font-mono" style={{ color: "var(--text-muted)" }}>
+                      {fmtCount(row.closedDeals)}
+                    </td>
+                    <td className="py-3.5 px-4 font-black font-mono text-purple-500">
+                      {fmtAmount(row.closedAmount)}
+                    </td>
+                    <td className="py-3.5 px-4 font-bold font-mono text-indigo-500">
+                      {fmtCount(row.totalDeals)}
+                    </td>
+                    <td className="py-3.5 px-4 font-black font-mono text-amber-500">
+                      {fmtAmount(row.totalAmount)}
+                    </td>
+                  </tr>
+                ))}
+                <tr
+                  style={{
+                    background: "rgba(168,85,247,0.08)",
+                    borderTop: "2px solid rgba(168,85,247,0.2)"
+                  }}
+                >
+                  <td className="py-3.5 px-4 font-black" style={{ color: "#a855f7" }}>
+                    Total
+                  </td>
+                  <td className="py-3.5 px-4 font-black font-mono" style={{ color: "var(--text-primary)" }}>
+                    {fmtCount(dealStats.oxyloans.runningDeals + dealStats.offline.runningDeals)}
+                  </td>
+                  <td className="py-3.5 px-4 font-black font-mono text-emerald-500">
+                    {fmtAmount(dealStats.oxyloans.runningAmount + dealStats.offline.runningAmount)}
+                  </td>
+                  <td className="py-3.5 px-4 font-black font-mono" style={{ color: "var(--text-primary)" }}>
+                    {fmtCount(dealStats.oxyloans.closedDeals + dealStats.offline.closedDeals)}
+                  </td>
+                  <td className="py-3.5 px-4 font-black font-mono text-purple-500">
+                    {fmtAmount(dealStats.oxyloans.closedAmount + dealStats.offline.closedAmount)}
+                  </td>
+                  <td className="py-3.5 px-4 font-black font-mono text-indigo-500">
+                    {fmtCount(dealStats.oxyloans.totalDeals + dealStats.offline.totalDeals)}
+                  </td>
+                  <td className="py-3.5 px-4 font-black font-mono text-amber-500">
+                    {fmtAmount(dealStats.oxyloans.totalAmount + dealStats.offline.totalAmount)}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </TableShell>
+        ) : (
+          <div className="rounded-2xl p-6 text-center text-xs font-semibold" style={{ background: "var(--card-bg)", border: "1px solid var(--border)", color: "var(--text-muted)" }}>
+            No deal stats available
+          </div>
+        )}
       </Section>
     </div>
   );

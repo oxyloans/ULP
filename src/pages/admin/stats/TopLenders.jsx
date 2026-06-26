@@ -15,7 +15,10 @@ export default function TopLenders() {
       try {
         setLoading(true);
         const response = await getTopParticipationLenders();
-        setLenders(response || []);
+        const filtered = (response || []).filter(
+          (lender) => lender.userId !== "d70aeb27-9800-4a2a-ac56-54648554db92"
+        );
+        setLenders(filtered);
       } catch (err) {
         console.error("Failed to fetch top participation lenders:", err);
         setError("Failed to load top lenders data");
