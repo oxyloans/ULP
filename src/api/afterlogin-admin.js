@@ -348,7 +348,7 @@ export async function submitInterestApprovals(payload) {
  * }
  */
 export async function updateLenderInterestPayments(payload) {
-  return patch('/api/oxybrick-service/updateLenderInterestPayments', payload);
+  return patch('/oxybrick-service/updateLenderInterestPayments', payload);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
