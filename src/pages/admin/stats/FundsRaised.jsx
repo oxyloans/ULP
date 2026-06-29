@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { formatINR } from "../../../utils/currency";
 import { getAllDealAndWalletInfo, getAdminDeals, getAdminOxyLoansDealsStats } from "../../../api/afterlogin-admin";
 import { StatCard, Section, TableShell, TableHead, icons } from "../AdminStats";
@@ -298,11 +299,35 @@ export default function FundsRaised() {
                     <td className="py-3.5 px-4 font-bold" style={{ color: "var(--text-primary)" }}>
                       {row.platform}
                     </td>
-                    <td className="py-3.5 px-4 font-semibold font-mono" style={{ color: "var(--text-muted)" }}>
-                      {fmtCount(row.runningDeals)}
+                    <td className="py-3.5 px-4 font-semibold font-mono">
+                      {row.platform === "OxyLoans" ? (
+                        <Link
+                          to="/admin/stats/oxyloans-running-deals"
+                          className="hover:underline cursor-pointer text-purple-500 hover:text-purple-400 font-bold flex items-center gap-1.5"
+                        >
+                          {fmtCount(row.runningDeals)}
+                          <svg className="w-3.5 h-3.5 inline-block opacity-70" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                          </svg>
+                        </Link>
+                      ) : (
+                        <span style={{ color: "var(--text-muted)" }}>{fmtCount(row.runningDeals)}</span>
+                      )}
                     </td>
                     <td className="py-3.5 px-4 font-black font-mono text-emerald-500">
-                      {fmtAmount(row.runningAmount)}
+                      {row.platform === "OxyLoans" ? (
+                        <Link
+                          to="/admin/stats/oxyloans-running-deals"
+                          className="hover:underline cursor-pointer text-emerald-500 hover:text-emerald-400 flex items-center gap-1.5 font-black"
+                        >
+                          {fmtAmount(row.runningAmount)}
+                          <svg className="w-3.5 h-3.5 inline-block opacity-70" fill="none" stroke="currentColor" strokeWidth="2.4" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                          </svg>
+                        </Link>
+                      ) : (
+                        fmtAmount(row.runningAmount)
+                      )}
                     </td>
                     <td className="py-3.5 px-4 font-semibold font-mono" style={{ color: "var(--text-muted)" }}>
                       {fmtCount(row.closedDeals)}

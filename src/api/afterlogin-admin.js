@@ -470,5 +470,18 @@ export async function getAdminOxyLoansDealsStats() {
   return response.json();
 }
 
+/**
+ * GET https://fintech.oxyloans.com/oxyloans/v1/user/AdminViewDealsWiseInfo
+ * Returns OxyLoans detailed deals-wise information.
+ */
+export async function getAdminViewDealsWiseInfo() {
+  const response = await fetch('https://fintech.oxyloans.com/oxyloans/v1/user/AdminViewDealsWiseInfo');
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return response.json();
+}
+
+
 
 
