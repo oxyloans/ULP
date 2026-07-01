@@ -70,6 +70,7 @@ import TopLenders from './pages/admin/stats/TopLenders.jsx';
 import TotalAssets from './pages/admin/stats/TotalAssets.jsx';
 import InterestPrincipal from './pages/admin/stats/InterestPrincipal.jsx';
 import OxyLoansRunningDeals from './pages/admin/stats/OxyLoansRunningDeals.jsx';
+import OfflineRunningDeals from './pages/admin/stats/OfflineRunningDeals.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 
@@ -234,6 +235,7 @@ function AdminLayout() {
               <Route path="stats"                 element={<Navigate replace to="stats/funds-raised" />} />
               <Route path="stats/funds-raised"    element={<RequireAdminPerm routeKey="stats"><FundsRaised /></RequireAdminPerm>} />
               <Route path="stats/oxyloans-running-deals" element={<RequireAdminPerm routeKey="stats"><OxyLoansRunningDeals /></RequireAdminPerm>} />
+              <Route path="stats/offline-running-deals" element={<RequireAdminPerm routeKey="stats"><OfflineRunningDeals /></RequireAdminPerm>} />
               <Route path="stats/top-lenders"    element={<RequireAdminPerm routeKey="stats"><TopLenders /></RequireAdminPerm>} />
               <Route path="stats/total-assets"   element={<RequireAdminPerm routeKey="stats"><TotalAssets /></RequireAdminPerm>} />
               <Route path="stats/interest-principal" element={<RequireAdminPerm routeKey="stats"><InterestPrincipal /></RequireAdminPerm>} />

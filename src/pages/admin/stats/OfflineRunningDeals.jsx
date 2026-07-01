@@ -1,7 +1,7 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { formatINR } from "../../../utils/currency";
-import { getAdminViewDealsWiseInfo } from "../../../api/afterlogin-admin";
+import { getAdminDeals } from "../../../api/afterlogin-admin";
 import { Section, TableShell, TableHead, StatCard, icons } from "../AdminStats";
 
 const ArrowLeftIcon = () => (
@@ -34,33 +34,44 @@ const SearchIcon = () => (
   </svg>
 );
 
-export default function OxyLoansRunningDeals() {
+export default function OfflineRunningDeals() {
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
   
-  // Extract category type from search params: 'normal' | 'escrow'
-  const categoryType = searchParams.get("type") || "normal";
+  // Extract category type from search params: 'sdlot' | 'gold' | 'asset'
+  const categoryType = searchParams.get("type") || "sdlot";
 
-  const [deals, setDeals] = useState([]);
+  const [runningDeals, setRunningDeals] = useState([]);
+  const [closedDeals, setClosedDeals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  
-  // Search, filter, and pagination states
+
+  // Search and pagination states
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "running" | "closed"
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const [statusFilter, setStatusFilter] = useState("all"); // "all" | "running" | "closed"
 
   useEffect(() => {
     async function fetchData() {
       try {
         setLoading(true);
         setError(null);
-        const data = await getAdminViewDealsWiseInfo();
-        setDeals(Array.isArray(data) ? data : []);
+        
+        const [runningRes, closedRes] = await Promise.all([
+          getAdminDeals("NORMAL").catch(() => ({})),
+          getAdminDeals("closed").catch(() => ({}))
+        ]);
+
+        const getDealsList = (res) => {
+          return res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
+        };
+
+        setRunningDeals(getDealsList(runningRes));
+        setClosedDeals(getDealsList(closedRes));
       } catch (err) {
-        console.error("Failed to fetch AdminViewDealsWiseInfo:", err);
-        setError("Failed to load OxyLoans deals data. Please try again later.");
+        console.error("Failed to fetch Offline deals:", err);
+        setError("Failed to load Offline deals data.");
       } finally {
         setLoading(false);
       }
@@ -68,78 +79,77 @@ export default function OxyLoansRunningDeals() {
     fetchData();
   }, []);
 
-  // Reset page to 1 on search, status filter, or category type change
+  // Reset page number on search, status filter, or category tab change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, statusFilter, categoryType]);
 
-  // Classification helper for Escrow vs Normal
-  const isEscrowDeal = (deal) => {
-    const name = (deal.dealName || "").toLowerCase();
-    const type = (deal.dealType || "").toLowerCase();
-    return name.includes("escrow") || type.includes("escrow");
+  // Combine and label deals with status
+  const allDeals = useMemo(() => {
+    const running = runningDeals.map(d => ({ ...d, status: "Running" }));
+    const closed = closedDeals.map(d => ({ ...d, status: "Closed" }));
+    return [...running, ...closed];
+  }, [runningDeals, closedDeals]);
+
+  // Categorized deals helper
+  const isCategoryMatch = (deal, cat) => {
+    const type = (deal.globalDealType || "").toUpperCase();
+    if (cat === "asset") return type === "ASSET";
+    if (cat === "gold") return type === "GOLD" || type === "REALGOLD";
+    // sdlot by default
+    return type === "SDLOT" || (type !== "ASSET" && type !== "GOLD" && type !== "REALGOLD");
   };
 
-  // Filter deals based on category type, search, and status filter
+  // Filter deals based on category tab, search term, and running/closed status
   const filteredDeals = useMemo(() => {
-    return deals.filter((deal) => {
-      // 1. Category check (Normal vs Escrow)
-      const escrow = isEscrowDeal(deal);
-      if (categoryType === "escrow" && !escrow) return false;
-      if (categoryType === "normal" && escrow) return false;
+    return allDeals.filter(deal => {
+      // 1. Category check
+      if (!isCategoryMatch(deal, categoryType)) return false;
 
       // 2. Search check
-      const nameMatch = (deal.dealName || "").toLowerCase().includes(searchTerm.toLowerCase());
-      const idMatch = String(deal.dealId || "").includes(searchTerm);
-      const matchesSearch = nameMatch || idMatch;
+      const name = (deal.dealName || "").toLowerCase();
+      const id = String(deal.dealId || deal.id || "");
+      const matchesSearch = name.includes(searchTerm.toLowerCase()) || id.includes(searchTerm);
 
       if (!matchesSearch) return false;
 
       // 3. Status filter check
-      if (statusFilter === "running") {
-        return (Number(deal.runningAmount) || 0) > 0;
-      }
-      if (statusFilter === "closed") {
-        return (Number(deal.closedAmount) || 0) > 0 && (Number(deal.runningAmount) || 0) === 0;
-      }
+      if (statusFilter === "running") return deal.status === "Running";
+      if (statusFilter === "closed") return deal.status === "Closed";
+
       return true;
     });
-  }, [deals, searchTerm, statusFilter, categoryType]);
+  }, [allDeals, categoryType, searchTerm, statusFilter]);
 
-  // Compute stats based on deals matching the current category
+  // Compute aggregate stats for current category
   const stats = useMemo(() => {
-    const categoryDeals = deals.filter(d => {
-      const escrow = isEscrowDeal(d);
-      return categoryType === "escrow" ? escrow : !escrow;
-    });
+    const categoryDeals = allDeals.filter(d => isCategoryMatch(d, categoryType));
+    let totalValue = 0;
+    let totalInvested = 0;
+    let runningCount = 0;
+    let closedCount = 0;
 
-    let totalDealsCount = categoryDeals.length;
-    let totalDealValue = 0;
-    let totalParticipation = 0;
-    let totalRunning = 0;
-    let totalClosed = 0;
-
-    categoryDeals.forEach((d) => {
-      totalDealValue += Number(d.dealValue) || 0;
-      totalParticipation += Number(d.totalParticipationAmount) || 0;
-      totalRunning += Number(d.runningAmount) || 0;
-      totalClosed += Number(d.closedAmount) || 0;
+    categoryDeals.forEach(d => {
+      totalValue += Number(d.dealValue || d.dealAmount) || 0;
+      totalInvested += Number(d.totalParticipationAmount || d.dealParticipationValue) || 0;
+      if (d.status === "Running") runningCount++;
+      else if (d.status === "Closed") closedCount++;
     });
 
     return {
-      totalDealsCount,
-      totalDealValue,
-      totalParticipation,
-      totalRunning,
-      totalClosed,
+      totalDeals: categoryDeals.length,
+      totalValue,
+      totalInvested,
+      runningCount,
+      closedCount
     };
-  }, [deals, categoryType]);
+  }, [allDeals, categoryType]);
 
   // Pagination calculations
   const totalItems = filteredDeals.length;
   const totalPages = Math.max(1, Math.ceil(totalItems / pageSize));
-  
-  // Guard current page range
+
+  // Guard page range
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages);
@@ -152,7 +162,7 @@ export default function OxyLoansRunningDeals() {
     return filteredDeals.slice(startIndex, startIndex + pageSize);
   }, [filteredDeals, startIndex, pageSize]);
 
-  // Generate pagination buttons
+  // Generate pagination page buttons
   const pageNumbers = useMemo(() => {
     const pages = [];
     const maxPageButtons = 5;
@@ -170,7 +180,7 @@ export default function OxyLoansRunningDeals() {
     return pages;
   }, [currentPage, totalPages]);
 
-  // Quick switch category tab
+  // Quick switch tab
   const setCategory = (cat) => {
     setSearchParams({ type: cat });
   };
@@ -181,7 +191,7 @@ export default function OxyLoansRunningDeals() {
         <div className="rounded-2xl p-6" style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}>
           <div className="flex items-center justify-center py-8">
             <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
-            <span className="ml-3 text-sm" style={{ color: "var(--text-muted)" }}>Loading deals data...</span>
+            <span className="ml-3 text-sm" style={{ color: "var(--text-muted)" }}>Loading Offline deals data...</span>
           </div>
         </div>
       </div>
@@ -207,13 +217,14 @@ export default function OxyLoansRunningDeals() {
   }
 
   const categoryLabels = {
-    normal: "Normal",
-    escrow: "Escrow"
+    sdlot: "SD Lot",
+    gold: "Gold",
+    asset: "Asset"
   };
 
   return (
     <div className="grid gap-7">
-      {/* Header Area */}
+      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-3">
           <button
@@ -233,12 +244,12 @@ export default function OxyLoansRunningDeals() {
               Stats / Platform Deal Summary
             </p>
             <h1 className="text-2xl font-black mt-1" style={{ color: "var(--text-primary)" }}>
-              OxyLoans {categoryLabels[categoryType]} Deals Info
+              Offline {categoryLabels[categoryType]} Deals
             </h1>
           </div>
         </div>
 
-        {/* Category tabs */}
+        {/* Category switcher tabs */}
         <div className="flex items-center gap-2 bg-neutral-500/5 p-1 rounded-2xl border" style={{ borderColor: "var(--border)" }}>
           {Object.entries(categoryLabels).map(([cat, label]) => (
             <button
@@ -260,31 +271,31 @@ export default function OxyLoansRunningDeals() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
           label={`Total ${categoryLabels[categoryType]} Deals`}
-          value={stats.totalDealsCount.toLocaleString("en-IN")}
-          sub={`Total ${categoryLabels[categoryType]} deals`}
+          value={stats.totalDeals.toLocaleString("en-IN")}
+          sub={`Running & closed ${categoryLabels[categoryType]} deals`}
           color="#6366f1"
           Icon={icons.Deal}
         />
         <StatCard
           label="Total Deal Value"
-          value={formatINR(stats.totalDealValue)}
-          sub="Accumulated cap/target value"
+          value={formatINR(stats.totalValue)}
+          sub="Sum of value / cap limits"
           color="#f59e0b"
           Icon={icons.Rupee}
         />
         <StatCard
-          label="Participation Amount"
-          value={formatINR(stats.totalParticipation)}
-          sub="Total amount lenders participated"
+          label="Total Invested Amount"
+          value={formatINR(stats.totalInvested)}
+          sub="Lender investments"
           color="#a855f7"
           Icon={icons.Chart}
         />
         <StatCard
-          label="Running Amount"
-          value={formatINR(stats.totalRunning)}
-          sub="Total live/running amount"
+          label="Running Deals Count"
+          value={stats.runningCount.toLocaleString("en-IN")}
+          sub="Active live deals"
           color="#10b981"
-          Icon={icons.Rupee}
+          Icon={icons.Deal}
         />
       </div>
 
@@ -293,7 +304,7 @@ export default function OxyLoansRunningDeals() {
         className="rounded-2xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-4"
         style={{ background: "var(--card-bg)", border: "1px solid var(--border)" }}
       >
-        {/* Search Bar */}
+        {/* Search */}
         <div className="relative flex-1 max-w-md">
           <span className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none" style={{ color: "var(--text-muted)" }}>
             <SearchIcon />
@@ -306,15 +317,14 @@ export default function OxyLoansRunningDeals() {
               borderColor: "var(--border)",
               color: "var(--text-primary)"
             }}
-            placeholder={`Search ${categoryLabels[categoryType]} deals...`}
+            placeholder={`Search ${categoryLabels[categoryType]} deals by name/ID...`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
 
-        {/* Filter Badges and Page Size Select */}
+        {/* Page Size & Status Filters */}
         <div className="flex items-center gap-3 flex-wrap self-start md:self-auto">
-          {/* Page Size Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold" style={{ color: "var(--text-muted)" }}>Rows:</span>
             <select
@@ -363,7 +373,7 @@ export default function OxyLoansRunningDeals() {
 
       {/* Table Section */}
       <Section
-        title={`OxyLoans ${categoryLabels[categoryType]} Deals`}
+        title={`Offline ${categoryLabels[categoryType]} Deals list`}
         subtitle={`Showing ${totalItems > 0 ? startIndex + 1 : 0} to ${endIndex} of ${totalItems} deals`}
       >
         <TableShell>
@@ -373,10 +383,10 @@ export default function OxyLoansRunningDeals() {
                 "Deal ID",
                 "Deal Name",
                 "Deal Value",
-                "Participation Amount",
-                "Running Amount",
-                "Closed Amount",
-                "Lenders (Total / Active / Closed)"
+                "Invested Amount",
+                "Remaining Value",
+                "Interest Rate",
+                "Status"
               ]}
             />
             <tbody>
@@ -389,42 +399,38 @@ export default function OxyLoansRunningDeals() {
               ) : (
                 paginatedDeals.map((deal, idx) => (
                   <tr
-                    key={deal.dealId}
+                    key={deal.dealId || deal.id}
                     style={{ borderBottom: idx === paginatedDeals.length - 1 ? "none" : "1px solid var(--border)" }}
                     className="transition-colors hover:bg-neutral-500/5"
                   >
                     <td className="py-3.5 px-4 font-mono font-bold" style={{ color: "var(--text-primary)" }}>
-                      {deal.dealId}
+                      {deal.dealId || deal.id}
                     </td>
                     <td className="py-3.5 px-4 font-bold" style={{ color: "var(--text-primary)" }}>
                       {deal.dealName || "—"}
                     </td>
                     <td className="py-3.5 px-4 font-semibold font-mono" style={{ color: "var(--text-muted)" }}>
-                      {formatINR(deal.dealValue)}
+                      {formatINR(deal.dealValue || deal.dealAmount)}
                     </td>
                     <td className="py-3.5 px-4 font-semibold font-mono text-purple-500">
-                      {formatINR(deal.totalParticipationAmount)}
+                      {formatINR(deal.totalParticipationAmount || deal.dealParticipationValue)}
                     </td>
-                    <td className="py-3.5 px-4 font-black font-mono text-emerald-500">
-                      {formatINR(deal.runningAmount)}
+                    <td className="py-3.5 px-4 font-semibold font-mono text-amber-500">
+                      {formatINR(deal.remainingDealValue || deal.currentDealValue)}
                     </td>
-                    <td className="py-3.5 px-4 font-semibold font-mono text-neutral-400">
-                      {formatINR(deal.closedAmount)}
+                    <td className="py-3.5 px-4 font-semibold font-mono text-emerald-500">
+                      {deal.rateofinterest ?? deal.monthlyInterest ?? 0}%
                     </td>
-                    <td className="py-3.5 px-4 font-bold text-center">
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <span className="px-2 py-0.5 rounded text-xs" style={{ background: "rgba(99,102,241,0.12)", color: "#818cf8" }} title="Total Lenders">
-                          {deal.totalUsers ?? 0}
-                        </span>
-                        <span className="text-neutral-500 text-xs">/</span>
-                        <span className="px-2 py-0.5 rounded text-xs" style={{ background: "rgba(16,185,129,0.12)", color: "#34d399" }} title="Active Lenders">
-                          {deal.currentUsers ?? 0}
-                        </span>
-                        <span className="text-neutral-500 text-xs">/</span>
-                        <span className="px-2 py-0.5 rounded text-xs" style={{ background: "rgba(239,68,68,0.12)", color: "#f87171" }} title="Closed Lenders">
-                          {deal.closedUsers ?? 0}
-                        </span>
-                      </div>
+                    <td className="py-3.5 px-4 font-bold">
+                      <span
+                        className="px-2.5 py-1 rounded-full text-xs font-semibold"
+                        style={{
+                          background: deal.status === "Running" ? "rgba(16,185,129,0.12)" : "rgba(107,114,128,0.12)",
+                          color: deal.status === "Running" ? "#10b981" : "#9ca3af"
+                        }}
+                      >
+                        {deal.status}
+                      </span>
                     </td>
                   </tr>
                 ))
@@ -433,7 +439,7 @@ export default function OxyLoansRunningDeals() {
           </table>
         </TableShell>
 
-        {/* Pagination Controls */}
+        {/* Pagination */}
         {totalItems > 0 && (
           <div
             className="rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4 mt-4"
@@ -455,7 +461,6 @@ export default function OxyLoansRunningDeals() {
                   borderColor: "var(--border)",
                   color: "var(--text-primary)"
                 }}
-                title="First Page"
               >
                 &laquo;
               </button>
@@ -469,7 +474,6 @@ export default function OxyLoansRunningDeals() {
                   borderColor: "var(--border)",
                   color: "var(--text-primary)"
                 }}
-                title="Previous Page"
               >
                 &lsaquo;
               </button>
@@ -498,7 +502,6 @@ export default function OxyLoansRunningDeals() {
                   borderColor: "var(--border)",
                   color: "var(--text-primary)"
                 }}
-                title="Next Page"
               >
                 &rsaquo;
               </button>
@@ -512,7 +515,6 @@ export default function OxyLoansRunningDeals() {
                   borderColor: "var(--border)",
                   color: "var(--text-primary)"
                 }}
-                title="Last Page"
               >
                 &raquo;
               </button>
