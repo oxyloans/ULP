@@ -11,7 +11,7 @@ const DEAL_TABS = [
   { key: "SDLOT", label: "SD Lot" },
   { key: "GOLD", label: "Gold Lot" },
 ];
-const ASSET_AREA_TYPES = ["PLOT", "FLAT"];
+const ASSET_AREA_TYPES = ["PLOT", "FLAT", "ACERE"];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
