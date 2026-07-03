@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getWalletSlips, approveWalletSlip, rejectWalletSlip } from '../../api/afterlogin-admin';
 import FilePreviewModal from '../../components/FilePreviewModal';
@@ -11,6 +11,7 @@ const EyeIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const CloseIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const WalletIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="18" cy="12" r="2"/></svg>;
 const RefreshIcon= () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
+const ChevronDownIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="6 9 12 15 18 9"/></svg>;
 
 function fmtINR(n) {
   return formatINR(n ?? 0);
@@ -35,8 +36,42 @@ function mapTxn(raw, idx) {
     slipUrl:             raw.transactionSlipUrl ?? null,
     hasSlip:             !!raw.transactionSlipUrl,
     fundTransferCompany: raw.fundTransferompany ?? raw.fundTransferCompany ?? null,
+    approvedBy:          raw.approvedBy ?? null,
+    comments:            raw.comments ?? null,
   };
 }
+
+// ─── Date Parsing Utility ─────────────────────────────────────────────────────
+function parseDateToTimestamp(dStr) {
+  if (!dStr || dStr === '—') return 0;
+  const cleanStr = dStr.split('·')[0].trim();
+  if (cleanStr.includes('/')) {
+    const parts = cleanStr.split('/');
+    if (parts.length === 3) {
+      const day = parts[0].padStart(2, '0');
+      const month = parts[1].padStart(2, '0');
+      const year = parts[2];
+      return new Date(`${year}-${month}-${day}`).getTime() || 0;
+    }
+  }
+  if (cleanStr.includes('-')) {
+    const parts = cleanStr.split('-');
+    if (parts.length === 3) {
+      if (parts[0].length === 4) {
+        return new Date(cleanStr).getTime() || 0;
+      } else {
+        const day = parts[0].padStart(2, '0');
+        const month = parts[1].padStart(2, '0');
+        const year = parts[2];
+        return new Date(`${year}-${month}-${day}`).getTime() || 0;
+      }
+    }
+  }
+  const parsed = Date.parse(cleanStr);
+  return isNaN(parsed) ? 0 : parsed;
+}
+
+const sortByDateDesc = (a, b) => parseDateToTimestamp(b.date) - parseDateToTimestamp(a.date);
 
 const STATUS_CONFIG = {
   APPROVE: { bg: '#ecfdf5', text: '#059669', border: '#a7f3d0', label: 'Approved'  },
@@ -184,6 +219,12 @@ export default function AdminWalletApprovals() {
   const [slipUrl, setSlipUrl]   = useState(null);
   const [tab, setTab]           = useState('REVIEW');
   const [confirmModal, setConfirmModal] = useState(null);
+  const [expandedUsers, setExpandedUsers] = useState({});
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    setExpandedUsers({});
+  }, [tab, searchQuery]);
 
   const fetchSlips = async () => {
     setLoading(true); setFetchErr('');
@@ -209,10 +250,10 @@ export default function AdminWalletApprovals() {
       };
       if (action === 'approve') {
         await approveWalletSlip(payload);
-        setTxns(prev => prev.map(t => t.id === txn.id ? { ...t, status: 'APPROVE', rawStatus: 'APPROVED' } : t));
+        setTxns(prev => prev.map(t => t.id === txn.id ? { ...t, status: 'APPROVE', rawStatus: 'APPROVED', approvedBy, comments } : t));
       } else {
         await rejectWalletSlip(payload);
-        setTxns(prev => prev.map(t => t.id === txn.id ? { ...t, status: 'REJECT', rawStatus: 'REJECTED' } : t));
+        setTxns(prev => prev.map(t => t.id === txn.id ? { ...t, status: 'REJECT', rawStatus: 'REJECTED', approvedBy, comments } : t));
       }
       setConfirmModal(null);
     } catch (err) { console.error(err.message); }
@@ -225,7 +266,61 @@ export default function AdminWalletApprovals() {
     { key: 'REJECT',  label: 'Rejected', color: '#dc2626' },
     { key: 'ALL',     label: 'All',      color: '#6366f1' },
   ];
-  const filtered = tab === 'ALL' ? txns : txns.filter(t => t.status === tab);
+
+  const query = searchQuery.trim().toLowerCase();
+  const matchesSearch = (t) => {
+    if (!query) return true;
+    return (
+      (t.userName && t.userName.toLowerCase().includes(query)) ||
+      (t.userId && t.userId.toLowerCase().includes(query)) ||
+      (t.utrNumber && t.utrNumber.toLowerCase().includes(query)) ||
+      (t.description && t.description.toLowerCase().includes(query)) ||
+      (t.fundTransferCompany && t.fundTransferCompany.toLowerCase().includes(query))
+    );
+  };
+
+  const filtered = (tab === 'ALL' ? txns : txns.filter(t => t.status === tab))
+    .filter(matchesSearch);
+
+  const toggleUserExpand = (uid) => {
+    setExpandedUsers(prev => ({
+      ...prev,
+      [uid]: !prev[uid]
+    }));
+  };
+
+  // Group by userId for APPROVED tab
+  const groupedApproved = [];
+  if (tab === 'APPROVE') {
+    const groups = {};
+    txns.forEach(t => {
+      if (t.status === 'APPROVE' && matchesSearch(t)) {
+        const uid = t.userId || 'unknown';
+        if (!groups[uid]) {
+          groups[uid] = {
+            userId: uid,
+            userName: t.userName,
+            totalAmount: 0,
+            txns: [],
+          };
+        }
+        groups[uid].totalAmount += t.amount;
+        groups[uid].txns.push(t);
+      }
+    });
+
+    // Sort each group's transactions date-wise (descending)
+    Object.values(groups).forEach(g => {
+      g.txns.sort(sortByDateDesc);
+    });
+
+    // Convert to array and sort users by their most recent transaction date descending
+    groupedApproved.push(...Object.values(groups).sort((a, b) => {
+      const timeA = a.txns.length > 0 ? parseDateToTimestamp(a.txns[0].date) : 0;
+      const timeB = b.txns.length > 0 ? parseDateToTimestamp(b.txns[0].date) : 0;
+      return timeB - timeA;
+    }));
+  }
 
   // Detect duplicate UTR numbers across ALL transactions
   const utrCounts = {};
@@ -291,15 +386,43 @@ export default function AdminWalletApprovals() {
           ))}
         </div>
 
-        <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
-          style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
-          {tabs.map(t => (
-            <button key={t.key} onClick={() => setTab(t.key)}
-              className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
-              style={{ background: tab === t.key ? `linear-gradient(135deg,${t.color},${t.color}cc)` : 'transparent', color: tab === t.key ? '#fff' : 'var(--text-muted)', boxShadow: tab === t.key ? `0 2px 8px ${t.color}40` : 'none' }}>
-              {t.label} · {counts[t.key]}
-            </button>
-          ))}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex items-center gap-1 p-1 rounded-xl w-fit"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            {tabs.map(t => (
+              <button key={t.key} onClick={() => setTab(t.key)}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={{ background: tab === t.key ? `linear-gradient(135deg,${t.color},${t.color}cc)` : 'transparent', color: tab === t.key ? '#fff' : 'var(--text-muted)', boxShadow: tab === t.key ? `0 2px 8px ${t.color}40` : 'none' }}>
+                {t.label} · {counts[t.key]}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full sm:w-80">
+            <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none" style={{ color: 'var(--text-muted)' }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2.2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </span>
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search user name, ID, UTR..."
+              className="w-full pl-10 pr-10 py-2 rounded-xl text-xs font-semibold outline-none transition-all"
+              style={{
+                background: 'var(--input-bg)',
+                border: '1.5px solid var(--border)',
+                color: 'var(--text-primary)',
+              }}
+              onFocus={e => e.target.style.borderColor = '#6366f1'}
+              onBlur={e => e.target.style.borderColor = 'var(--border)'}
+            />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')}
+                className="absolute inset-y-0 right-0 flex items-center pr-3"
+                style={{ color: 'var(--text-muted)' }}>
+                <CloseIcon />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="rounded-2xl overflow-hidden"
@@ -320,102 +443,248 @@ export default function AdminWalletApprovals() {
             </div>
           )}
           {!loading && !fetchErr && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                    {['User', 'Description', 'Amount', 'Date', 'Fund Transfer To', 'Status', 'Slip', 'Actions'].map(h => (
-                      <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr><td colSpan={8} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No transactions in this category</td></tr>
-                  ) : filtered.map(txn => {
-                    const isDup = isDuplicateUtr(txn.utrNumber);
-                    return (
-                    <tr key={txn.id}
-                      style={{
-                        borderBottom: '1px solid var(--border)',
-                        outline: isDup ? '2px solid rgba(239,68,68,0.5)' : 'none',
-                        outlineOffset: '-1px',
-                        background: isDup ? 'rgba(239,68,68,0.03)' : 'transparent',
-                      }}
-                      onMouseEnter={e => e.currentTarget.style.background = isDup ? 'rgba(239,68,68,0.06)' : 'var(--row-hover)'}
-                      onMouseLeave={e => e.currentTarget.style.background = isDup ? 'rgba(239,68,68,0.03)' : 'transparent'}>
-                      <td className="py-3.5 px-4">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-                            style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}>
-                            {(txn.userName || 'U').charAt(0).toUpperCase()}
+            tab === 'APPROVE' ? (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm font-semibold ">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+                      {['User', 'Approved Count', 'Total Approved Amount', 'Last Approved Date', 'Actions'].map(h => (
+                        <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {groupedApproved.length === 0 ? (
+                      <tr><td colSpan={5} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No approved transactions found</td></tr>
+                    ) : (
+                      groupedApproved.map(group => {
+                        const isExpanded = expandedUsers[group.userId] !== undefined 
+                          ? expandedUsers[group.userId] 
+                          : (!!query);
+                        return (
+                          <Fragment key={group.userId}>
+                            <tr
+                              style={{
+                                borderBottom: '1px solid var(--border)',
+                                background: isExpanded ? 'var(--row-hover)' : 'transparent',
+                                transition: 'all 0.2s ease',
+                              }}
+                              onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.background = 'var(--row-hover)'; }}
+                              onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.background = 'transparent'; }}>
+                              <td className="py-4 px-4">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                                    style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
+                                    {(group.userName || 'U').charAt(0).toUpperCase()}
+                                  </div>
+                                  <div>
+                                    <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{group.userName}</p>
+                                    <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{group.userId}</p>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="text-xs font-bold px-2.5 py-1 rounded-lg"
+                                  style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border)' }}>
+                                  {group.txns.length} {group.txns.length === 1 ? 'Deposit' : 'Deposits'}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4">
+                                <span className="text-sm font-extrabold" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
+                                  {fmtINR(group.totalAmount)}
+                                </span>
+                              </td>
+                              <td className="py-4 px-4 text-xs font-medium" style={{ color: 'var(--text-muted)' }}>
+                                {group.txns[0]?.date || '—'}
+                              </td>
+                              <td className="py-4 px-4">
+                                <button onClick={() => toggleUserExpand(group.userId)}
+                                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                                  style={{
+                                    background: isExpanded ? '#10b981' : 'rgba(16,185,129,0.1)',
+                                    color: isExpanded ? '#fff' : '#10b981',
+                                    border: '1px solid rgba(16,185,129,0.25)',
+                                  }}>
+                                  {isExpanded ? 'Hide Records' : 'View Records'}
+                                  <span style={{ transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s', display: 'inline-block' }}>
+                                    <ChevronDownIcon />
+                                  </span>
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr key={`${group.userId}-details`}>
+                                <td colSpan={5} className="p-0" style={{ background: 'var(--input-bg)' }}>
+                                  <div className="px-6 py-4 border-b border-dashed" style={{ borderColor: 'var(--border)' }}>
+                                    <h4 className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-muted)' }}>
+                                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                      Individual Approved Records for {group.userName}
+                                    </h4>
+                                    <div className="rounded-xl overflow-hidden border animate-fadeIn" style={{ borderColor: 'var(--border)', background: 'var(--surface-card)' }}>
+                                      <table className="w-full text-xs">
+                                        <thead>
+                                          <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+                                            {['Date', 'Description', 'Amount', 'Fund Transfer To', 'Approved By & Comments', 'Slip'].map(sh => (
+                                              <th key={sh} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider text-[10px]" style={{ color: 'var(--text-muted)' }}>{sh}</th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          {group.txns.map(subTxn => (
+                                            <tr key={subTxn.id} style={{ borderBottom: '1px solid var(--border)' }}
+                                              onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
+                                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                                              <td className="py-2.5 px-3 font-medium whitespace-nowrap" style={{ color: 'var(--text-primary)' }}>{subTxn.date}</td>
+                                              <td className="py-2.5 px-3">
+                                                <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{subTxn.description}</p>
+                                                {subTxn.utrNumber && <p className="text-[10px] font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>UTR: {subTxn.utrNumber}</p>}
+                                              </td>
+                                              <td className="py-2.5 px-3">
+                                                <span className="font-extrabold" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>+{fmtINR(subTxn.amount)}</span>
+                                              </td>
+                                              <td className="py-2.5 px-3">
+                                                {subTxn.fundTransferCompany ? (
+                                                  <span className="text-[10px] font-semibold px-2 py-0.5 rounded"
+                                                    style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                                    {subTxn.fundTransferCompany}
+                                                  </span>
+                                                ) : '—'}
+                                              </td>
+                                              <td className="py-2.5 px-3">
+                                                <div className="flex flex-col gap-0.5">
+                                                  <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                                                    By: {subTxn.approvedBy || 'Admin'}
+                                                  </span>
+                                                  {subTxn.comments && (
+                                                    <span className="italic" style={{ color: 'var(--text-muted)', fontSize: '10px' }}>
+                                                      "{subTxn.comments}"
+                                                    </span>
+                                                  )}
+                                                </div>
+                                              </td>
+                                              <td className="py-2.5 px-3">
+                                                {subTxn.hasSlip ? (
+                                                  <button onClick={() => setSlipUrl(subTxn.slipUrl)}
+                                                    className="inline-flex items-center gap-1 px-2 py-1 rounded text-[10px] font-bold transition-all hover:scale-105"
+                                                    style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)' }}>
+                                                    <EyeIcon /> View Slip
+                                                  </button>
+                                                ) : '—'}
+                                              </td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+                      {['User', 'Description', 'Amount', 'Date', 'Fund Transfer To', 'Status', 'Slip', 'Actions'].map(h => (
+                        <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filtered.length === 0 ? (
+                      <tr><td colSpan={8} className="py-12 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No transactions in this category</td></tr>
+                    ) : filtered.map(txn => {
+                      const isDup = isDuplicateUtr(txn.utrNumber);
+                      return (
+                      <tr key={txn.id}
+                        style={{
+                          borderBottom: '1px solid var(--border)',
+                          outline: isDup ? '2px solid rgba(239,68,68,0.5)' : 'none',
+                          outlineOffset: '-1px',
+                          background: isDup ? 'rgba(239,68,68,0.03)' : 'transparent',
+                        }}
+                        onMouseEnter={e => e.currentTarget.style.background = isDup ? 'rgba(239,68,68,0.06)' : 'var(--row-hover)'}
+                        onMouseLeave={e => e.currentTarget.style.background = isDup ? 'rgba(239,68,68,0.03)' : 'transparent'}>
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
+                              style={{ background: 'rgba(168,85,247,0.12)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}>
+                              {(txn.userName || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{txn.userName}</p>
+                              <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>…{txn.userId.slice(-4)}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{txn.userName}</p>
-                            <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>…{txn.userId.slice(-4)}</p>
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{txn.description}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{txn.rawStatus}</p>
+                            {isDup && (
+                              <span className="text-xs font-bold px-1.5 py-0.5 rounded-md"
+                                style={{ background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)' }}>
+                                ⚠ Duplicate UTR
+                              </span>
+                            )}
                           </div>
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>{txn.description}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{txn.rawStatus}</p>
-                          {isDup && (
-                            <span className="text-xs font-bold px-1.5 py-0.5 rounded-md"
-                              style={{ background: 'rgba(239,68,68,0.1)', color: '#dc2626', border: '1px solid rgba(239,68,68,0.3)' }}>
-                              ⚠ Duplicate UTR
+                        </td>
+                        <td className="py-3.5 px-4">
+                          <span className="text-sm font-extrabold" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>+{fmtINR(txn.amount)}</span>
+                        </td>
+                        <td className="py-3.5 px-4 text-xs" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{txn.date}</td>
+                        <td className="py-3.5 px-4">
+                          {txn.fundTransferCompany
+                            ? <span className="text-xs font-semibold px-2.5 py-1 rounded-lg whitespace-nowrap"
+                                style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.25)' }}>
+                                {txn.fundTransferCompany}
+                              </span>
+                            : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td className="py-3.5 px-4"><StatusChip status={txn.status} /></td>
+                        <td className="py-3.5 px-4">
+                          {txn.hasSlip
+                            ? <button onClick={() => setSlipUrl(txn.slipUrl)}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                                style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                                <EyeIcon /> View
+                              </button>
+                            : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
+                        </td>
+                        <td className="py-3.5 px-4">
+                          {txn.status === 'REVIEW' ? (
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => setConfirmModal({ txn, action: 'approve' })}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                                style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
+                                <CheckIcon /> Approve
+                              </button>
+                              <button onClick={() => setConfirmModal({ txn, action: 'reject' })}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                                style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
+                                <XIcon /> Reject
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                              {txn.status === 'APPROVE' ? '✓ Approved' : txn.status === 'REJECT' ? '✕ Rejected' : '—'}
                             </span>
                           )}
-                        </div>
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <span className="text-sm font-extrabold" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>+{fmtINR(txn.amount)}</span>
-                      </td>
-                      <td className="py-3.5 px-4 text-xs" style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{txn.date}</td>
-                      <td className="py-3.5 px-4">
-                        {txn.fundTransferCompany
-                          ? <span className="text-xs font-semibold px-2.5 py-1 rounded-lg whitespace-nowrap"
-                              style={{ background: 'rgba(245,158,11,0.1)', color: '#d97706', border: '1px solid rgba(245,158,11,0.25)' }}>
-                              {txn.fundTransferCompany}
-                            </span>
-                          : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </td>
-                      <td className="py-3.5 px-4"><StatusChip status={txn.status} /></td>
-                      <td className="py-3.5 px-4">
-                        {txn.hasSlip
-                          ? <button onClick={() => setSlipUrl(txn.slipUrl)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-                              <EyeIcon /> View
-                            </button>
-                          : <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        {txn.status === 'REVIEW' ? (
-                          <div className="flex items-center gap-2">
-                            <button onClick={() => setConfirmModal({ txn, action: 'approve' })}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                              style={{ background: '#ecfdf5', color: '#059669', border: '1px solid #a7f3d0' }}>
-                              <CheckIcon /> Approve
-                            </button>
-                            <button onClick={() => setConfirmModal({ txn, action: 'reject' })}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                              style={{ background: '#fef2f2', color: '#dc2626', border: '1px solid #fecaca' }}>
-                              <XIcon /> Reject
-                            </button>
-                          </div>
-                        ) : (
-                          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
-                            {txn.status === 'APPROVE' ? '✓ Approved' : txn.status === 'REJECT' ? '✕ Rejected' : '—'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </td>
+                      </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )
           )}
         </div>
       </div>

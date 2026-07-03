@@ -294,6 +294,7 @@ function mapDeal(raw) {
   return {
     id:             raw.id ?? raw.dealName,
     title:          raw.dealName,
+    globalDealType: raw.globalDealType ?? '',
     auctionType:    'Open',
     status,
     tag:            status === 'Closed' ? 'Achieved' : 'Live',
@@ -522,6 +523,9 @@ export default function SDLots() {
   const filtered = lots.filter(l => {
     // Only show running (Open) deals
     if (l.status !== 'Open') return false;
+
+    // Skip non-SDLOT global deal types
+    if (l.globalDealType && l.globalDealType !== 'SDLOT') return false;
 
     // If deal has a userIds restriction, only show to included users
     if (l.userIds && l.userIds.trim()) {

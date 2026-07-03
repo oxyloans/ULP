@@ -38,6 +38,9 @@ import MyParticipations from './pages/MyParticipations.jsx';
 import Profile from './pages/Profile.jsx';
 import SDLotsTest from './UserAPI/SDLotsTest.jsx';
 import AssetDeals from './pages/AssetDeals.jsx';
+import AssetDealsTest from './pages/AssetDealsTest.jsx';
+import AssetParticipate from './pages/AssetParticipate.jsx';
+import AssetParticipations from './pages/AssetParticipations.jsx';
 import GoldDealsParticipated from './pages/GoldDealsParticipated.jsx';
 import GoldDeal from './pages/GoldDeal.jsx';
 import GoldDealContribute from './pages/GoldDealContribute.jsx';
@@ -181,9 +184,12 @@ function UserLayout() {
             <Route path="/gold-deals-participation" element={<GoldDealsParticipated />} />
             <Route path="/interestPaymentDates/:propertyId" element={<InterestPaymentDates />} />
             <Route path="/asset" element={<AssetDeals />} />
+            <Route path="/asset-test" element={<AssetDealsTest />} />
             <Route path="/sd-lots-test" element={<SDLotsTest />} />
             <Route path="/sd-lot/participate/:id" element={<SDLotParticipate />} />
+            <Route path="/asset/participate/:id" element={<AssetParticipate />} />
             <Route path="/my-participations" element={<MyParticipations />} />
+            <Route path="/asset-deals-participation" element={<AssetParticipations />} />
             <Route path="/wallet" element={<WalletDashboard />} />
             <Route path="/wallet/history" element={<WalletHistory />} />
             <Route path="/wallet/withdrawal-requests" element={<WalletWithdrawalRequests />} />

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals } from "../../api/afterlogin-admin";
+import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals, uploadFractionalAssetFile } from "../../api/afterlogin-admin";
 import { formatINR } from "../../utils/currency";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -12,6 +12,7 @@ const DEAL_TABS = [
   { key: "GOLD", label: "Gold Lot" },
 ];
 const ASSET_AREA_TYPES = ["PLOT", "FLAT", "ACERE"];
+const ASSET_SUB_TYPES  = ["FRACTIONAL_LENDING", "STUDENT"];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -200,7 +201,7 @@ const inp = (err) => ({
 
 function Field({ label, required, error, hint, children }) {
   return (
-    <div className="grid gap-1.5">
+    <div className="grid gap-1.5 min-w-0">
       <label className="text-xs font-semibold flex items-center gap-1" style={{ color: "var(--text-muted)" }}>
         {label}{required && <span style={{ color: "#ef4444" }}>*</span>}
       </label>
@@ -248,12 +249,12 @@ function FilePicker({ label, file, files = [], multiple, accept, required = true
 
   return (
     <Field label={label} required={required} error={error}>
-      <label className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-3 cursor-pointer"
+      <label className="w-full rounded-xl px-4 py-3 flex items-center justify-between gap-3 cursor-pointer min-w-0"
         style={{
           background: "var(--input-bg)",
           border: `1.5px dashed ${error ? "#ef4444" : "var(--border)"}`,
         }}>
-        <span className="text-sm font-semibold truncate" style={{ color: names ? "var(--text-primary)" : "var(--text-muted)" }}>
+        <span className="text-sm font-semibold truncate min-w-0" style={{ color: names ? "var(--text-primary)" : "var(--text-muted)" }}>
           {names || "Choose file"}
         </span>
         <span className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-bold"
@@ -285,13 +286,23 @@ const EMPTY_FORM = {
 };
 
 const EMPTY_ASSET_FORM = {
-  dealName: "", dealValue: "", dealType: "NORMAL",
+  dealName: "", dealAmount: "", dealType: "NORMAL", dealSubType: "STUDENT",
   monthlyInterest: "", quartelyInterest: "", halfInterest: "", yearlyInterest: "",
   borrowerName: "", projectName: "",
   legalReport: null, valuationReport: null,
   assetValue: "", latitude: "", longitude: "",
   assetArea: "", assetAreaType: "PLOT",
   images: [], videos: [],
+  duration: "",
+  minimumParticipation: "",
+  maxParticipation: "",
+  fundsAcceptanceStartDate: "",
+  fundsAcceptanceEndDate: "",
+  loanActiveDate: "",
+  emiEndDate: "",
+  transferFundsId: "",
+  transferFunds: "",
+  transferTo: "",
 };
 
 export default function CreateDeal({ editDeal: editDealProp = null }) {
@@ -346,30 +357,65 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   // Populate form when editDeal is loaded (either from prop or async fetch)
   useEffect(() => {
     if (!editDeal) return;
-    if (editDeal.globalDealType === "GOLD" || editDeal.globalDealType === "SDLOT") {
+    if (editDeal.globalDealType === "GOLD" || editDeal.globalDealType === "SDLOT" || editDeal.globalDealType === "ASSET") {
       setActiveTab(editDeal.globalDealType);
     }
-    setForm({
-      dealName:                  editDeal.dealName                  ?? "",
-      dealType:                  editDeal.dealType                  ?? "NORMAL",
-      dealSubType:               editDeal.dealSubType               ?? "STUDENT",
-      globalDealType:            editDeal.globalDealType            ?? "SDLOT",
-      dealAmount:                editDeal.dealAmount                ? String(editDeal.dealAmount)                : "",
-      duration:                  editDeal.duration                  ? String(editDeal.duration)                  : "",
-      minimumParticipation:      editDeal.minimumParticipation      ? String(editDeal.minimumParticipation)      : "",
-      maxParticipation:          editDeal.maxParticipation          ? String(editDeal.maxParticipation)          : "",
-      monthlyInterest:           editDeal.monthlyInterest           ? String(editDeal.monthlyInterest)           : "",
-      quartelyInterest:          editDeal.quartelyInterest          ? String(editDeal.quartelyInterest)          : "",
-      halfInterest:              editDeal.halfInterest              ? String(editDeal.halfInterest)              : "",
-      yearlyInterest:            editDeal.yearlyInterest            ? String(editDeal.yearlyInterest)            : "",
-      fundsAcceptanceStartDate:  fromApiDate(editDeal.fundsAcceptanceStartDate  ?? ""),
-      fundsAcceptanceEndDate:    fromApiDate(editDeal.fundsAcceptanceEndDate    ?? ""),
-      loanActiveDate:            fromApiDate(editDeal.loanActiveDate            ?? ""),
-      emiEndDate:                fromApiDate(editDeal.emiEndDate                ?? ""),
-      transferFundsId:           editDeal.transferFundsId           ?? "",
-      transferFunds:             editDeal.transferFunds             ?? "",
-      transferTo:                editDeal.transferTo                ?? "",
-    });
+    if (editDeal.globalDealType === "ASSET") {
+      const fractional = editDeal.fractionalInvestmentDto ?? {};
+      setAssetForm({
+        dealName:                  editDeal.dealName                  ?? "",
+        dealAmount:                editDeal.dealAmount                ? String(editDeal.dealAmount)                : "",
+        dealType:                  editDeal.dealType                  ?? "NORMAL",
+        dealSubType:               editDeal.dealSubType               ?? "STUDENT",
+        monthlyInterest:           editDeal.monthlyInterest           ? String(editDeal.monthlyInterest)           : "",
+        quartelyInterest:          editDeal.quartelyInterest          ? String(editDeal.quartelyInterest)          : "",
+        halfInterest:              editDeal.halfInterest              ? String(editDeal.halfInterest)              : "",
+        yearlyInterest:            editDeal.yearlyInterest            ? String(editDeal.yearlyInterest)            : "",
+        borrowerName:              fractional.borrowerName            ?? "",
+        projectName:               fractional.projectName             ?? "",
+        assetValue:                fractional.assetValue              ? String(fractional.assetValue)              : "",
+        latitude:                  fractional.latitude                ? String(fractional.latitude)                : "",
+        longitude:                 fractional.longitude               ? String(fractional.longitude)               : "",
+        area:                      editDeal.assetArea                 ?? fractional.assetArea ?? "",
+        assetAreaType:             fractional.fractionalAssetType     ?? "PLOT",
+        legalReport:               null,
+        valuationReport:           null,
+        images:                    [],
+        videos:                    [],
+        duration:                  editDeal.duration                  ? String(editDeal.duration)                  : "",
+        minimumParticipation:      editDeal.minimumParticipation      ? String(editDeal.minimumParticipation)      : "",
+        maxParticipation:          editDeal.maxParticipation          ? String(editDeal.maxParticipation)          : "",
+        fundsAcceptanceStartDate:  fromApiDate(editDeal.fundsAcceptanceStartDate  ?? ""),
+        fundsAcceptanceEndDate:    fromApiDate(editDeal.fundsAcceptanceEndDate    ?? ""),
+        loanActiveDate:            fromApiDate(editDeal.loanActiveDate            ?? ""),
+        emiEndDate:                fromApiDate(editDeal.emiEndDate                ?? ""),
+        transferFundsId:           editDeal.transferFundsId           ?? "",
+        transferFunds:             editDeal.transferFunds             ?? "",
+        transferTo:                editDeal.transferTo                ?? "",
+      });
+    } else {
+      setForm({
+        dealName:                  editDeal.dealName                  ?? "",
+        dealType:                  editDeal.dealType                  ?? "NORMAL",
+        dealSubType:               editDeal.dealSubType               ?? "STUDENT",
+        globalDealType:            editDeal.globalDealType            ?? "SDLOT",
+        dealAmount:                editDeal.dealAmount                ? String(editDeal.dealAmount)                : "",
+        duration:                  editDeal.duration                  ? String(editDeal.duration)                  : "",
+        minimumParticipation:      editDeal.minimumParticipation      ? String(editDeal.minimumParticipation)      : "",
+        maxParticipation:          editDeal.maxParticipation          ? String(editDeal.maxParticipation)          : "",
+        monthlyInterest:           editDeal.monthlyInterest           ? String(editDeal.monthlyInterest)           : "",
+        quartelyInterest:          editDeal.quartelyInterest          ? String(editDeal.quartelyInterest)          : "",
+        halfInterest:              editDeal.halfInterest              ? String(editDeal.halfInterest)              : "",
+        yearlyInterest:            editDeal.yearlyInterest            ? String(editDeal.yearlyInterest)            : "",
+        fundsAcceptanceStartDate:  fromApiDate(editDeal.fundsAcceptanceStartDate  ?? ""),
+        fundsAcceptanceEndDate:    fromApiDate(editDeal.fundsAcceptanceEndDate    ?? ""),
+        loanActiveDate:            fromApiDate(editDeal.loanActiveDate            ?? ""),
+        emiEndDate:                fromApiDate(editDeal.emiEndDate                ?? ""),
+        transferFundsId:           editDeal.transferFundsId           ?? "",
+        transferFunds:             editDeal.transferFunds             ?? "",
+        transferTo:                editDeal.transferTo                ?? "",
+      });
+    }
   }, [editDeal]);
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: "" })); };
@@ -386,6 +432,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
 
   // Derive selected bank object from transferFundsId
   const selectedBank = bankAccounts.find(b => String(b.id ?? b.accountNumber) === form.transferFundsId) ?? null;
+  const selectedAssetBank = bankAccounts.find(b => String(b.id ?? b.accountNumber) === assetForm.transferFundsId) ?? null;
 
   const validate = () => {
     const e = {};
@@ -407,18 +454,31 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   const validateAsset = () => {
     const e = {};
     if (!assetForm.dealName.trim())       e.dealName = "Deal name is required";
-    if (!assetForm.dealValue)             e.dealValue = "Deal value is required";
+    if (!assetForm.dealAmount)            e.dealAmount = "Deal amount is required";
     if (!assetForm.monthlyInterest)       e.monthlyInterest = "Monthly ROI is required";
     if (!assetForm.borrowerName.trim())   e.borrowerName = "Borrower name is required";
     if (!assetForm.projectName.trim())    e.projectName = "Project name is required";
-    if (!assetForm.legalReport)           e.legalReport = "Legal report is required";
-    if (!assetForm.valuationReport)       e.valuationReport = "Valuation report is required";
+    if (!isEdit) {
+      if (!assetForm.legalReport)           e.legalReport = "Legal report is required";
+      if (!assetForm.valuationReport)       e.valuationReport = "Valuation report is required";
+    }
     if (!assetForm.assetValue)            e.assetValue = "Asset value is required";
     if (!assetForm.latitude)              e.latitude = "Latitude is required";
     if (!assetForm.longitude)             e.longitude = "Longitude is required";
     if (!assetForm.assetArea.trim())      e.assetArea = "Asset area is required";
     if (assetForm.images.length > 3)      e.images = "Upload up to 3 images";
     if (assetForm.videos.length > 3)      e.videos = "Upload up to 3 videos";
+    if (!assetForm.duration)              e.duration = "Duration is required";
+    if (!assetForm.minimumParticipation)  e.minimumParticipation = "Minimum participation is required";
+    if (!assetForm.maxParticipation)      e.maxParticipation = "Maximum participation is required";
+    if (!assetForm.fundsAcceptanceStartDate) e.fundsAcceptanceStartDate = "Start date is required";
+    if (!assetForm.fundsAcceptanceEndDate)   e.fundsAcceptanceEndDate = "End date is required";
+    if (!assetForm.loanActiveDate)        e.loanActiveDate = "Loan active date is required";
+    if (!assetForm.emiEndDate)            e.emiEndDate = "EMI end date is required";
+
+    const min = numVal(assetForm.minimumParticipation), max = numVal(assetForm.maxParticipation);
+    if (min && max && min >= max) e.maxParticipation = "Max must be greater than min";
+
     return e;
   };
 
@@ -471,29 +531,81 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     setSubmitting(true);
     setSubmitError("");
     try {
-      const payload = new FormData();
-      payload.append("dealName", assetForm.dealName.trim());
-      payload.append("dealAmount", numVal(assetForm.dealValue));
-      payload.append("dealType", assetForm.dealType);
-      payload.append("dealSubType", "FRACTIONAL_LENDING");
-      payload.append("globalDealType", "ASSET");
-      payload.append("monthlyInterest", parseFloat(assetForm.monthlyInterest) || 0);
-      payload.append("quartelyInterest", parseFloat(assetForm.quartelyInterest) || 0);
-      payload.append("halfInterest", parseFloat(assetForm.halfInterest) || 0);
-      payload.append("yearlyInterest", parseFloat(assetForm.yearlyInterest) || 0);
-      payload.append("borrowerName", assetForm.borrowerName.trim());
-      payload.append("projectName", assetForm.projectName.trim());
-      payload.append("assetValue", numVal(assetForm.assetValue));
-      payload.append("latitude", assetForm.latitude);
-      payload.append("longitude", assetForm.longitude);
-      payload.append("assetArea", assetForm.assetArea.trim());
-      payload.append("assetAreaType", assetForm.assetAreaType);
-      payload.append("legalReport", assetForm.legalReport);
-      payload.append("valuationReport", assetForm.valuationReport);
-      assetForm.images.forEach(file => payload.append("images", file));
-      assetForm.videos.forEach(file => payload.append("videos", file));
+      const payload = {
+        dealName:                  assetForm.dealName.trim(),
+        dealAmount:                numVal(assetForm.dealAmount),
+        dealType:                  assetForm.dealType,
+        dealSubType:               assetForm.dealSubType,
+        globalDealType:            "ASSET",
+        monthlyInterest:           parseFloat(assetForm.monthlyInterest) || 0,
+        quartelyInterest:          parseFloat(assetForm.quartelyInterest) || 0,
+        halfInterest:              parseFloat(assetForm.halfInterest) || 0,
+        yearlyInterest:            parseFloat(assetForm.yearlyInterest) || 0,
+        duration:                  parseInt(assetForm.duration, 10),
+        minimumParticipation:      numVal(assetForm.minimumParticipation),
+        maxParticipation:          numVal(assetForm.maxParticipation),
+        fundsAcceptanceStartDate:  toApiDate(assetForm.fundsAcceptanceStartDate),
+        fundsAcceptanceEndDate:    toApiDate(assetForm.fundsAcceptanceEndDate),
+        loanActiveDate:            toApiDate(assetForm.loanActiveDate),
+        emiEndDate:                toApiDate(assetForm.emiEndDate),
+        transferFundsId:           assetForm.transferFundsId,
+        transferFunds:             assetForm.transferFunds,
+        transferTo:                assetForm.transferTo,
+        fractionalInvestmentDto: {
+          assetValue: numVal(assetForm.assetValue),
+          borrowerName: assetForm.borrowerName.trim(),
+          fractionalAssetType: assetForm.assetAreaType,
+          id: editDeal?.fractionalInvestmentDto?.id || null,
+          latitude: parseFloat(assetForm.latitude) || 0,
+          longitude: parseFloat(assetForm.longitude) || 0,
+          projectName: assetForm.projectName.trim()
+        }
+      };
 
-      await createOrUpdateDeal(payload);
+      if (isEdit && editDeal?.id) {
+        payload.id = editDeal.id;
+      }
+
+      // 1. Create/Update deal
+      const createdDeal = await createOrUpdateDeal(payload);
+
+      // 2. Fetch the asset ID
+      const assetId = createdDeal?.fractionalInvestmentDto?.id || createdDeal?.id || editDeal?.fractionalInvestmentDto?.id || editDeal?.id;
+      if (!assetId) {
+        throw new Error("Deal created, but failed to retrieve the asset ID for file uploads.");
+      }
+
+      // 3. Upload reports and media
+      const uploadPromises = [];
+      if (assetForm.legalReport) {
+        uploadPromises.push(
+          uploadFractionalAssetFile({ file: assetForm.legalReport, assetId, fileType: "legalreport" })
+        );
+      }
+      if (assetForm.valuationReport) {
+        uploadPromises.push(
+          uploadFractionalAssetFile({ file: assetForm.valuationReport, assetId, fileType: "valuationreport" })
+        );
+      }
+      if (Array.isArray(assetForm.images)) {
+        assetForm.images.forEach(file => {
+          uploadPromises.push(
+            uploadFractionalAssetFile({ file, assetId, fileType: "fractionalimage" })
+          );
+        });
+      }
+      if (Array.isArray(assetForm.videos)) {
+        assetForm.videos.forEach(file => {
+          uploadPromises.push(
+            uploadFractionalAssetFile({ file, assetId, fileType: "fractionalvideo" })
+          );
+        });
+      }
+
+      if (uploadPromises.length > 0) {
+        await Promise.all(uploadPromises);
+      }
+
       setSubmitted(true);
     } catch (err) {
       setSubmitError(err.message ?? "Submission failed. Please try again.");
@@ -558,7 +670,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         {/* Left — Deal stats single horizontal row */}
         <div className="flex items-stretch gap-0 divide-x" style={{ borderBottom: '1px solid var(--border)', '--tw-divide-opacity': 1 }}>
           {(activeTab === "ASSET" ? [
-            { label: "Deal Value", value: fmtINR(numVal(assetForm.dealValue)), color: "#6366f1" },
+            { label: "Deal Value", value: fmtINR(numVal(assetForm.dealAmount)), color: "#6366f1" },
             { label: "Monthly ROI", value: assetForm.monthlyInterest ? assetForm.monthlyInterest + "%" : "—", color: "#10b981" },
             { label: "Asset Value", value: fmtINR(numVal(assetForm.assetValue)), color: "#818cf8" },
             { label: "Area Type", value: assetForm.assetAreaType, color: "#f59e0b" },
@@ -577,7 +689,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         </div>
 
         {/* Right — Bank details table */}
-        {activeTab !== "ASSET" && (form.transferTo || form.transferFunds || selectedBank) && (
+        {((activeTab === "ASSET" ? (assetForm.transferTo || assetForm.transferFunds || selectedAssetBank) : (form.transferTo || form.transferFunds || selectedBank))) && (
           <div>
             <div className="px-5 py-2.5 flex items-center gap-2"
               style={{ borderBottom: '1px solid rgba(245,158,11,0.2)', background: 'rgba(245,158,11,0.04)' }}>
@@ -589,12 +701,12 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
             <table className="w-full text-sm">
               <tbody>
                 {[
-                  { label: 'Company Name',   value: selectedBank?.companyName   || form.transferTo    || '—' },
-                  { label: 'Bank Name',      value: selectedBank?.bankName      || form.transferFunds || '—' },
-                  { label: 'Account Number', value: selectedBank?.accountNumber || '—', mono: true },
-                  { label: 'IFSC Code',      value: selectedBank?.ifscCode      || '—', mono: true },
-                  { label: 'Branch',         value: selectedBank?.branchName    || selectedBank?.branch || '—' },
-                  { label: 'Account Type',   value: selectedBank?.accountType   || '—' },
+                  { label: 'Company Name',   value: activeTab === "ASSET" ? (selectedAssetBank?.companyName || assetForm.transferTo || '—') : (selectedBank?.companyName || form.transferTo || '—') },
+                  { label: 'Bank Name',      value: activeTab === "ASSET" ? (selectedAssetBank?.bankName || assetForm.transferFunds || '—') : (selectedBank?.bankName || form.transferFunds || '—') },
+                  { label: 'Account Number', value: activeTab === "ASSET" ? (selectedAssetBank?.accountNumber || '—') : (selectedBank?.accountNumber || '—'), mono: true },
+                  { label: 'IFSC Code',      value: activeTab === "ASSET" ? (selectedAssetBank?.ifscCode || '—') : (selectedBank?.ifscCode || '—'), mono: true },
+                  { label: 'Branch',         value: activeTab === "ASSET" ? (selectedAssetBank?.branchName || selectedAssetBank?.branch || '—') : (selectedBank?.branchName || selectedBank?.branch || '—') },
+                  { label: 'Account Type',   value: activeTab === "ASSET" ? (selectedAssetBank?.accountType || '—') : (selectedBank?.accountType || '—') },
                 ].map((r, i) => (
                   <tr key={r.label} style={{ borderBottom: i < 5 ? '1px solid var(--border)' : 'none' }}>
                     <td className="px-5 py-2.5 text-xs font-semibold w-40" style={{ color: 'var(--text-muted)', background: 'var(--input-bg)' }}>{r.label}</td>
@@ -660,21 +772,22 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         <div className="rounded-2xl p-5 grid gap-4"
           style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
           <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#818cf8" }}>Deal Identity</p>
+          <Field label="Deal Name" required error={assetErrors.dealName}>
+            <input type="text" placeholder="Enter deal name"
+              value={assetForm.dealName} onChange={e => setAsset("dealName", e.target.value)}
+              style={inp(assetErrors.dealName)} />
+          </Field>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Deal Name" required error={assetErrors.dealName}>
-              <input type="text" placeholder="Enter deal name"
-                value={assetForm.dealName} onChange={e => setAsset("dealName", e.target.value)}
-                style={inp(assetErrors.dealName)} />
+            <Field label="Deal Type" required>
+              <PillSelect value={assetForm.dealType} onChange={v => setAsset("dealType", v)} options={DEAL_TYPES} accent="#818cf8" />
             </Field>
-            <Field label="Deal Value (₹)" required error={assetErrors.dealValue} hint={numVal(assetForm.dealValue) > 0 ? fmtINR(numVal(assetForm.dealValue)) : undefined}>
-              <input type="text" inputMode="numeric" placeholder="e.g. 1000000"
-                value={assetForm.dealValue} onChange={e => setAsset("dealValue", toLocale(e.target.value))}
-                style={{ ...inp(assetErrors.dealValue), fontFamily: "'JetBrains Mono', monospace" }} />
+            <Field label="Sub Type" required>
+              <select value={assetForm.dealSubType} onChange={e => setAsset("dealSubType", e.target.value)}
+                style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
+                {ASSET_SUB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
             </Field>
           </div>
-          <Field label="Deal Type" required>
-            <PillSelect value={assetForm.dealType} onChange={v => setAsset("dealType", v)} options={DEAL_TYPES} accent="#818cf8" />
-          </Field>
         </div>
 
         <div className="rounded-2xl p-5 grid gap-4"
@@ -737,6 +850,108 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           <Field label="Asset Type" required>
             <PillSelect value={assetForm.assetAreaType} onChange={v => setAsset("assetAreaType", v)} options={ASSET_AREA_TYPES} accent="#06b6d4" />
           </Field>
+        </div>
+
+        {/* Financial Details */}
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#6366f1" }}>Financial Details</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Deal Amount (₹)" required error={assetErrors.dealAmount} hint={numVal(assetForm.dealAmount) > 0 ? fmtINR(numVal(assetForm.dealAmount)) : undefined}>
+              <input type="text" inputMode="numeric" placeholder="e.g. 100000"
+                value={assetForm.dealAmount} onChange={e => setAsset("dealAmount", toLocale(e.target.value))}
+                style={{ ...inp(assetErrors.dealAmount), fontFamily: "'JetBrains Mono', monospace" }} />
+            </Field>
+            <Field label="Duration (months)" required error={assetErrors.duration}>
+              <input type="number" min="1" placeholder="e.g. 5"
+                value={assetForm.duration} onChange={e => setAsset("duration", e.target.value)}
+                style={inp(assetErrors.duration)} />
+            </Field>
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Min Participation (₹)" required error={assetErrors.minimumParticipation} hint={numVal(assetForm.minimumParticipation) > 0 ? fmtINR(numVal(assetForm.minimumParticipation)) : undefined}>
+              <input type="text" inputMode="numeric" placeholder="e.g. 500"
+                value={assetForm.minimumParticipation} onChange={e => setAsset("minimumParticipation", toLocale(e.target.value))}
+                style={{ ...inp(assetErrors.minimumParticipation), fontFamily: "'JetBrains Mono', monospace" }} />
+            </Field>
+            <Field label="Max Participation (₹)" required error={assetErrors.maxParticipation} hint={numVal(assetForm.maxParticipation) > 0 ? fmtINR(numVal(assetForm.maxParticipation)) : undefined}>
+              <input type="text" inputMode="numeric" placeholder="e.g. 5000"
+                value={assetForm.maxParticipation} onChange={e => setAsset("maxParticipation", toLocale(e.target.value))}
+                style={{ ...inp(assetErrors.maxParticipation), fontFamily: "'JetBrains Mono', monospace" }} />
+            </Field>
+          </div>
+        </div>
+
+        {/* Key Dates */}
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>Key Dates</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Funds Acceptance Start" required error={assetErrors.fundsAcceptanceStartDate}>
+              <input type="date" value={assetForm.fundsAcceptanceStartDate} onChange={e => setAsset("fundsAcceptanceStartDate", e.target.value)}
+                style={inp(assetErrors.fundsAcceptanceStartDate)} />
+            </Field>
+            <Field label="Funds Acceptance End" required error={assetErrors.fundsAcceptanceEndDate}>
+              <input type="date" value={assetForm.fundsAcceptanceEndDate} onChange={e => setAsset("fundsAcceptanceEndDate", e.target.value)}
+                style={inp(assetErrors.fundsAcceptanceEndDate)} />
+            </Field>
+            <Field label="Loan Active Date" required error={assetErrors.loanActiveDate}>
+              <input type="date" value={assetForm.loanActiveDate} onChange={e => setAsset("loanActiveDate", e.target.value)}
+                style={inp(assetErrors.loanActiveDate)} />
+            </Field>
+            <Field label="EMI End Date" required error={assetErrors.emiEndDate}>
+              <input type="date" value={assetForm.emiEndDate} onChange={e => setAsset("emiEndDate", e.target.value)}
+                style={inp(assetErrors.emiEndDate)} />
+            </Field>
+          </div>
+        </div>
+
+        {/* Transfer Funds */}
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#06b6d4" }}>Transfer Funds</p>
+
+          <Field label="Transfer Funds (Bank Account)" error={assetErrors.transferFundsId}>
+            <BankSelect
+              value={assetForm.transferFundsId}
+              loading={banksLoading}
+              accounts={bankAccounts}
+              error={assetErrors.transferFundsId}
+              onChange={(id, bank) => {
+                setAssetForm(f => ({
+                  ...f,
+                  transferFundsId: id,
+                  transferFunds:   bank?.bankName ?? "",
+                  transferTo:      id,
+                }));
+                setAssetErrors(err => ({ ...err, transferFundsId: "" }));
+              }}
+            />
+          </Field>
+
+          {selectedAssetBank && (
+            <div className="rounded-xl px-4 py-3 grid gap-2"
+              style={{ background: "rgba(6,182,212,0.06)", border: "1px solid rgba(6,182,212,0.2)" }}>
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#06b6d4" }}>Selected Bank</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 text-xs">
+                {[
+                  { label: "Company Name",   value: selectedAssetBank.companyName   },
+                  { label: "Bank Name",      value: selectedAssetBank.bankName      },
+                  { label: "Account No.",    value: selectedAssetBank.accountNumber },
+                  { label: "IFSC",           value: selectedAssetBank.ifscCode      },
+                  { label: "Branch",         value: selectedAssetBank.branch        },
+                  { label: "Account Type",   value: selectedAssetBank.accountType   },
+                ].filter(r => r.value).map(r => (
+                  <div key={r.label}>
+                    <p style={{ color: "var(--text-muted)" }}>{r.label}</p>
+                    <p className="font-bold mt-0.5" style={{ color: "var(--text-primary)", fontFamily: r.label === "IFSC" || r.label === "Account No." ? "monospace" : "inherit" }}>
+                      {r.value}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="rounded-2xl p-5 grid gap-4"

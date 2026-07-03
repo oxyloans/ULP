@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
-import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement } from "../api/afterlogin-user";
+import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement, getSdLots } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
 
 const INDIGO = '#6366f1';
@@ -92,7 +92,7 @@ function mergeMigratedByRoi(items) {
         dealName: item?.dealName ?? "Unknown",
         roi: Number(item?.roi ?? 0),
         payOutType: item?.payOutType ?? null,
-        earliestDate: item?.participationDate ?? null,
+        earliestDate: (item?.participationDate || item?.participatedDate) ?? null,
         entries: [],
       });
     }
@@ -100,8 +100,8 @@ function mergeMigratedByRoi(items) {
     g.entries.push(item);
     g.payOutType = g.payOutType ?? item?.payOutType ?? null;
     const oldDate = parseDdMmYyyy(g.earliestDate);
-    const nextDate = parseDdMmYyyy(item?.participationDate);
-    if (!oldDate || (nextDate && nextDate < oldDate)) g.earliestDate = item?.participationDate ?? g.earliestDate;
+    const nextDate = parseDdMmYyyy(item?.participationDate || item?.participatedDate);
+    if (!oldDate || (nextDate && nextDate < oldDate)) g.earliestDate = (item?.participationDate || item?.participatedDate) ?? g.earliestDate;
   }
 
   return Array.from(groups.values()).map(g => {
@@ -552,7 +552,7 @@ function DealRow({ p, index, navigate, onViewInterest }) {
                   className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
                   style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, color: "#fff", boxShadow: `0 4px 16px ${INDIGO}50` }}
                 >
-                  <PlusIcon /> Add More
+                  <PlusIcon /> Add Funds
                 </button>
               )}
               <button
@@ -827,7 +827,7 @@ function MigratedDealRow({ d, index }) {
                       <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.payOutType)}</td>
                       <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.typeOfTransaction)}</td>
                       <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.interestDate)}</td>
-                      <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.participationDate)}</td>
+                      <td className="py-2 px-2 text-xs font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{fmtNullable(entry?.participationDate || entry?.participatedDate)}</td>
                       <td className="py-2 px-2 font-bold tabular-nums whitespace-nowrap" style={{ color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>
                         {fmtINR(monthlyEquiv(entry?.currentPrincipalAmount ?? 0, entry?.roi ?? 0, "MONTHLY"))}
                       </td>
@@ -865,6 +865,7 @@ export default function MyParticipations() {
   const [migratedError, setMigratedError] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [interestDeal, setInterestDeal] = useState(null);
+  const [dealTypeMap, setDealTypeMap] = useState({});
 
   const load = () => {
     setLoading(true);
@@ -874,8 +875,9 @@ export default function MyParticipations() {
     Promise.allSettled([
       getRunningDeals(),
       getUserOfflineParticipationDealsInfo(),
+      getSdLots("NORMAL").catch(() => []),
     ])
-      .then(([runningRes, migratedRes]) => {
+      .then(([runningRes, migratedRes, testDeals, normalDeals]) => {
         if (runningRes.status === "fulfilled") {
           if (runningRes.value) setData(runningRes.value);
         } else {
@@ -888,6 +890,17 @@ export default function MyParticipations() {
           setMigratedDeals([]);
           setMigratedError(migratedRes.reason?.message ?? "Failed to load migrated data");
         }
+
+        const typeMap = {};
+        const testList = testDeals.status === "fulfilled" ? (testDeals.value || []) : [];
+        const normalList = normalDeals.status === "fulfilled" ? (normalDeals.value || []) : [];
+        const allDeals = [...testList, ...normalList, ...premiumList];
+        for (const deal of allDeals) {
+          if (deal && deal.id) {
+            typeMap[deal.id] = deal.globalDealType ?? '';
+          }
+        }
+        setDealTypeMap(typeMap);
       })
       .finally(() => {
         setLoading(false);
@@ -896,7 +909,10 @@ export default function MyParticipations() {
 
   useEffect(() => { load(); }, []);
 
-  const participations = data?.participationInfo ?? [];
+  const participations = (data?.participationInfo ?? []).filter(p => {
+    const dealType = dealTypeMap[p.dealId] ?? '';
+    return dealType !== 'ASSET';
+  });
   const runningItems = participations.map((p, i) => ({ source: "running", key: p.dealId ?? `running-${i}`, payload: p }));
   const mergedMigrated = mergeMigratedByRoi(migratedDeals);
   const migratedItems = mergedMigrated.map((d, i) => ({ source: "migrated", key: `${d.dealName ?? "deal"}-${d.roi ?? 0}-${i}`, payload: d }));

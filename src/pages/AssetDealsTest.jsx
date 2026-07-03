@@ -422,7 +422,7 @@ function mapAssetDeal(raw) {
   };
 }
 
-export default function AssetDeals() {
+export default function AssetDealsTest() {
   const { user } = useAuth();
   const [deals, setDeals] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -431,7 +431,7 @@ export default function AssetDeals() {
 
   useEffect(() => {
     Promise.all([
-      getSdLots("NORMAL").catch(() => []),
+      getSdLots("TEST").catch(() => []),
     ])
     .then(([testDeals, normalDeals]) => {
       const allDeals = [...(testDeals || []), ...(normalDeals || [])];

@@ -37,7 +37,7 @@ const NAV_ITEMS = [
     children: [
       { title: 'SD Deals',   path: '/my-participations',        Icon: SDLotIcon, comingSoon: false },
       { title: 'Gold Deals', path: '/gold-deals-participation', Icon: GoldIcon,  comingSoon: false },
-      { title: 'Asset',      path: '/asset',                    Icon: Building,  comingSoon: true  },
+      { title: 'Asset',      path: '/asset-deals-participation', Icon: Building,  comingSoon: false },
     ],
   },
   { title: 'Wallet',     path: '/wallet',   Icon: WalletIcon,  comingSoon: false },
@@ -46,7 +46,7 @@ const NAV_ITEMS = [
 ];
 
 const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset', '/gold-deals',];
-const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/gold-deals/participation/'];
+const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/gold-deals/participation/','/asset-deals-participation'];
 
 function pathMatches(pathname, basePath) {
   return pathname === basePath || pathname.startsWith(`${basePath}/`);

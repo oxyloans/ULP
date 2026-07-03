@@ -399,6 +399,19 @@ export async function uploadSaleDeedDocument({ assetId, file }) {
   );
 }
 
+/**
+ * POST /upload-service/fractionalAssetMultipleUploads
+ */
+export async function uploadFractionalAssetFile({ file, assetId, fileType }) {
+  const formData = new FormData();
+  formData.append('file', file);
+  formData.append('assetId', assetId);
+  formData.append('fileType', fileType);
+
+  return post('/upload-service/fractionalAssetMultipleUploads', formData);
+}
+
+
 // ══════════════════════════════════════════════════════════════════════════════
 // BORROWERS
 // ══════════════════════════════════════════════════════════════════════════════
