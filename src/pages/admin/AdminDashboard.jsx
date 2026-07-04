@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { getPlatformStats, getAdminDeals, getPendingApprovals, getAllUsers, getAdminOfflinePayments, getAdminOxyLoansDeals, getAdminProperties, getAllDealAndWalletInfo } from "../../api/afterlogin-admin";
+import { getPlatformStats, getAdminDeals, getPendingApprovals, getAllUsers, getAdminOfflinePayments, getAdminOxyLoansDeals, getAdminProperties, getAllDealAndWalletInfo, getAdminOxyLoansDealsStats } from "../../api/afterlogin-admin";
 import { getAllLoanActiveDeals } from "../../api/afterlogin-user";
 import { formatINR } from "../../utils/currency";
 
@@ -149,6 +149,7 @@ export default function AdminDashboard() {
   const [pending,     setPending]     = useState([]);
   const [offPay,      setOffPay]      = useState([]);
   const [olDeals,     setOlDeals]     = useState([]);
+  const [olStats,     setOlStats]     = useState(null);
   const [props,       setProps]       = useState([]);
   const [propSummary, setPropSummary] = useState({ total: 0, plots: { count: 0 }, flats: { count: 0 }, acres: { count: 0 }, villas: { count: 0 } });
   const [sdSearch,    setSdSearch]    = useState('');
@@ -163,6 +164,7 @@ export default function AdminDashboard() {
     getPendingApprovals().then(d => { if (Array.isArray(d)) setPending(d); }).catch(() => {});
     getAdminOfflinePayments().then(d => { if (Array.isArray(d)) setOffPay(d); }).catch(() => {});
     getAdminOxyLoansDeals().then(d => { if (Array.isArray(d)) setOlDeals(d); }).catch(() => {});
+    getAdminOxyLoansDealsStats().then(d => setOlStats(d)).catch(() => {});
     getAdminProperties().then(d => {
       if (d?.properties) setProps(d.properties);
       if (d?.summary)    setPropSummary(d.summary);
@@ -313,9 +315,9 @@ export default function AdminDashboard() {
         <p className="text-xs uppercase tracking-widest font-semibold mb-3" style={{ color: 'var(--text-muted)' }}>Platform Metrics</p>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <KpiCard label="Total Members"    value={String(approvedMembers.length)} sub={`${pendingMembers.length} pending approval`}  trend="+3 this month" color="#a855f7" Icon={I.Users} />
-          <KpiCard label="OxyLoans Active"  value={String(activeDeals.length)}     sub={`${closedDeals.length} closed deals`}          trend="+12%"          color="#6366f1" Icon={I.Bank}  />
-          <KpiCard label="Offline Payments" value={String(verifiedPay.length)}     sub={`${pendingPay.length} pending review`}         trend="+5%"           color="#f59e0b" Icon={I.Package} />
-          <KpiCard label="SD Lots Open"     value={String(deals.filter(l => l.dealStatus !== 'ACHIEVED').length)} sub={`${fmtINR(totalRaised)} raised total`}         trend="+2 this month" color="#10b981" Icon={I.SDLot} />
+          <KpiCard label="OxyLoans Active"  value={String(olStats?.runningDeals ?? activeDeals.length)} sub={`${olStats?.closedDeals ?? closedDeals.length} closed deals`} trend="+12%" color="#6366f1" Icon={I.Bank}  />
+          <KpiCard label="OxyLoans Raised"  value={fmtINR(olStats?.totalDealsAmount ?? 0)} sub={`${fmtINR(olStats?.runningDealsAmount ?? 0)} running`} trend="+8%" color="#818cf8" Icon={I.Rupee} />
+          <KpiCard label="SD Lots Open"     value={String(deals.filter(l => l.dealStatus !== 'ACHIEVED').length)} sub="Active running lots" trend="+2 this month" color="#10b981" Icon={I.SDLot} />
         </div>
       </div>
 

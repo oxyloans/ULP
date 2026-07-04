@@ -18,9 +18,10 @@ function fmtINR(n) {
 }
 
 const TABS = [
-  { key: 'NORMAL', label: 'Running', color: '#10b981' },
-  { key: 'closed',  label: 'Closed',  color: '#6366f1' },
-  { key: 'TEST',    label: 'Test',    color: '#f59e0b' },
+  { key: 'NORMAL', label: 'Running SD Lots', color: '#10b981' },
+  { key: 'ASSET',  label: 'Asset Deals',      color: '#06b6d4' },
+  { key: 'closed', label: 'Closed',          color: '#6366f1' },
+  { key: 'TEST',   label: 'Test',            color: '#f59e0b' },
 ];
 
 // ─── Feedback modal for success / error messages ──────────────────────────────
@@ -582,8 +583,8 @@ export default function AdminOffline() {
 
   const load = (tab = activeTab) => {
     setLoading(true); setError(''); setDeals([]);
-    // getRunningClosedDeals(tab)
-    getAdminDeals(tab)
+    const apiTab = tab === 'ASSET' ? 'NORMAL' : tab;
+    getAdminDeals(apiTab)
       .then(res => {
         const list = res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
         setDeals(list);
@@ -619,24 +620,33 @@ export default function AdminOffline() {
 
   const tabColor = TABS.find(t => t.key === activeTab)?.color ?? '#10b981';
 
-  const filtered = deals.filter(d =>
-    !search || d.dealName?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = deals.filter(d => {
+    const matchesSearch = !search || d.dealName?.toLowerCase().includes(search.toLowerCase());
+    if (!matchesSearch) return false;
+
+    if (activeTab === 'NORMAL') {
+      return d.globalDealType !== 'ASSET';
+    }
+    if (activeTab === 'ASSET') {
+      return d.globalDealType === 'ASSET';
+    }
+    return true;
+  });
 
   // KPIs
-  const totalDealValue   = deals.reduce((s, d) => s + (d.dealValue ?? d.dealAmount ?? 0), 0);
-  const totalParticipated = deals.reduce((s, d) => s + (d.totalParticipationAmount ?? d.dealParticipationValue ?? 0), 0);
-  const totalRemaining   = deals.reduce((s, d) => s + (d.remainingDealValue ?? d.currentDealValue ?? 0), 0);
-  const avgRoi           = deals.length
-    ? (deals.reduce((s, d) => s + (d.rateofinterest ?? d.monthlyInterest ?? 0), 0) / deals.length).toFixed(2)
+  const totalDealValue   = filtered.reduce((s, d) => s + (d.dealValue ?? d.dealAmount ?? 0), 0);
+  const totalParticipated = filtered.reduce((s, d) => s + (d.totalParticipationAmount ?? d.dealParticipationValue ?? 0), 0);
+  const totalRemaining   = filtered.reduce((s, d) => s + (d.remainingDealValue ?? d.currentDealValue ?? 0), 0);
+  const avgRoi           = filtered.length
+    ? (filtered.reduce((s, d) => s + (d.rateofinterest ?? d.monthlyInterest ?? 0), 0) / filtered.length).toFixed(2)
     : '—';
 
   const kpis = [
-    { label: 'Total Deals',    value: String(deals.length),      color: tabColor  },
+    { label: 'Total Deals',    value: String(filtered.length),      color: tabColor  },
     { label: 'Total Deal Size',value: fmtINR(totalDealValue),    color: '#818cf8' },
     { label: 'Total Invested', value: fmtINR(totalParticipated), color: '#10b981' },
     { label: 'Remaining',      value: fmtINR(totalRemaining),    color: '#f59e0b' },
-    { label: 'Avg ROI',        value: deals.length ? `${avgRoi}%` : '—', color: '#f59e0b' },
+    { label: 'Avg ROI',        value: filtered.length ? `${avgRoi}%` : '—', color: '#f59e0b' },
   ];
 
   return (

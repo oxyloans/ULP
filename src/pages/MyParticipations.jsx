@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
-import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement, getSdLots } from "../api/afterlogin-user";
+import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
 
 const INDIGO = '#6366f1';
@@ -865,7 +865,6 @@ export default function MyParticipations() {
   const [migratedError, setMigratedError] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [interestDeal, setInterestDeal] = useState(null);
-  const [dealTypeMap, setDealTypeMap] = useState({});
 
   const load = () => {
     setLoading(true);
@@ -875,9 +874,8 @@ export default function MyParticipations() {
     Promise.allSettled([
       getRunningDeals(),
       getUserOfflineParticipationDealsInfo(),
-      getSdLots("NORMAL").catch(() => []),
     ])
-      .then(([runningRes, migratedRes, testDeals, normalDeals]) => {
+      .then(([runningRes, migratedRes]) => {
         if (runningRes.status === "fulfilled") {
           if (runningRes.value) setData(runningRes.value);
         } else {
@@ -890,17 +888,6 @@ export default function MyParticipations() {
           setMigratedDeals([]);
           setMigratedError(migratedRes.reason?.message ?? "Failed to load migrated data");
         }
-
-        const typeMap = {};
-        const testList = testDeals.status === "fulfilled" ? (testDeals.value || []) : [];
-        const normalList = normalDeals.status === "fulfilled" ? (normalDeals.value || []) : [];
-        const allDeals = [...testList, ...normalList, ...premiumList];
-        for (const deal of allDeals) {
-          if (deal && deal.id) {
-            typeMap[deal.id] = deal.globalDealType ?? '';
-          }
-        }
-        setDealTypeMap(typeMap);
       })
       .finally(() => {
         setLoading(false);
@@ -909,12 +896,12 @@ export default function MyParticipations() {
 
   useEffect(() => { load(); }, []);
 
-  const participations = (data?.participationInfo ?? []).filter(p => {
-    const dealType = dealTypeMap[p.dealId] ?? '';
-    return dealType !== 'ASSET';
-  });
+  const participations = (data?.participationInfo ?? []).filter(p => p.globalDealType !== 'ASSET');
   const runningItems = participations.map((p, i) => ({ source: "running", key: p.dealId ?? `running-${i}`, payload: p }));
-  const mergedMigrated = mergeMigratedByRoi(migratedDeals);
+  const filteredMigratedDeals = useMemo(() => {
+    return migratedDeals.filter(m => m.globalDealType !== 'ASSET');
+  }, [migratedDeals]);
+  const mergedMigrated = mergeMigratedByRoi(filteredMigratedDeals);
   const migratedItems = mergedMigrated.map((d, i) => ({ source: "migrated", key: `${d.dealName ?? "deal"}-${d.roi ?? 0}-${i}`, payload: d }));
   const combinedItems = [...runningItems, ...migratedItems];
   const filteredItems = combinedItems.filter(item => sourceFilter === "all" || item.source === sourceFilter);

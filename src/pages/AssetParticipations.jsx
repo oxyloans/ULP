@@ -423,7 +423,6 @@ export default function AssetParticipations() {
   const [migratedError, setMigratedError] = useState("");
   const [interestDeal, setInterestDeal] = useState(null);
   const [sourceFilter, setSourceFilter] = useState("all");
-  const [dealTypeMap, setDealTypeMap] = useState({});
 
   const loadData = () => {
     setLoading(true);
@@ -433,23 +432,8 @@ export default function AssetParticipations() {
     Promise.allSettled([
       getRunningDeals(),
       getUserOfflineParticipationDealsInfo(),
-      getSdLots("NORMAL").catch(() => []),
     ])
-    .then(([runningRes, migratedRes, testDeals, normalDeals, premiumDeals]) => {
-      // Build lookup map for globalDealType
-      const typeMap = {};
-      const testList = testDeals.status === "fulfilled" ? (testDeals.value || []) : [];
-      const normalList = normalDeals.status === "fulfilled" ? (normalDeals.value || []) : [];
-      const premiumList = premiumDeals.status === "fulfilled" ? (premiumDeals.value || []) : [];
-      const allDeals = [...testList, ...normalList, ...premiumList];
-      
-      for (const deal of allDeals) {
-        if (deal && deal.id) {
-          typeMap[deal.id] = deal.globalDealType ?? '';
-        }
-      }
-      setDealTypeMap(typeMap);
-
+    .then(([runningRes, migratedRes]) => {
       if (runningRes.status === "fulfilled" && runningRes.value) {
         setData(runningRes.value);
       } else {
@@ -478,13 +462,13 @@ export default function AssetParticipations() {
   // Filter running online deals to keep only ASSET globalDealType
   const runningAssetParticipations = useMemo(() => {
     const all = data?.participationInfo ?? [];
-    return all.filter(p => dealTypeMap[p.dealId] === 'ASSET');
-  }, [data?.participationInfo, dealTypeMap]);
+    return all.filter(p => p.globalDealType === 'ASSET');
+  }, [data?.participationInfo]);
 
   // Filter offline migrated deals to keep only ASSET globalDealType
   const migratedAssetDeals = useMemo(() => {
-    return migratedDeals.filter(m => dealTypeMap[m.dealId] === 'ASSET');
-  }, [migratedDeals, dealTypeMap]);
+    return migratedDeals.filter(m => m.globalDealType === 'ASSET');
+  }, [migratedDeals]);
 
   const runningItems = useMemo(() => {
     return runningAssetParticipations.map((p, i) => ({
