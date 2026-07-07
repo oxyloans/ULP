@@ -11,7 +11,7 @@ const DEAL_TABS = [
   { key: "SDLOT", label: "SD Lot" },
   { key: "GOLD", label: "Gold Lot" },
 ];
-const ASSET_AREA_TYPES = ["PLOT", "FLAT", "ACERE"];
+const ASSET_AREA_TYPES = ["PLOT", "FLAT", "ACRE"];
 const ASSET_SUB_TYPES  = ["FRACTIONAL_LENDING", "STUDENT"];
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ const EMPTY_FORM = {
 };
 
 const EMPTY_ASSET_FORM = {
-  dealName: "", dealAmount: "", dealType: "NORMAL", dealSubType: "STUDENT",
+  dealName: "", dealAmount: "", dealType: "NORMAL", dealSubType: "FRACTIONAL_LENDING",
   monthlyInterest: "", quartelyInterest: "", halfInterest: "", yearlyInterest: "",
   borrowerName: "", projectName: "",
   legalReport: null, valuationReport: null,
