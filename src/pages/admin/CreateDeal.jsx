@@ -366,7 +366,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         dealName:                  editDeal.dealName                  ?? "",
         dealAmount:                editDeal.dealAmount                ? String(editDeal.dealAmount)                : "",
         dealType:                  editDeal.dealType                  ?? "NORMAL",
-        dealSubType:               editDeal.dealSubType               ?? "STUDENT",
+        dealSubType:               editDeal.dealSubType               ?? "FRACTIONAL_LENDING",
         monthlyInterest:           editDeal.monthlyInterest           ? String(editDeal.monthlyInterest)           : "",
         quartelyInterest:          editDeal.quartelyInterest          ? String(editDeal.quartelyInterest)          : "",
         halfInterest:              editDeal.halfInterest              ? String(editDeal.halfInterest)              : "",
@@ -376,7 +376,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         assetValue:                fractional.assetValue              ? String(fractional.assetValue)              : "",
         latitude:                  fractional.latitude                ? String(fractional.latitude)                : "",
         longitude:                 fractional.longitude               ? String(fractional.longitude)               : "",
-        area:                      editDeal.assetArea                 ?? fractional.assetArea ?? "",
+        assetArea:                 editDeal.assetArea                 ?? fractional.assetArea ?? "",
         assetAreaType:             fractional.fractionalAssetType     ?? "PLOT",
         legalReport:               null,
         valuationReport:           null,
@@ -455,7 +455,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     const e = {};
     if (!assetForm.dealName.trim())       e.dealName = "Deal name is required";
     if (!assetForm.dealAmount)            e.dealAmount = "Deal amount is required";
-    if (!assetForm.monthlyInterest)       e.monthlyInterest = "Monthly ROI is required";
+    // if (!assetForm.monthlyInterest)       e.monthlyInterest = "Monthly ROI is required";
     if (!assetForm.borrowerName.trim())   e.borrowerName = "Borrower name is required";
     if (!assetForm.projectName.trim())    e.projectName = "Project name is required";
     if (!isEdit) {
@@ -558,7 +558,8 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           id: editDeal?.fractionalInvestmentDto?.id || null,
           latitude: parseFloat(assetForm.latitude) || 0,
           longitude: parseFloat(assetForm.longitude) || 0,
-          projectName: assetForm.projectName.trim()
+          projectName: assetForm.projectName.trim(),
+          area: assetForm.assetArea,
         }
       };
 
@@ -795,7 +796,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#10b981" }}>ROI (%)</p>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { key: "monthlyInterest", label: "Monthly", required: true },
+              { key: "monthlyInterest", label: "Monthly", required: false },
               { key: "quartelyInterest", label: "Quarterly", required: false },
               { key: "yearlyInterest", label: "Yearly", required: false },
               { key: "halfInterest", label: "Half-Yearly", required: false },
