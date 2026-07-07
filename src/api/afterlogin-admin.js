@@ -468,7 +468,7 @@ export async function downloadPrincipalInterestExcel(payload) {
  * Close / de-activate a deal manually.
  */
 export async function closeDealManually(dealId) {
-  return patch(`/oxybrick-service/dealClosedManually?dealI=${dealId}`, {});
+  return patch(`/oxybrick-service/dealClosedManually?dealId=${dealId}`, {});
 }
 
 /**
