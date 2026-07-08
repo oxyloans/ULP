@@ -672,7 +672,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         <div className="flex items-stretch gap-0 divide-x" style={{ borderBottom: '1px solid var(--border)', '--tw-divide-opacity': 1 }}>
           {(activeTab === "ASSET" ? [
             { label: "Deal Value", value: fmtINR(numVal(assetForm.dealAmount)), color: "#6366f1" },
-            { label: "Monthly ROI", value: assetForm.monthlyInterest ? assetForm.monthlyInterest + "%" : "—", color: "#10b981" },
+            { label: assetForm.monthlyInterest ? "Monthly ROI" : assetForm.yearlyInterest ? "Yearly ROI" : "ROI", value: assetForm.monthlyInterest ? assetForm.monthlyInterest + "%" : assetForm.yearlyInterest ? assetForm.yearlyInterest + "%" : "—", color: "#10b981" },
             { label: "Asset Value", value: fmtINR(numVal(assetForm.assetValue)), color: "#818cf8" },
             { label: "Area Type", value: assetForm.assetAreaType, color: "#f59e0b" },
           ] : [
