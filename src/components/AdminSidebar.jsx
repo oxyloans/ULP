@@ -33,6 +33,7 @@ const interestSubItems = [
 const migratedSubItems = [
   { title: 'Migrated Users',      path: '/admin/migrated-users',      perm: PERM.MIGRATED },
   { title: 'Migrated Total Data', path: '/admin/migrated-total-data', perm: PERM.MIGRATED },
+  { title: 'Migrated Deals',      path: '/admin/migrated-deals',      perm: PERM.MIGRATED },
 ];
 const walletSubItems = [
   { title: 'Wallet Approvals',   path: '/admin/wallet-approvals',   perm: PERM.WALLET },

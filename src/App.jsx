@@ -64,6 +64,7 @@ import AdminAssetPayouts from './pages/admin/AdminAssetPayouts.jsx';
 import AdminPrincipalInterest from './pages/admin/AdminPrincipalInterest.jsx';
 import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
+import AdminMigratedDeals from './pages/admin/AdminMigratedDeals.jsx';
 import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
 import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
 import AdminStats from './pages/admin/AdminStats.jsx';
@@ -238,6 +239,7 @@ function AdminLayout() {
               <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
               <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />
               <Route path="migrated-total-data"   element={<RequireAdminPerm routeKey="migrated-total-data"><AdminMigratedTotalData /></RequireAdminPerm>} />
+              <Route path="migrated-deals"         element={<RequireAdminPerm routeKey="migrated-deals"><AdminMigratedDeals /></RequireAdminPerm>} />
               <Route path="stats"                 element={<Navigate replace to="stats/funds-raised" />} />
               <Route path="stats/funds-raised"    element={<RequireAdminPerm routeKey="stats"><FundsRaised /></RequireAdminPerm>} />
               <Route path="stats/oxyloans-running-deals" element={<RequireAdminPerm routeKey="stats"><OxyLoansRunningDeals /></RequireAdminPerm>} />

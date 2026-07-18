@@ -145,6 +145,7 @@ export const ROUTE_PERM_MAP = {
   'offline':             PERM.OFFLINE,
   'migrated-users':      PERM.MIGRATED,
   'migrated-total-data': PERM.MIGRATED,
+  'migrated-deals':      PERM.MIGRATED,
   'wallet-approvals':    PERM.WALLET,
   'wallet-withdrawals':  PERM.WALLET,
   'interest/sd-lot':     PERM.INTEREST,

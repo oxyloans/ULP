@@ -445,6 +445,17 @@ export async function returnPrincipal(payload) {
 }
 
 /**
+ * POST /oxybrick-service/offlineDealsPrincipalReturned
+ * Body: {
+ *   dealName: string,
+ *   offlineReturnedDto: [{ lenderId: string, returnedPrincipalAmount: number }]
+ * }
+ */
+export async function offlineDealsPrincipalReturned({ dealName, offlineReturnedDto }) {
+  return post('/oxybrick-service/offlineDealsPrincipalReturned', { dealName, offlineReturnedDto });
+}
+
+/**
  * GET /oxybrick-service/getPrincipalInterestInitiatedUsers
  * Params: dealId, fileType (principal | principalinterest)
  */
@@ -493,6 +504,31 @@ export async function getAdminViewDealsWiseInfo() {
     throw new Error(`HTTP error! status: ${response.status}`);
   }
   return response.json();
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// MIGRATED DEALS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/listOfMigratedDealsInfo
+ * Returns: Array of { dealName: string, roi: number, interestDate: string }
+ */
+export async function listOfMigratedDealsInfo() {
+  return get('/oxybrick-service/listOfMigratedDealsInfo');
+}
+
+/**
+ * GET /oxybrick-service/getDealBasedParticipationDetails?dealName={dealName}
+ * Returns: {
+ *   dealName, roi, interestDate,
+ *   totalParticipationAmount, principalReturnedAmount, activeParticipationAmount,
+ *   lendersList: [{ userId, lenderId, userName, mobileNumber, email,
+ *                   totalParticipationAmount, returnedAmount, currentAmount }]
+ * }
+ */
+export async function getDealBasedParticipationDetails(dealName) {
+  return get(`/oxybrick-service/getDealBasedParticipationDetails?dealName=${encodeURIComponent(dealName)}`);
 }
 
 
