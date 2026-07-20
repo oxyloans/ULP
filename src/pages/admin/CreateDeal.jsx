@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals, uploadFractionalAssetFile, getAllBorrowers } from "../../api/afterlogin-admin";
+import { createOrUpdateDeal, getAdminBankDetails, getAdminDeals, uploadFractionalAssetFile, getAllLoadAssetDetails } from "../../api/afterlogin-admin";
 import { formatINR } from "../../utils/currency";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -499,14 +499,22 @@ const EMPTY_ASSET_FORM = {
   transferTo: "",
 };
 
-// Borrower deal — same financial fields as asset deal, but borrower is picked from existing list
+// Borrower deal — same financial + asset fields as asset deal, but borrower is picked from getAllLoadAssetDetails
 const EMPTY_BORROWER_FORM = {
   dealName: "", dealAmount: "", dealType: "NORMAL", dealSubType: "FRACTIONAL_LENDING",
   monthlyInterest: "", quartelyInterest: "", halfInterest: "", yearlyInterest: "",
-  borrowerId: "",      // selected borrower id
-  borrowerName: "",    // auto-filled from borrower list
-  projectName: "",     // auto-filled from borrower list (editable)
+  borrowerId: "",      // selected asset id from getAllLoadAssetDetails
+  borrowerName: "",    // auto-filled
+  projectName: "",     // auto-filled (editable)
   assetValue: "",
+  latitude: "",
+  longitude: "",
+  assetArea: "",
+  assetAreaType: "PLOT",
+  legalReport: null,
+  valuationReport: null,
+  images: [],
+  videos: [],
   duration: "",
   minimumParticipation: "",
   maxParticipation: "",
@@ -569,11 +577,11 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
 
   const selectedBorrowerBank = bankAccounts.find(b => String(b.id ?? b.accountNumber) === borrowerForm.transferFundsId) ?? null;
 
-  // Fetch borrowers when BORROWER tab is active
+  // Fetch assets when BORROWER tab is active
   useEffect(() => {
     if (activeTab !== "BORROWER") return;
     setBorrowersLoading(true);
-    getAllBorrowers()
+    getAllLoadAssetDetails()
       .then(data => setBorrowerList(Array.isArray(data) ? data : []))
       .catch(() => {})
       .finally(() => setBorrowersLoading(false));
@@ -584,7 +592,8 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     return (
       (b.borrowerName ?? "").toLowerCase().includes(q) ||
       (b.projectName  ?? "").toLowerCase().includes(q) ||
-      (b.panNumber    ?? "").toLowerCase().includes(q)
+      (b.ownerName    ?? "").toLowerCase().includes(q) ||
+      (b.flatNumber   ?? "").toLowerCase().includes(q)
     );
   });
 
@@ -610,7 +619,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   const validateBorrower = () => {
     const e = {};
     if (!borrowerForm.dealName.trim())        e.dealName            = "Deal name is required";
-    if (!borrowerForm.borrowerId)             e.borrowerId          = "Please select a borrower";
+    if (!borrowerForm.borrowerId)             e.borrowerId          = "Please select an asset";
     if (!borrowerForm.dealAmount)             e.dealAmount          = "Deal amount is required";
     if (!borrowerForm.duration)               e.duration            = "Duration is required";
     if (!borrowerForm.minimumParticipation)   e.minimumParticipation = "Minimum participation is required";
@@ -619,6 +628,12 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     if (!borrowerForm.fundsAcceptanceEndDate)   e.fundsAcceptanceEndDate   = "End date is required";
     if (!borrowerForm.loanActiveDate)         e.loanActiveDate      = "Loan active date is required";
     if (!borrowerForm.emiEndDate)             e.emiEndDate          = "EMI end date is required";
+    if (!borrowerForm.assetValue)             e.assetValue          = "Asset value is required";
+    if (!borrowerForm.latitude)               e.latitude            = "Latitude is required";
+    if (!borrowerForm.longitude)              e.longitude           = "Longitude is required";
+    if (!borrowerForm.assetArea.trim())       e.assetArea           = "Asset area is required";
+    if (borrowerForm.images.length > 3)       e.images              = "Upload up to 3 images";
+    if (borrowerForm.videos.length > 3)       e.videos              = "Upload up to 3 videos";
     const min = numVal(borrowerForm.minimumParticipation), max = numVal(borrowerForm.maxParticipation);
     if (min && max && min >= max) e.maxParticipation = "Max must be greater than min";
     return e;
@@ -656,14 +671,40 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           assetValue:          numVal(borrowerForm.assetValue),
           borrowerName:        borrowerForm.borrowerName.trim(),
           projectName:         borrowerForm.projectName.trim(),
-          fractionalAssetType: "PLOT",
-          latitude:            0,
-          longitude:           0,
-          area:                "",
+          fractionalAssetType: borrowerForm.assetAreaType,
+          latitude:            parseFloat(borrowerForm.latitude) || 0,
+          longitude:           parseFloat(borrowerForm.longitude) || 0,
+          area:                borrowerForm.assetArea,
           id:                  null,
         },
       };
-      await createOrUpdateDeal(payload);
+
+      // 1. Create deal
+      const createdDeal = await createOrUpdateDeal(payload);
+
+      // 2. Get asset ID for file uploads
+      const assetId = createdDeal?.fractionalInvestmentDto?.id || createdDeal?.id;
+      if (assetId) {
+        const uploadPromises = [];
+        if (borrowerForm.legalReport) {
+          uploadPromises.push(uploadFractionalAssetFile({ file: borrowerForm.legalReport, assetId, fileType: "legalreport" }));
+        }
+        if (borrowerForm.valuationReport) {
+          uploadPromises.push(uploadFractionalAssetFile({ file: borrowerForm.valuationReport, assetId, fileType: "valuationreport" }));
+        }
+        if (Array.isArray(borrowerForm.images)) {
+          borrowerForm.images.forEach(file => {
+            uploadPromises.push(uploadFractionalAssetFile({ file, assetId, fileType: "fractionalimage" }));
+          });
+        }
+        if (Array.isArray(borrowerForm.videos)) {
+          borrowerForm.videos.forEach(file => {
+            uploadPromises.push(uploadFractionalAssetFile({ file, assetId, fileType: "fractionalvideo" }));
+          });
+        }
+        if (uploadPromises.length > 0) await Promise.all(uploadPromises);
+      }
+
       setSubmitted(true);
     } catch (err) {
       setSubmitError(err.message ?? "Submission failed. Please try again.");
@@ -1371,31 +1412,12 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
       <form onSubmit={handleBorrowerSubmit} className="grid gap-4">
 
         {/* Deal Identity */}
-        <div className="rounded-2xl p-5 grid gap-4"
-          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
-          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#10b981" }}>Deal Identity</p>
-          <Field label="Deal Name" required error={borrowerErrors.dealName}>
-            <input type="text" placeholder="e.g. BRW-ProjectAlpha-20L-2026"
-              value={borrowerForm.dealName} onChange={e => setBorrower("dealName", e.target.value)}
-              style={inp(borrowerErrors.dealName)} />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Deal Type" required>
-              <PillSelect value={borrowerForm.dealType} onChange={v => setBorrower("dealType", v)} options={DEAL_TYPES} accent="#10b981" />
-            </Field>
-            <Field label="Sub Type" required>
-              <select value={borrowerForm.dealSubType} onChange={e => setBorrower("dealSubType", e.target.value)}
-                style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
-                {ASSET_SUB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
-              </select>
-            </Field>
-          </div>
-        </div>
+        
 
         {/* Borrower Selector */}
         <div className="rounded-2xl p-5 grid gap-4"
           style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
-          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#06b6d4" }}>Select Borrower</p>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#06b6d4" }}>Select Asset</p>
 
           {borrowersLoading ? (
             <div className="flex items-center gap-2 px-4 py-3 rounded-xl"
@@ -1403,10 +1425,10 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
               </svg>
-              <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading borrowers…</span>
+              <span className="text-sm" style={{ color: "var(--text-muted)" }}>Loading assets…</span>
             </div>
           ) : (
-            <Field label="Borrower" required error={borrowerErrors.borrowerId}>
+            <Field label="Asset" required error={borrowerErrors.borrowerId}>
               <div className="relative">
                 {/* Trigger */}
                 <button type="button" onClick={() => setBorrowerDropOpen(o => !o)}
@@ -1428,7 +1450,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                       </div>
                     </div>
                   ) : (
-                    <span className="text-sm" style={{ color: "var(--text-muted)" }}>— Select borrower from list —</span>
+                    <span className="text-sm" style={{ color: "var(--text-muted)" }}>— Select asset from list —</span>
                   )}
                   <span className="flex-shrink-0 transition-transform duration-200"
                     style={{ transform: borrowerDropOpen ? "rotate(180deg)" : "rotate(0)", color: "var(--text-muted)" }}>
@@ -1444,7 +1466,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                     <div className="flex items-center gap-2 px-3 py-2.5"
                       style={{ borderBottom: "1px solid var(--border)", background: "var(--input-bg)" }}>
                       <SearchIcon />
-                      <input autoFocus type="text" placeholder="Search by name or project…"
+                      <input autoFocus type="text" placeholder="Search by borrower name or project…"
                         value={borrowerSearch} onChange={e => setBorrowerSearch(e.target.value)}
                         className="flex-1 text-sm bg-transparent outline-none"
                         style={{ color: "var(--text-primary)" }} />
@@ -1470,7 +1492,12 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                                 ...f,
                                 borrowerId:   key,
                                 borrowerName: b.borrowerName ?? "",
-                                projectName:  proj,
+                                projectName:  b.projectName ?? "",
+                                assetValue:   b.takenAssetValue ? String(b.takenAssetValue) : (b.actualAssetValue ? String(b.actualAssetValue) : ""),
+                                assetAreaType: b.assetType === "FLAT" ? "FLAT" : b.assetType === "PLOT" ? "PLOT" : "PLOT",
+                                assetArea:    b.size ?? b.area ?? "",
+                                latitude:     "",
+                                longitude:    "",
                               }));
                               setBorrowerErrors(e => ({ ...e, borrowerId: "" }));
                               setBorrowerDropOpen(false);
@@ -1494,8 +1521,9 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                             <div className="flex-1 min-w-0">
                               <p className="text-sm font-bold truncate" style={{ color: active ? "#10b981" : "var(--text-primary)" }}>{b.borrowerName}</p>
                               <p className="text-xs truncate" style={{ color: "var(--text-muted)" }}>
-                                {proj || "—"}
-                                {b.phoneNumber && <span className="ml-2">· {b.phoneNumber}</span>}
+                                {b.projectName || "—"}
+                                {b.assetType && <span className="ml-2">· {b.assetType}</span>}
+                                {b.flatNumber && <span className="ml-2">· {b.flatNumber}</span>}
                               </p>
                             </div>
                             {active && (
@@ -1517,7 +1545,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           {borrowerForm.borrowerId && (
             <div className="rounded-xl px-4 py-3 grid gap-3"
               style={{ background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.2)" }}>
-              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#10b981" }}>Selected Borrower</p>
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "#10b981" }}>Asset Details</p>
               <div className="grid sm:grid-cols-2 gap-3">
                 <Field label="Borrower Name" required error={borrowerErrors.borrowerName}>
                   <input type="text" value={borrowerForm.borrowerName}
@@ -1529,15 +1557,57 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                     onChange={e => setBorrower("projectName", e.target.value)}
                     style={inp(borrowerErrors.projectName)} />
                 </Field>
-                <Field label="Asset Value (₹)" error={borrowerErrors.assetValue} hint={numVal(borrowerForm.assetValue) > 0 ? fmtINR(numVal(borrowerForm.assetValue)) : undefined}>
+                <Field label="Asset Value (₹)" required error={borrowerErrors.assetValue} hint={numVal(borrowerForm.assetValue) > 0 ? fmtINR(numVal(borrowerForm.assetValue)) : undefined}>
                   <input type="text" inputMode="numeric" placeholder="e.g. 2500000"
                     value={borrowerForm.assetValue}
                     onChange={e => setBorrower("assetValue", toLocale(e.target.value))}
                     style={{ ...inp(borrowerErrors.assetValue), fontFamily: "'JetBrains Mono', monospace" }} />
                 </Field>
+                <Field label="Asset Area" required error={borrowerErrors.assetArea}>
+                  <input type="text" placeholder="e.g. 832 sqft"
+                    value={borrowerForm.assetArea}
+                    onChange={e => setBorrower("assetArea", e.target.value)}
+                    style={inp(borrowerErrors.assetArea)} />
+                </Field>
+                <Field label="Latitude" required error={borrowerErrors.latitude}>
+                  <input type="text" inputMode="decimal" placeholder="e.g. 17.3850"
+                    value={borrowerForm.latitude}
+                    onChange={e => setBorrower("latitude", e.target.value.replace(/[^0-9.-]/g, ""))}
+                    style={inp(borrowerErrors.latitude)} />
+                </Field>
+                <Field label="Longitude" required error={borrowerErrors.longitude}>
+                  <input type="text" inputMode="decimal" placeholder="e.g. 78.4867"
+                    value={borrowerForm.longitude}
+                    onChange={e => setBorrower("longitude", e.target.value.replace(/[^0-9.-]/g, ""))}
+                    style={inp(borrowerErrors.longitude)} />
+                </Field>
               </div>
+              <Field label="Asset Type" required>
+                <PillSelect value={borrowerForm.assetAreaType} onChange={v => setBorrower("assetAreaType", v)} options={ASSET_AREA_TYPES} accent="#10b981" />
+              </Field>
             </div>
           )}
+        </div>
+
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#10b981" }}>Deal Identity</p>
+          <Field label="Deal Name" required error={borrowerErrors.dealName}>
+            <input type="text" placeholder="e.g. BRW-ProjectAlpha-20L-2026"
+              value={borrowerForm.dealName} onChange={e => setBorrower("dealName", e.target.value)}
+              style={inp(borrowerErrors.dealName)} />
+          </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Deal Type" required>
+              <PillSelect value={borrowerForm.dealType} onChange={v => setBorrower("dealType", v)} options={DEAL_TYPES} accent="#10b981" />
+            </Field>
+            <Field label="Sub Type" required>
+              <select value={borrowerForm.dealSubType} onChange={e => setBorrower("dealSubType", e.target.value)}
+                style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
+                {ASSET_SUB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </Field>
+          </div>
         </div>
 
         {/* ROI */}
@@ -1625,7 +1695,23 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           </div>
         </div>
 
-        {/* Transfer Funds */}
+        {/* Validation Check */}
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>Validation Check</p>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FilePicker label="Legal Report" file={borrowerForm.legalReport} accept=".pdf,.jpg,.jpeg,.png"
+              error={borrowerErrors.legalReport} onChange={file => setBorrower("legalReport", file)} />
+            <FilePicker label="Valuation Report" file={borrowerForm.valuationReport} accept=".pdf,.jpg,.jpeg,.png"
+              error={borrowerErrors.valuationReport} onChange={file => setBorrower("valuationReport", file)} />
+            <FilePicker label="Images (max 3)" files={borrowerForm.images} multiple accept="image/*" required={false}
+              error={borrowerErrors.images} onChange={files => setBorrower("images", files.slice(0, 3))} />
+            <FilePicker label="Videos (max 3)" files={borrowerForm.videos} multiple accept="video/*" required={false}
+              error={borrowerErrors.videos} onChange={files => setBorrower("videos", files.slice(0, 3))} />
+          </div>
+        </div>
+
+        {/* Transfer Funds (Borrower) */}
         <div className="rounded-2xl p-5 grid gap-4"
           style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
           <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#06b6d4" }}>Transfer Funds</p>
