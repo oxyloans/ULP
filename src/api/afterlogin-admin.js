@@ -531,6 +531,40 @@ export async function getDealBasedParticipationDetails(dealName) {
   return get(`/oxybrick-service/getDealBasedParticipationDetails?dealName=${encodeURIComponent(dealName)}`);
 }
 
+/**
+ * GET /oxybrick-service/offlinePrincipalAndInterestInfo?dealName={dealName}
+ * Returns: Array of {
+ *   id, userId, principalAmount, userName, accNo, bankName,
+ *   princInterestAmount, diferenceDays, ifsc, lenderId, initiatedDate
+ * }
+ */
+export async function getOfflinePrincipalAndInterestInfo(dealName) {
+  return get(`/oxybrick-service/offlinePrincipalAndInterestInfo?dealName=${encodeURIComponent(dealName)}`);
+}
+
+/**
+ * PATCH /oxybrick-service/updateOfflineDealPrincipalStatus
+ * Body: {
+ *   dealName: string,
+ *   paidDate: string (yyyy-mm-dd),
+ *   principalReturnedUsers: [{
+ *     diferenceDays: number,
+ *     id: string,
+ *     ifsc: string,
+ *     lenderId: string,
+ *     princInterestAmount: number,
+ *     principalAmount: number
+ *   }]
+ * }
+ */
+export async function updateOfflineDealPrincipalStatus({ dealName, paidDate, principalReturnedUsers }) {
+  return patch('/oxybrick-service/updateOfflineDealPrincipalStatus', {
+    dealName,
+    paidDate,
+    principalReturnedUsers,
+  });
+}
+
 
 
 

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Modal } from 'antd';
-import { listOfMigratedDealsInfo, getDealBasedParticipationDetails, offlineDealsPrincipalReturned } from '../../api/afterlogin-admin';
+import { listOfMigratedDealsInfo, getDealBasedParticipationDetails, offlineDealsPrincipalReturned, getOfflinePrincipalAndInterestInfo, updateOfflineDealPrincipalStatus } from '../../api/afterlogin-admin';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon = () => (
@@ -628,7 +628,338 @@ function ParticipationModalContent({ dealName }) {
   );
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+const CoinsIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"
+    strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+    <circle cx="8" cy="8" r="6"/>
+    <path d="M18.09 10.37A6 6 0 1 1 10.34 18"/>
+    <path d="M7 6h1v4"/>
+    <path d="m16.71 13.88.7.71-2.82 2.82"/>
+  </svg>
+);
+
+// ─── Principal & Interest Modal ───────────────────────────────────────────────
+/**
+ * Props:
+ *   open      – boolean
+ *   onClose   – () => void
+ *   dealName  – string
+ */
+function PrincipalInterestModal({ open, onClose, dealName }) {
+  const [records,    setRecords]    = useState([]);
+  const [loading,    setLoading]    = useState(false);
+  const [error,      setError]      = useState('');
+  const [selected,   setSelected]   = useState(new Set()); // Set of record ids
+  const [paidDate,   setPaidDate]   = useState(() => new Date().toISOString().slice(0, 10));
+  const [submitting, setSubmitting] = useState(false);
+  const [result,     setResult]     = useState(null); // { success, message }
+
+  const loadRecords = useCallback(() => {
+    if (!dealName) return;
+    setLoading(true);
+    setError('');
+    setRecords([]);
+    setSelected(new Set());
+    setResult(null);
+    getOfflinePrincipalAndInterestInfo(dealName)
+      .then(res => setRecords(Array.isArray(res) ? res : []))
+      .catch(e => setError(e.message ?? 'Failed to load data'))
+      .finally(() => setLoading(false));
+  }, [dealName]);
+
+  // Load whenever modal opens
+  const prevOpen = useRef(false);
+  useEffect(() => {
+    if (open && !prevOpen.current) loadRecords();
+    if (!open) { setResult(null); setSelected(new Set()); }
+    prevOpen.current = open;
+  }, [open, loadRecords]);
+
+  const allSelected = records.length > 0 && selected.size === records.length;
+  const someSelected = selected.size > 0 && !allSelected;
+
+  const toggleAll = () => {
+    if (allSelected) setSelected(new Set());
+    else setSelected(new Set(records.map(r => r.id)));
+  };
+
+  const toggleOne = (id) => {
+    setSelected(prev => {
+      const n = new Set(prev);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+
+  const handleMarkPaid = async () => {
+    if (selected.size === 0 || submitting) return;
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const principalReturnedUsers = records
+        .filter(r => selected.has(r.id))
+        .map(r => ({
+          diferenceDays:      r.diferenceDays      ?? 0,
+          id:                 r.id,
+          ifsc:               r.ifsc               ?? '',
+          lenderId:           r.lenderId           ?? '',
+          princInterestAmount: r.princInterestAmount ?? 0,
+          principalAmount:    r.principalAmount    ?? 0,
+        }));
+      await updateOfflineDealPrincipalStatus({ dealName, paidDate, principalReturnedUsers });
+      setResult({ success: true, message: `Marked ${selected.size} record${selected.size !== 1 ? 's' : ''} as paid successfully.` });
+      setSelected(new Set());
+      loadRecords();
+    } catch (e) {
+      setResult({ success: false, message: e.message ?? 'Failed to update. Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={open}
+      onCancel={onClose}
+      footer={null}
+      width="min(98vw, 860px)"
+      centered
+      styles={{
+        content: {
+          background: 'var(--card-bg)',
+          border: '1.5px solid rgba(168,85,247,0.3)',
+          borderRadius: '1.25rem',
+          padding: 0,
+          overflow: 'hidden',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+        },
+        header: {
+          background: 'var(--card-bg)',
+          borderBottom: '1px solid var(--border)',
+          borderRadius: '1.25rem 1.25rem 0 0',
+          padding: '20px 24px 16px',
+          marginBottom: 0,
+        },
+        body: { padding: '0', maxHeight: 'calc(88vh - 72px)', overflowY: 'auto' },
+      }}
+      title={
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#c084fc' }}>
+              <CoinsIcon />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest m-0" style={{ color: '#a855f7' }}>
+                Principal &amp; Interest
+              </p>
+              <p className="text-sm font-bold m-0" style={{ color: 'var(--text-primary)' }}>
+                {dealName}
+              </p>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <div className="flex flex-col">
+
+        {/* ── Toolbar ── */}
+        <div className="flex items-center justify-between gap-4 px-6 py-4"
+          style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-elevated)' }}>
+          {/* Paid date */}
+          <div className="flex items-center gap-2.5">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Paid Date</span>
+            <input
+              type="date"
+              value={paidDate}
+              onChange={e => setPaidDate(e.target.value)}
+              className="px-3 py-1.5 rounded-lg text-sm outline-none tabular-nums"
+              style={{
+                background: 'var(--input-bg)',
+                border: '1px solid var(--border)',
+                color: 'var(--text-primary)',
+                minWidth: 140,
+              }}
+            />
+          </div>
+
+          {/* Actions row */}
+          <div className="flex items-center gap-3">
+            {selected.size > 0 && (
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+                {selected.size} selected
+              </span>
+            )}
+            <button
+              onClick={handleMarkPaid}
+              disabled={selected.size === 0 || submitting}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+              style={{
+                background: selected.size > 0 ? 'rgba(16,185,129,0.14)' : 'var(--input-bg)',
+                color:      selected.size > 0 ? '#10b981' : 'var(--text-muted)',
+                border:     `1px solid ${selected.size > 0 ? 'rgba(16,185,129,0.35)' : 'var(--border)'}`,
+              }}>
+              {submitting ? (
+                <div className="w-4 h-4 rounded-full border-2 animate-spin"
+                  style={{ borderColor: '#10b981', borderTopColor: 'transparent' }} />
+              ) : (
+                <CheckIcon />
+              )}
+              {submitting ? 'Processing…' : 'Mark as Paid'}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Result banner ── */}
+        {result && (
+          <div className="mx-6 mt-4 rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2"
+            style={{
+              background: result.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)',
+              color:      result.success ? '#10b981' : '#f87171',
+              border:     `1px solid ${result.success ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)'}`,
+            }}>
+            <span>{result.success ? '✓' : '✕'}</span>
+            {result.message}
+          </div>
+        )}
+
+        {/* ── Loading ── */}
+        {loading && (
+          <div className="flex items-center justify-center gap-3 py-16">
+            <div className="w-5 h-5 rounded-full border-2 animate-spin"
+              style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
+            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading records…</span>
+          </div>
+        )}
+
+        {/* ── Error ── */}
+        {!loading && error && (
+          <div className="py-14 text-center">
+            <p className="text-sm" style={{ color: '#f87171' }}>{error}</p>
+            <button onClick={loadRecords} className="mt-3 text-xs underline" style={{ color: '#a855f7' }}>Retry</button>
+          </div>
+        )}
+
+        {/* ── Empty ── */}
+        {!loading && !error && records.length === 0 && (
+          <div className="py-16 text-center">
+            <p className="text-2xl mb-2">📭</p>
+            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No records found</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Nothing pending for this deal</p>
+          </div>
+        )}
+
+        {/* ── Table ── */}
+        {!loading && !error && records.length > 0 && (
+          <div className="overflow-x-auto" style={{ padding: '16px 24px 24px' }}>
+            <table className="w-full text-sm border-collapse">
+              <thead>
+                <tr style={{ background: 'var(--surface-elevated)' }}>
+                  {/* Select-all */}
+                  <th className="py-2.5 px-3 rounded-tl-lg" style={{ width: 40, borderBottom: '1px solid var(--border)' }}>
+                    <Checkbox checked={allSelected} indeterminate={someSelected} onChange={toggleAll} />
+                  </th>
+                  {[
+                    { label: '#',            align: 'left'  },
+                    { label: 'Lender ID',    align: 'left'  },
+                    { label: 'Name',         align: 'left'  },
+                    { label: 'Principal',    align: 'right' },
+                    { label: 'Interest',     align: 'right' },
+                    { label: 'Days',         align: 'center'},
+                    { label: 'Initiated',    align: 'left'  },
+                  ].map(({ label, align }) => (
+                    <th key={label}
+                      className={`py-2.5 px-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap text-${align}`}
+                      style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {records.map((r, i) => {
+                  const isChecked = selected.has(r.id);
+                  const rowBg     = isChecked ? 'rgba(168,85,247,0.07)' : 'transparent';
+                  return (
+                    <tr
+                      key={r.id ?? i}
+                      onClick={() => toggleOne(r.id)}
+                      style={{
+                        borderBottom: '1px solid var(--border)',
+                        background: rowBg,
+                        cursor: 'pointer',
+                        transition: 'background 0.12s',
+                      }}
+                      onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = 'rgba(168,85,247,0.04)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.background = rowBg; }}>
+
+                      {/* Checkbox */}
+                      <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
+                        <Checkbox checked={isChecked} onChange={() => toggleOne(r.id)} />
+                      </td>
+
+                      {/* # */}
+                      <td className="py-3 px-3">
+                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
+                      </td>
+
+                      {/* Lender ID */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className="font-mono text-xs px-2 py-0.5 rounded"
+                          style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}>
+                          {r.lenderId ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Name */}
+                      <td className="py-3 px-3">
+                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                          {r.userName ?? '—'}
+                        </span>
+                      </td>
+
+                      {/* Principal */}
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <span className="text-sm font-bold tabular-nums" style={{ color: '#60a5fa' }}>
+                          {fmt(r.principalAmount)}
+                        </span>
+                      </td>
+
+                      {/* Interest */}
+                      <td className="py-3 px-3 text-right whitespace-nowrap">
+                        <span className="text-sm font-semibold tabular-nums" style={{ color: '#34d399' }}>
+                          {fmt(r.princInterestAmount)}
+                        </span>
+                      </td>
+
+                      {/* Days */}
+                      <td className="py-3 px-3 text-center whitespace-nowrap">
+                        <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums"
+                          style={{ background: 'var(--surface-elevated)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                          {r.diferenceDays ?? '—'}d
+                        </span>
+                      </td>
+
+                      {/* Initiated */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+                          {r.initiatedDate ?? '—'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+      </div>
+    </Modal>
+  );
+}
+
+
 export default function AdminMigratedDeals() {
   const [data,       setData]       = useState([]);
   const [loading,    setLoading]    = useState(true);
@@ -636,6 +967,7 @@ export default function AdminMigratedDeals() {
   const [refreshing, setRefreshing] = useState(false);
   const [search,     setSearch]     = useState('');
   const [modalDeal,  setModalDeal]  = useState(null); // deal name string | null
+  const [piModal,    setPiModal]    = useState(null); // deal name string | null (principal & interest modal)
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -659,7 +991,7 @@ export default function AdminMigratedDeals() {
     );
   }, [data, search]);
 
-  const cols = ['#', 'Deal Name', 'ROI (%)', 'Interest Date', 'Participants'];
+  const cols = ['#', 'Deal Name', 'ROI (%)', 'Interest Date', 'Participants', 'Principal & Interest'];
 
   return (
     <>
@@ -800,6 +1132,15 @@ export default function AdminMigratedDeals() {
                           View
                         </button>
                       </td>
+                      <td className="py-3.5 px-4 whitespace-nowrap">
+                        <button
+                          onClick={() => setPiModal(deal.dealName)}
+                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
+                          style={{ background: 'rgba(251,146,60,0.12)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>
+                          <CoinsIcon />
+                          P&amp;I Info
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -809,7 +1150,7 @@ export default function AdminMigratedDeals() {
         </div>
       </div>
 
-      {/* Antd Modal */}
+      {/* Antd Modal — Participation */}
       <Modal
         open={!!modalDeal}
         onCancel={() => setModalDeal(null)}
@@ -858,6 +1199,13 @@ export default function AdminMigratedDeals() {
       >
         <ParticipationModalContent dealName={modalDeal} />
       </Modal>
+
+      {/* Principal & Interest Modal */}
+      <PrincipalInterestModal
+        open={!!piModal}
+        onClose={() => setPiModal(null)}
+        dealName={piModal}
+      />
     </>
   );
 }
