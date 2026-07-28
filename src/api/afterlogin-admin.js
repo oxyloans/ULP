@@ -516,25 +516,31 @@ export async function getAdminViewDealsWiseInfo() {
 
 /**
  * POST /auth-service/auth/sign-up  (admin-initiated, registrationBy = 'ADMIN')
- * No OTP required — admin bypasses mobile verification.
+ * No OTP required — random 6-digit OTP and UUID session generated client-side.
  */
 export async function adminRegisterUser({ firstName, lastName, email, gender, mobileNumber, password, referId }) {
+  const randomOtp     = String(Math.floor(100000 + Math.random() * 900000));
+  const randomSession = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = (Math.random() * 16) | 0;
+    return (c === 'x' ? r : (r & 0x3) | 0x8).toString(16);
+  });
+
   return post('/auth-service/auth/sign-up', {
     alternativeMobile: mobileNumber,
     email,
     firstName,
     gender,
     lastName,
-    middleName:   '',
-    mobileOtp:    '',
-    otpSession:   '',
+    middleName:     '',
+    mobileOtp:      randomOtp,
+    otpSession:     randomSession,
     mobileNumber,
     password,
-    profileImage: '',
-    proofNumber:  '',
-    proofPath:    '',
-    roleId:       'bb261c45-f169-445d-a08f-eb47d9080aa0',
-    refferId:     referId ?? '',
+    profileImage:   '',
+    proofNumber:    '',
+    proofPath:      '',
+    roleId:         'bb261c45-f169-445d-a08f-eb47d9080aa0',
+    refferId:       referId ?? '',
     registrationBy: 'admin',
   });
 }
