@@ -60,16 +60,30 @@ client.interceptors.request.use((config) => {
 
 // Normalise errors
 client.interceptors.response.use(
-  (res) => res.data,          // unwrap → callers get data directly
+  (res) => {
+    const data = res.data;
+    // Some endpoints return a 2xx but with an error payload (e.g. 302 redirect
+    // that resolves with { message, httpStatus, trace }). Treat those as errors.
+    if (data && typeof data === 'object' && data.httpStatus && data.httpStatus >= 400) {
+      const error   = new Error(data.message || 'Request failed');
+      error.status  = data.httpStatus;
+      error.data    = data;
+      return Promise.reject(error);
+    }
+    return data;          // unwrap → callers get data directly
+  },
   (err) => {
     const status  = err.response?.status ?? 0;
-    const message = err.response?.data?.message
-      || err.response?.data?.error
+    const body    = err.response?.data;
+    // Prefer the httpStatus embedded in the body (e.g. 302 that carries 409 payload)
+    const realStatus = (body && body.httpStatus >= 400) ? body.httpStatus : status;
+    const message = body?.message
+      || body?.error
       || err.message
       || 'Network error';
     const error   = new Error(message);
-    error.status  = status;
-    error.data    = err.response?.data ?? null;
+    error.status  = realStatus;
+    error.data    = body ?? null;
     return Promise.reject(error);
   }
 );

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Modal } from 'antd';
 import { adminRegisterUser } from '../../api/afterlogin-admin';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -56,13 +57,11 @@ export default function AdminRegisterUser() {
   const [showPw,     setShowPw]     = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted,  setSubmitted]  = useState(false);
-  const [submitError,setSubmitError]= useState('');
   const [lastId,     setLastId]     = useState('');
 
   const set = (k, v) => {
     setForm(f => ({ ...f, [k]: v }));
     setErrors(e => ({ ...e, [k]: '' }));
-    setSubmitError('');
   };
 
   // ── Validation ──────────────────────────────────────────────────────────────
@@ -86,7 +85,7 @@ export default function AdminRegisterUser() {
     const errs = validate();
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
-    setSubmitting(true); setSubmitError('');
+    setSubmitting(true);
     try {
       const res   = await adminRegisterUser({
         firstName:    form.firstName.trim(),
@@ -100,14 +99,32 @@ export default function AdminRegisterUser() {
       setLastId(res?.userId ?? res?.data?.userId ?? '');
       setSubmitted(true);
     } catch (err) {
-      setSubmitError(err.data?.message ?? err.message ?? 'Registration failed. Please try again.');
+      const status = err.status ?? 0;
+      const raw    = err.data?.message ?? err.message ?? '';
+      const msg    = (raw && raw !== 'Network error')
+        ? raw
+        : (status === 409 || status === 302)
+          ? 'This mobile number or email is already registered.'
+          : 'Registration failed. Please try again.';
+      Modal.error({
+        title:   'Registration Failed',
+        content: msg,
+        centered: true,
+        okButtonProps: {
+          style: {
+            background: 'rgba(168,85,247,0.9)',
+            borderColor: 'rgba(168,85,247,0.9)',
+            color: '#fff',
+          },
+        },
+      });
     } finally {
       setSubmitting(false);
     }
   };
 
   const handleReset = () => {
-    setForm(EMPTY); setErrors({}); setSubmitError('');
+    setForm(EMPTY); setErrors({});
     setSubmitted(false); setLastId('');
   };
 
@@ -181,15 +198,6 @@ export default function AdminRegisterUser() {
         </div>
 
         <div className="p-6 grid gap-5">
-
-          {/* Error banner */}
-          {submitError && (
-            <div className="rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2"
-              style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-              {submitError}
-            </div>
-          )}
 
           {/* ── Personal Info ── */}
           <Section title="Personal Info" />
