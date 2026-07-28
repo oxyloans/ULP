@@ -346,6 +346,7 @@ export default function Register() {
         otp:         form.otp,
         otpSession,
         referId:     form.referId.trim(),
+        registrationBy : null
       });
       setStep(2);
     } catch (err) {

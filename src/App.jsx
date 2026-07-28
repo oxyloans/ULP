@@ -65,6 +65,7 @@ import AdminPrincipalInterest from './pages/admin/AdminPrincipalInterest.jsx';
 import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
 import AdminMigratedDeals from './pages/admin/AdminMigratedDeals.jsx';
+import AdminRegisterUser from './pages/admin/AdminRegisterUser.jsx';
 import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
 import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
 import AdminStats from './pages/admin/AdminStats.jsx';
@@ -237,6 +238,7 @@ function AdminLayout() {
               <Route path="interest/asset"        element={<RequireAdminPerm routeKey="interest/asset"><AdminAssetPayouts /></RequireAdminPerm>} />
               <Route path="interest/principal-interest" element={<RequireAdminPerm routeKey="interest/principal-interest"><AdminPrincipalInterest /></RequireAdminPerm>} />
               <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
+              <Route path="register-user"         element={<RequireAdminPerm routeKey="register-user"><AdminRegisterUser /></RequireAdminPerm>} />
               <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />
               <Route path="migrated-total-data"   element={<RequireAdminPerm routeKey="migrated-total-data"><AdminMigratedTotalData /></RequireAdminPerm>} />
               <Route path="migrated-deals"         element={<RequireAdminPerm routeKey="migrated-deals"><AdminMigratedDeals /></RequireAdminPerm>} />

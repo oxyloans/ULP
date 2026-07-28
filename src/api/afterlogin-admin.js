@@ -510,6 +510,35 @@ export async function getAdminViewDealsWiseInfo() {
 // MIGRATED DEALS
 // ══════════════════════════════════════════════════════════════════════════════
 
+// ══════════════════════════════════════════════════════════════════════════════
+// MANUAL USER REGISTRATION (admin)
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * POST /auth-service/auth/sign-up  (admin-initiated, registrationBy = 'ADMIN')
+ * No OTP required — admin bypasses mobile verification.
+ */
+export async function adminRegisterUser({ firstName, lastName, email, gender, mobileNumber, password, referId }) {
+  return post('/auth-service/auth/sign-up', {
+    alternativeMobile: mobileNumber,
+    email,
+    firstName,
+    gender,
+    lastName,
+    middleName:   '',
+    mobileOtp:    '',
+    otpSession:   '',
+    mobileNumber,
+    password,
+    profileImage: '',
+    proofNumber:  '',
+    proofPath:    '',
+    roleId:       'bb261c45-f169-445d-a08f-eb47d9080aa0',
+    refferId:     referId ?? '',
+    registrationBy: 'admin',
+  });
+}
+
 /**
  * GET /oxybrick-service/listOfMigratedDealsInfo
  * Returns: Array of { dealName: string, roi: number, interestDate: string }

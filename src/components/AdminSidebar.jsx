@@ -50,13 +50,15 @@ const statsSubItems = [
 const UsersIcon2    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
 const MigrateIcon2  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 const BorrowerIcon2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
+const UserPlusIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>;
 
 const navItemsBefore = [
-  { title: 'Dashboard',     path: '/admin/dashboard',   Icon: HomeIcon,      perm: PERM.DASHBOARD   },
-  { title: 'Create Deal',   path: '/admin/create-deal', Icon: PlusIcon,      perm: PERM.CREATE_DEAL },
-  { title: 'Total Users',   path: '/admin/total-users', Icon: UsersIcon2,    perm: PERM.TOTAL_USERS },
-  { title: 'Borrowers',     path: '/admin/borrowers',   Icon: BorrowerIcon2, perm: PERM.BORROWERS   },
-  { title: 'Offline Deals', path: '/admin/offline',     Icon: PackageIcon,   perm: PERM.OFFLINE     },
+  { title: 'Dashboard',       path: '/admin/dashboard',     Icon: HomeIcon,      perm: PERM.DASHBOARD     },
+  { title: 'Create Deal',     path: '/admin/create-deal',   Icon: PlusIcon,      perm: PERM.CREATE_DEAL   },
+  { title: 'Register User',   path: '/admin/register-user', Icon: UserPlusIcon,  perm: PERM.REGISTER_USER },
+  { title: 'Total Users',     path: '/admin/total-users',   Icon: UsersIcon2,    perm: PERM.TOTAL_USERS   },
+  { title: 'Borrowers',       path: '/admin/borrowers',     Icon: BorrowerIcon2, perm: PERM.BORROWERS     },
+  { title: 'Offline Deals',   path: '/admin/offline',       Icon: PackageIcon,   perm: PERM.OFFLINE       },
 ];
 
 const navItemsAfter = [

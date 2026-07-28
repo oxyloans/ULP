@@ -58,7 +58,12 @@ const fmt = (n) =>
     ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n)
     : '—';
 
-// ─── Give Principal Modal ─────────────────────────────────────────────────────
+// ─── Dark theme wrapper for modals (portals escape the data-theme root) ───────
+const D = ({ children }) => (
+  <div data-theme="dark" style={{ colorScheme: 'dark' }}>{children}</div>
+);
+
+
 /**
  * Props:
  *   open        – boolean
@@ -122,9 +127,9 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
       onClick={() => setMode(val)}
       className="flex-1 py-2 rounded-xl text-xs font-bold transition-all"
       style={{
-        background: mode === val ? 'rgba(168,85,247,0.18)' : 'var(--input-bg)',
-        color:      mode === val ? '#c084fc' : 'var(--text-muted)',
-        border:     `1.5px solid ${mode === val ? 'rgba(168,85,247,0.5)' : 'var(--border)'}`,
+        background: mode === val ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)',
+        color:      mode === val ? '#c084fc' : '#64748b',
+        border:     `1.5px solid ${mode === val ? 'rgba(168,85,247,0.5)' : 'rgba(255,255,255,0.08)'}`,
       }}>
       {label}
     </button>
@@ -139,12 +144,12 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
       centered
       styles={{
         content: {
-          background: 'var(--card-bg)',
+          background: '#161b27',
           border: '2px solid rgba(168,85,247,0.4)',
           borderRadius: '1.25rem',
           padding: 0,
           overflow: 'hidden',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.45)',
         },
         header: {
           background: 'rgba(168,85,247,0.08)',
@@ -153,9 +158,10 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
           padding: '18px 28px',
           marginBottom: 0,
         },
-        body: { padding: '24px 28px 28px', maxHeight: 'calc(90vh - 80px)', overflowY: 'auto' },
+        body: { padding: '24px 28px 28px', maxHeight: 'calc(90vh - 80px)', overflowY: 'auto', background: '#161b27' },
       }}
       title={
+        <D>
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center"
             style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>
@@ -163,13 +169,15 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
           </div>
           <div>
             <p className="text-xs uppercase tracking-widest font-semibold m-0" style={{ color: '#c084fc' }}>Give Principal</p>
-            <p className="text-sm font-extrabold m-0 truncate max-w-xs sm:max-w-md" style={{ color: 'var(--text-primary)' }}>
+            <p className="text-sm font-extrabold m-0 truncate max-w-xs sm:max-w-md" style={{ color: '#f1f5f9' }}>
               {dealName} · {lenders.length} lender{lenders.length !== 1 ? 's' : ''}
             </p>
           </div>
         </div>
+        </D>
       }
     >
+      <D>
       <div className="flex flex-col gap-5">
 
         {/* Result banner */}
@@ -186,7 +194,7 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
 
         {/* Mode selector */}
         <div>
-          <p className="text-xs font-semibold mb-2 uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs font-semibold mb-2 uppercase tracking-widest" style={{ color: '#64748b' }}>
             Payout Amount
           </p>
           <div className="flex gap-2">
@@ -204,12 +212,12 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
             return (
               <div key={l.lenderId}
                 className="flex items-center justify-between gap-3 rounded-xl px-4 py-3"
-                style={{ background: 'var(--surface-elevated)', border: '1px solid var(--border)' }}>
+                style={{ background: '#1c2333', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
+                  <p className="text-sm font-semibold truncate" style={{ color: '#f1f5f9' }}>
                     {l.userName ?? l.lenderId}
                   </p>
-                  <p className="text-xs mt-0.5 font-mono" style={{ color: 'var(--text-muted)' }}>
+                  <p className="text-xs mt-0.5 font-mono" style={{ color: '#64748b' }}>
                     Available: {fmt(current)}
                   </p>
                 </div>
@@ -224,9 +232,9 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
                       onChange={e => setCustomAmts(prev => ({ ...prev, [l.lenderId]: e.target.value }))}
                       className="w-36 px-3 py-1.5 rounded-lg text-sm text-right outline-none"
                       style={{
-                        background: 'var(--input-bg)',
+                        background: 'rgba(255,255,255,0.04)',
                         border: `1px solid ${(!customAmts[l.lenderId] || parseFloat(customAmts[l.lenderId]) <= 0) ? '#ef4444' : 'rgba(168,85,247,0.4)'}`,
-                        color: 'var(--text-primary)',
+                        color: '#f1f5f9',
                       }}
                     />
                     {customAmts[l.lenderId] && parseFloat(customAmts[l.lenderId]) > current && (
@@ -247,7 +255,7 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
         <div className="rounded-xl px-4 py-3 flex items-center justify-between gap-3"
           style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--text-muted)' }}>Total Payout</p>
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: '#64748b' }}>Total Payout</p>
             <p className="text-xl font-extrabold tabular-nums" style={{ color: '#c084fc' }}>{fmt(totalPayout)}</p>
           </div>
           <button
@@ -266,6 +274,7 @@ function GivePrincipalModal({ open, onClose, dealName, lenders, onSuccess }) {
         </div>
 
       </div>
+      </D>
     </Modal>
   );
 }
@@ -292,8 +301,8 @@ function Checkbox({ checked, indeterminate, onChange, disabled }) {
         style={{
           width: 16,
           height: 16,
-          background: checked || indeterminate ? 'rgba(168,85,247,0.2)' : 'var(--input-bg)',
-          border: `2px solid ${checked || indeterminate ? 'rgba(168,85,247,0.7)' : 'var(--border)'}`,
+          background: checked || indeterminate ? 'rgba(168,85,247,0.2)' : 'rgba(255,255,255,0.04)',
+          border: `2px solid ${checked || indeterminate ? 'rgba(168,85,247,0.7)' : 'rgba(255,255,255,0.15)'}`,
           transition: 'all 0.15s',
           opacity: disabled ? 0.4 : 1,
         }}>
@@ -376,22 +385,27 @@ function ParticipationModalContent({ dealName }) {
   };
 
   if (loading) return (
+    <D>
     <div className="flex items-center justify-center gap-3 py-16">
       <div className="w-5 h-5 rounded-full border-2 animate-spin"
         style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
-      <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Loading participation data…</span>
+      <span className="text-sm font-semibold" style={{ color: '#64748b' }}>Loading participation data…</span>
     </div>
+    </D>
   );
 
   if (error) return (
+    <D>
     <div className="py-12 text-center">
       <p className="text-sm" style={{ color: '#ef4444' }}>{error}</p>
     </div>
+    </D>
   );
 
   if (!details) return null;
 
   return (
+    <D>
     <div className="flex flex-col gap-4">
       {/* Give Principal modal (nested) */}
       {gpModal && (
@@ -407,18 +421,14 @@ function ParticipationModalContent({ dealName }) {
       {/* Summary cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'ROI',                value: details.roi != null ? `${details.roi}%` : '—', color: '#10b981' },
-          { label: 'Interest Date',      value: details.interestDate ?? '—',                   color: '#c084fc' },
-          { label: 'Total Participated', value: fmt(details.totalParticipationAmount),          color: '#3b82f6' },
-          { label: 'Active Amount',      value: fmt(details.activeParticipationAmount),         color: '#f59e0b' },
+          { label: 'ROI',                value: details.roi != null ? `${details.roi}%` : '—',                               color: '#10b981' },
+          { label: 'Interest Date',      value: details.interestDate ?? '—',                                                  color: '#c084fc' },
+          { label: 'Total Participated', value: details.totalParticipationAmount != null ? fmt(details.totalParticipationAmount) : (details.lendersList ? fmt(details.lendersList.reduce((s, l) => s + (l.totalParticipationAmount ?? 0), 0)) : '—'), color: '#3b82f6' },
+          { label: 'Active Amount',      value: details.activeParticipationAmount != null ? fmt(details.activeParticipationAmount) : (details.lendersList ? fmt(details.lendersList.reduce((s, l) => s + (l.currentAmount ?? 0), 0)) : '—'),         color: '#f59e0b' },
         ].map(({ label, value, color }) => (
           <div key={label} className="rounded-xl p-4 text-center"
-            style={{
-              background: 'var(--surface-elevated)',
-              border: `1.5px solid ${color}40`,
-              boxShadow: `0 2px 12px ${color}15`,
-            }}>
-            <p className="text-xs font-medium mb-1.5" style={{ color: 'var(--text-muted)' }}>{label}</p>
+            style={{ background: '#1c2333' }}>
+            <p className="text-xs font-medium mb-1.5" style={{ color: '#64748b' }}>{label}</p>
             <p className="text-base font-extrabold" style={{ color }}>{value}</p>
           </div>
         ))}
@@ -433,7 +443,7 @@ function ParticipationModalContent({ dealName }) {
         <div className="flex-1">
           <div className="relative w-full sm:max-w-sm">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none"
-              style={{ color: 'var(--text-muted)' }}>
+              style={{ color: '#64748b' }}>
               <SearchIcon />
             </span>
             <input
@@ -442,15 +452,15 @@ function ParticipationModalContent({ dealName }) {
               value={search}
               onChange={e => setSearch(e.target.value)}
               className="w-full pl-9 pr-4 py-2 rounded-xl text-sm outline-none"
-              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#f1f5f9' }}
             />
             {search && (
               <button onClick={() => setSearch('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-xs"
-                style={{ color: 'var(--text-muted)' }}>✕</button>
+                style={{ color: '#64748b' }}>✕</button>
             )}
           </div>
-          <p className="text-xs mt-1.5" style={{ color: 'var(--text-muted)' }}>
+          <p className="text-xs mt-1.5" style={{ color: '#64748b' }}>
             {lenders.length} lender{lenders.length !== 1 ? 's' : ''}
             {search.trim() ? ` matching "${search.trim()}"` : ' total'}
           </p>
@@ -476,14 +486,14 @@ function ParticipationModalContent({ dealName }) {
       {lenders.length === 0 ? (
         <div className="py-10 text-center">
           <p className="text-2xl mb-2">🔍</p>
-          <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No lenders found</p>
-          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Try adjusting your search</p>
+          <p className="text-sm font-medium" style={{ color: '#f1f5f9' }}>No lenders found</p>
+          <p className="text-xs mt-1" style={{ color: '#64748b' }}>Try adjusting your search</p>
         </div>
       ) : (
-        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border)' }}>
+        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid rgba(255,255,255,0.07)' }}>
           <table className="w-full text-sm">
             <thead>
-              <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-elevated)' }}>
+              <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1c2333' }}>
                 {/* Select-all checkbox */}
                 <th className="py-3 px-4 w-10">
                   <Checkbox
@@ -496,7 +506,7 @@ function ParticipationModalContent({ dealName }) {
                 {['#', 'Lender ID', 'Name', 'Total Participated', 'Returned', 'Current', 'Action'].map(h => (
                   <th key={h}
                     className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
-                    style={{ color: 'var(--text-muted)' }}>{h}</th>
+                    style={{ color: '#64748b' }}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -527,7 +537,7 @@ function ParticipationModalContent({ dealName }) {
                     style={{
                       borderBottom: isFullyReturned
                         ? '1px solid rgba(16,185,129,0.2)'
-                        : '1px solid var(--border)',
+                        : '1px solid rgba(255,255,255,0.05)',
                       background: rowBg,
                     }}
                     onMouseEnter={e => { e.currentTarget.style.background = rowHoverBg; }}
@@ -543,7 +553,7 @@ function ParticipationModalContent({ dealName }) {
                     </td>
 
                     <td className="py-3 px-4 whitespace-nowrap">
-                      <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
+                      <span className="text-xs tabular-nums" style={{ color: '#64748b' }}>{i + 1}</span>
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <span className="font-mono text-xs px-2 py-0.5 rounded-md"
@@ -553,7 +563,7 @@ function ParticipationModalContent({ dealName }) {
                     </td>
                     <td className="py-3 px-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
-                        <span className="font-semibold" style={{ color: isFullyReturned ? '#10b981' : 'var(--text-primary)' }}>
+                        <span className="font-semibold" style={{ color: isFullyReturned ? '#10b981' : '#f1f5f9' }}>
                           {l.userName ?? '—'}
                         </span>
                         {isFullyReturned && (
@@ -589,7 +599,7 @@ function ParticipationModalContent({ dealName }) {
                             ? { background: 'rgba(16,185,129,0.12)', color: '#10b981',      border: '1px solid rgba(16,185,129,0.35)' }
                             : isEligible
                               ? { background: 'rgba(245,158,11,0.1)',  color: '#f59e0b',      border: '1px solid rgba(245,158,11,0.25)' }
-                              : { background: 'rgba(100,116,139,0.1)', color: 'var(--text-muted)', border: '1px solid rgba(100,116,139,0.2)' }
+                              : { background: 'rgba(100,116,139,0.1)', color: '#94a3b8', border: '1px solid rgba(100,116,139,0.2)' }
                         }>
                         {isFullyReturned ? '₹0 — Settled' : fmt(current)}
                       </span>
@@ -625,6 +635,7 @@ function ParticipationModalContent({ dealName }) {
         </div>
       )}
     </div>
+    </D>
   );
 }
 
@@ -726,58 +737,59 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
       centered
       styles={{
         content: {
-          background: 'var(--card-bg)',
+          background: '#161b27',
           border: '1.5px solid rgba(168,85,247,0.3)',
           borderRadius: '1.25rem',
           padding: 0,
           overflow: 'hidden',
-          boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
+          boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
         },
         header: {
-          background: 'var(--card-bg)',
-          borderBottom: '1px solid var(--border)',
+          background: '#161b27',
+          borderBottom: '1px solid rgba(255,255,255,0.07)',
           borderRadius: '1.25rem 1.25rem 0 0',
           padding: '20px 24px 16px',
           marginBottom: 0,
         },
-        body: { padding: '0', maxHeight: 'calc(88vh - 72px)', overflowY: 'auto' },
+        body: { padding: '0', maxHeight: 'calc(88vh - 72px)', overflowY: 'auto', background: '#161b27' },
       }}
       title={
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-              style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#c084fc' }}>
-              <CoinsIcon />
-            </div>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-widest m-0" style={{ color: '#a855f7' }}>
-                Principal &amp; Interest
-              </p>
-              <p className="text-sm font-bold m-0" style={{ color: 'var(--text-primary)' }}>
-                {dealName}
-              </p>
-            </div>
+        <D>
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#c084fc' }}>
+            <CoinsIcon />
+          </div>
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest m-0" style={{ color: '#a855f7' }}>
+              Principal &amp; Interest
+            </p>
+            <p className="text-sm font-bold m-0" style={{ color: '#f1f5f9' }}>
+              {dealName}
+            </p>
           </div>
         </div>
+        </D>
       }
     >
+      <D>
       <div className="flex flex-col">
 
         {/* ── Toolbar ── */}
         <div className="flex items-center justify-between gap-4 px-6 py-4"
-          style={{ borderBottom: '1px solid var(--border)', background: 'var(--surface-elevated)' }}>
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1c2333' }}>
           {/* Paid date */}
           <div className="flex items-center gap-2.5">
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Paid Date</span>
+            <span className="text-xs font-semibold" style={{ color: '#64748b' }}>Paid Date</span>
             <input
               type="date"
               value={paidDate}
               onChange={e => setPaidDate(e.target.value)}
               className="px-3 py-1.5 rounded-lg text-sm outline-none tabular-nums"
               style={{
-                background: 'var(--input-bg)',
-                border: '1px solid var(--border)',
-                color: 'var(--text-primary)',
+                background: 'rgba(255,255,255,0.04)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                color: '#f1f5f9',
                 minWidth: 140,
               }}
             />
@@ -786,7 +798,7 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
           {/* Actions row */}
           <div className="flex items-center gap-3">
             {selected.size > 0 && (
-              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>
+              <span className="text-xs font-semibold" style={{ color: '#64748b' }}>
                 {selected.size} selected
               </span>
             )}
@@ -795,9 +807,9 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
               disabled={selected.size === 0 || submitting}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
-                background: selected.size > 0 ? 'rgba(16,185,129,0.14)' : 'var(--input-bg)',
-                color:      selected.size > 0 ? '#10b981' : 'var(--text-muted)',
-                border:     `1px solid ${selected.size > 0 ? 'rgba(16,185,129,0.35)' : 'var(--border)'}`,
+                background: selected.size > 0 ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.04)',
+                color:      selected.size > 0 ? '#10b981' : '#64748b',
+                border:     `1px solid ${selected.size > 0 ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
               }}>
               {submitting ? (
                 <div className="w-4 h-4 rounded-full border-2 animate-spin"
@@ -828,7 +840,7 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
           <div className="flex items-center justify-center gap-3 py-16">
             <div className="w-5 h-5 rounded-full border-2 animate-spin"
               style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading records…</span>
+            <span className="text-sm" style={{ color: '#64748b' }}>Loading records…</span>
           </div>
         )}
 
@@ -844,8 +856,8 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
         {!loading && !error && records.length === 0 && (
           <div className="py-16 text-center">
             <p className="text-2xl mb-2">📭</p>
-            <p className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>No records found</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Nothing pending for this deal</p>
+            <p className="text-sm font-medium" style={{ color: '#f1f5f9' }}>No records found</p>
+            <p className="text-xs mt-1" style={{ color: '#64748b' }}>Nothing pending for this deal</p>
           </div>
         )}
 
@@ -854,23 +866,22 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
           <div className="overflow-x-auto" style={{ padding: '16px 24px 24px' }}>
             <table className="w-full text-sm border-collapse">
               <thead>
-                <tr style={{ background: 'var(--surface-elevated)' }}>
-                  {/* Select-all */}
-                  <th className="py-2.5 px-3 rounded-tl-lg" style={{ width: 40, borderBottom: '1px solid var(--border)' }}>
+                <tr style={{ background: '#1c2333' }}>
+                  <th className="py-2.5 px-3" style={{ width: 40, borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                     <Checkbox checked={allSelected} indeterminate={someSelected} onChange={toggleAll} />
                   </th>
                   {[
-                    { label: '#',            align: 'left'  },
-                    { label: 'Lender ID',    align: 'left'  },
-                    { label: 'Name',         align: 'left'  },
-                    { label: 'Principal',    align: 'right' },
-                    { label: 'Interest',     align: 'right' },
-                    { label: 'Days',         align: 'center'},
-                    { label: 'Initiated',    align: 'left'  },
+                    { label: '#',         align: 'left'   },
+                    { label: 'Lender ID', align: 'left'   },
+                    { label: 'Name',      align: 'left'   },
+                    { label: 'Principal', align: 'right'  },
+                    { label: 'Interest',  align: 'right'  },
+                    { label: 'Days',      align: 'center' },
+                    { label: 'Initiated', align: 'left'   },
                   ].map(({ label, align }) => (
                     <th key={label}
                       className={`py-2.5 px-3 text-xs font-semibold uppercase tracking-widest whitespace-nowrap text-${align}`}
-                      style={{ color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
+                      style={{ color: '#64748b', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
                       {label}
                     </th>
                   ))}
@@ -879,13 +890,13 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
               <tbody>
                 {records.map((r, i) => {
                   const isChecked = selected.has(r.id);
-                  const rowBg     = isChecked ? 'rgba(168,85,247,0.07)' : 'transparent';
+                  const rowBg     = isChecked ? 'rgba(168,85,247,0.08)' : 'transparent';
                   return (
                     <tr
                       key={r.id ?? i}
                       onClick={() => toggleOne(r.id)}
                       style={{
-                        borderBottom: '1px solid var(--border)',
+                        borderBottom: '1px solid rgba(255,255,255,0.05)',
                         background: rowBg,
                         cursor: 'pointer',
                         transition: 'background 0.12s',
@@ -893,56 +904,41 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
                       onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = 'rgba(168,85,247,0.04)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = rowBg; }}>
 
-                      {/* Checkbox */}
                       <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
                         <Checkbox checked={isChecked} onChange={() => toggleOne(r.id)} />
                       </td>
-
-                      {/* # */}
                       <td className="py-3 px-3">
-                        <span className="text-xs tabular-nums" style={{ color: 'var(--text-muted)' }}>{i + 1}</span>
+                        <span className="text-xs tabular-nums" style={{ color: '#64748b' }}>{i + 1}</span>
                       </td>
-
-                      {/* Lender ID */}
                       <td className="py-3 px-3 whitespace-nowrap">
                         <span className="font-mono text-xs px-2 py-0.5 rounded"
                           style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}>
                           {r.lenderId ?? '—'}
                         </span>
                       </td>
-
-                      {/* Name */}
                       <td className="py-3 px-3">
-                        <span className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
+                        <span className="text-sm font-medium" style={{ color: '#f1f5f9' }}>
                           {r.userName ?? '—'}
                         </span>
                       </td>
-
-                      {/* Principal */}
                       <td className="py-3 px-3 text-right whitespace-nowrap">
                         <span className="text-sm font-bold tabular-nums" style={{ color: '#60a5fa' }}>
                           {fmt(r.principalAmount)}
                         </span>
                       </td>
-
-                      {/* Interest */}
                       <td className="py-3 px-3 text-right whitespace-nowrap">
                         <span className="text-sm font-semibold tabular-nums" style={{ color: '#34d399' }}>
                           {fmt(r.princInterestAmount)}
                         </span>
                       </td>
-
-                      {/* Days */}
                       <td className="py-3 px-3 text-center whitespace-nowrap">
                         <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold tabular-nums"
-                          style={{ background: 'var(--surface-elevated)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                          style={{ background: 'rgba(255,255,255,0.05)', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.08)' }}>
                           {r.diferenceDays ?? '—'}d
                         </span>
                       </td>
-
-                      {/* Initiated */}
                       <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>
+                        <span className="font-mono text-xs" style={{ color: '#64748b' }}>
                           {r.initiatedDate ?? '—'}
                         </span>
                       </td>
@@ -955,6 +951,7 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
         )}
 
       </div>
+      </D>
     </Modal>
   );
 }
@@ -1159,16 +1156,16 @@ export default function AdminMigratedDeals() {
         centered
         styles={{
           content: {
-            background: 'var(--card-bg)',
-            border: '2px solid rgba(168,85,247,0.4)',
+            background: '#161b27',
+            border: 'none',
             borderRadius: '1.25rem',
             padding: 0,
             overflow: 'hidden',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
           },
           header: {
-            background: 'rgba(168,85,247,0.08)',
-            borderBottom: '1.5px solid rgba(168,85,247,0.25)',
+            background: '#161b27',
+            borderBottom: '1px solid rgba(255,255,255,0.07)',
             borderRadius: '1.25rem 1.25rem 0 0',
             padding: '18px 28px',
             marginBottom: 0,
@@ -1177,9 +1174,11 @@ export default function AdminMigratedDeals() {
             padding: '24px 28px 28px',
             maxHeight: 'calc(90vh - 80px)',
             overflowY: 'auto',
+            background: '#161b27',
           },
         }}
         title={
+          <D>
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-xl flex items-center justify-center"
               style={{ background: 'rgba(168,85,247,0.15)', border: '1px solid rgba(168,85,247,0.3)', color: '#c084fc' }}>
@@ -1190,11 +1189,12 @@ export default function AdminMigratedDeals() {
                 Participation Details
               </p>
               <p className="text-sm font-extrabold m-0 truncate max-w-xs sm:max-w-lg"
-                style={{ color: 'var(--text-primary)' }}>
+                style={{ color: '#f1f5f9' }}>
                 {modalDeal}
               </p>
             </div>
           </div>
+          </D>
         }
       >
         <ParticipationModalContent dealName={modalDeal} />
