@@ -72,6 +72,11 @@ export async function getWalletWithdrawalRequests() {
   return get(`/api/oxybrick-service/getWalletWithdrawal?userId=${encodeURIComponent(userId)}`);
 }
 
+export async function getUserUtrDetails() {
+  const userId = getUserId();
+  return get(`/oxybrick-service/cashfree/getUerUtrDetails/${userId}`);
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // SD LOTS / DEALS
 // ══════════════════════════════════════════════════════════════════════════════

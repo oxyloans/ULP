@@ -881,8 +881,9 @@ export default function MyParticipations() {
         } else {
           setError(runningRes.reason?.message ?? "Failed to load");
         }
-
+          
         if (migratedRes.status === "fulfilled") {
+          console.log("migratedDeals: ", migratedRes.value);
           setMigratedDeals(Array.isArray(migratedRes.value) ? migratedRes.value : []);
         } else {
           setMigratedDeals([]);

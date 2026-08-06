@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { uploadDepositSlip, analyzeDepositSlip, getWalletBalance, getUserProfile, getAdminBankDetailsInfo, walletWithdrawal, getWalletWithdrawalRequests } from '../api/afterlogin-user';
+import { uploadDepositSlip, analyzeDepositSlip, getWalletBalance, getUserProfile, getAdminBankDetailsInfo, walletWithdrawal, getWalletWithdrawalRequests, getUserUtrDetails } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 
 const WalletIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="18" cy="12" r="2"/></svg>;
@@ -202,6 +202,8 @@ export default function WalletDashboard() {
   const [adminBanks, setAdminBanks] = useState([]);
   const [withdrawalRequests, setWithdrawalRequests] = useState([]);
   const [withdrawModalOpen, setWithdrawModalOpen] = useState(false);
+  const [pendingHistory, setPendingHistory] = useState([]);
+  const [pendingHistoryLoading, setPendingHistoryLoading] = useState(true);
 
   const loadWithdrawalRequests = async () => {
     try {
@@ -227,6 +229,10 @@ export default function WalletDashboard() {
     getUserProfile().catch(() => {});
     getAdminBankDetailsInfo().then(data => { if (Array.isArray(data)) setAdminBanks(data); else if (data) setAdminBanks([data]); }).catch(() => {});
     loadWithdrawalRequests();
+    getUserUtrDetails()
+      .then(data => setPendingHistory((Array.isArray(data) ? data : []).filter(r => r.walletStatus === 'UPLOADED')))
+      .catch(() => setPendingHistory([]))
+      .finally(() => setPendingHistoryLoading(false));
   }, []);
 
   const approvedCount = withdrawalRequests.filter(r => String(r?.status ?? r?.walletStatus ?? '').toUpperCase() === 'APPROVED').length;
@@ -252,6 +258,55 @@ export default function WalletDashboard() {
             <button onClick={() => navigate('/wallet/history')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'var(--surface-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><HistoryIcon />Transaction History</button>
             <button onClick={() => setWithdrawModalOpen(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'linear-gradient(135deg,#0ea5e9,#2563eb)', color: '#fff', border: '1px solid rgba(37,99,235,0.4)', boxShadow: '0 8px 20px rgba(37,99,235,0.28)' }}><WalletIcon />Wallet Withdraw</button>
             <button onClick={() => navigate('/wallet/withdrawal-requests')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'var(--surface-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><TrendUp />Raised Requests ({raisedCount}/{approvedCount})</button>
+          </div>
+          {/* Pending History */}
+          <div className="rounded-2xl overflow-hidden" style={{ background: '#fffdf0', border: '1.5px solid #fde68a', boxShadow: '0 2px 12px rgba(234,179,8,0.08)' }}>
+            <div className="px-5 py-4 flex items-center gap-2">
+              <span style={{ color: '#eab308' }}><HistoryIcon /></span>
+              <h3 className="text-sm font-black uppercase tracking-widest" style={{ color: '#92400e' }}>Pending Deposits</h3>
+              {!pendingHistoryLoading && (
+                <span className="ml-auto text-xs font-bold px-3 py-1 rounded-full" style={{ background: '#fef08a', color: '#a16207' }}>
+                  {pendingHistory.length} pending
+                </span>
+              )}
+            </div>
+            {pendingHistoryLoading ? (
+              <div className="px-4 pb-4 grid gap-3">
+                {[1, 2].map(i => <div key={i} className="h-16 rounded-xl shimmer-bg" />)}
+              </div>
+            ) : pendingHistory.length === 0 ? (
+              <div className="px-4 pb-6 text-center">
+                <p className="text-sm font-semibold" style={{ color: '#a16207' }}>No pending deposits</p>
+              </div>
+            ) : (
+              <div className="px-4 pb-4 grid gap-3">
+                {pendingHistory.map((item, idx) => (
+                  <div key={item.utrNumber ?? idx} className="flex items-center gap-3 rounded-xl px-4 py-3 bg-white" style={{ border: '1px solid #fde68a', boxShadow: '0 1px 4px rgba(234,179,8,0.07)' }}>
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: '#fef9c3', color: '#eab308' }}>
+                      <HistoryIcon />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold" style={{ color: '#1e293b', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {fmtINR(item.transactionAmount)}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: '#64748b' }}>
+                        UTR: {item.utrNumber}&nbsp;·&nbsp;{item.transactionDate}
+                      </p>
+                    </div>
+                    <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded" style={{ background: '#fef3c7', color: '#d97706', letterSpacing: '0.05em' }}>
+                        {item.walletStatus}
+                      </span>
+                      {item.transactionSlipUrl && (
+                        <a href={item.transactionSlipUrl} target="_blank" rel="noopener noreferrer" className="text-[11px] font-semibold" style={{ color: '#2563eb' }}>
+                          View Slip
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
