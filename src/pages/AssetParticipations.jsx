@@ -4,6 +4,27 @@ import { Modal } from 'antd';
 import { getRunningDeals, getUserViewInterestStatement, getSdLots, getUserOfflineParticipationDealsInfo } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 
+// ─── SD Lot helpers (mirrors SDLots.jsx mapDeal) ─────────────────────────────
+function mapSdDeal(raw) {
+  const totalSize    = raw.dealAmount ?? 0;
+  const participated = raw.dealParticipationValue ?? 0;
+  const remaining    = raw.remainingDealValue ?? (totalSize - participated);
+  const status       = raw.dealStatus === 'ACHIEVED' ? 'Closed' : 'Open';
+  return {
+    id:             raw.id ?? raw.dealName,
+    title:          raw.dealName ?? '—',
+    globalDealType: raw.globalDealType ?? '',
+    status,
+    totalSize,
+    raised:         participated,
+    remaining,
+    minInvestment:  raw.minimumParticipation ?? 0,
+    maxInvestment:  raw.maxParticipation ?? 0,
+    roiMonthly:     raw.monthlyInterest ?? 0,
+    tenure:         raw.duration ? `${raw.duration} months` : '—',
+  };
+}
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const Building   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><rect x="3" y="4" width="18" height="17" rx="1"/><path d="M3 8h18M6 11h3v3H6v-3zm4.5 0h3v3h-3v-3zm4.5 0h3v3h-3v-3zM6 16h3v2H6v-2zm4.5 0h4v5h-4v-5zM15 16h3v2h-3v-2zM1 21h22"/></svg>;
 const Ruler      = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M21.3 8.7L8.7 21.3c-.4.4-1 .4-1.4 0l-4.6-4.6c-.4-.4-.4-1 0-1.4L15.3 2.7c.4-.4 1-.4 1.4 0l4.6 4.6c.4.4.4 1 0 1.4zM9 13.5l1.5 1.5M11.5 11l1.5 1.5M14 8.5l1.5 1.5M16.5 6l1.5 1.5"/></svg>;
@@ -141,7 +162,7 @@ function MigratedDealRow({ d, index }) {
                     <CalIcon /> Since {fmtNullable(d.earliestDate)}
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-bold" style={{ background: `rgba(245,158,11,0.1)`, color: '#f59e0b', border: `1px solid rgba(245,158,11,0.2)` }}>
-                    Offline/Migrated
+                    Migrated
                   </span>
                   <span className="text-[10px] px-2 py-0.5 rounded-full font-semibold" style={{ background: `rgba(99,102,241,0.1)`, color: '#6366f1', border: `1px solid rgba(99,102,241,0.2)` }}>
                     {fmtNullable(d.payOutType)}
@@ -424,6 +445,11 @@ export default function AssetParticipations() {
   const [interestDeal, setInterestDeal] = useState(null);
   const [sourceFilter, setSourceFilter] = useState("all");
 
+  // SD Lot remaining deals state
+  const [sdLotDeals, setSdLotDeals] = useState([]);
+  const [sdLotLoading, setSdLotLoading] = useState(false);
+  const [showSdLots, setShowSdLots] = useState(false);
+
   const loadData = () => {
     setLoading(true);
     setError("");
@@ -455,6 +481,22 @@ export default function AssetParticipations() {
     });
   };
 
+  const loadSdLots = () => {
+    if (sdLotDeals.length > 0) { setShowSdLots(v => !v); return; }
+    setSdLotLoading(true);
+    getSdLots("NORMAL")
+      .then(data => {
+        if (Array.isArray(data)) {
+          const mapped = data
+            .map(mapSdDeal)
+            .filter(d => d.status !== 'Closed' && d.remaining > 0 && (!d.globalDealType || d.globalDealType === 'SDLOT'));
+          setSdLotDeals(mapped);
+        }
+      })
+      .catch(() => {})
+      .finally(() => { setSdLotLoading(false); setShowSdLots(true); });
+  };
+
   useEffect(() => {
     loadData();
   }, []);
@@ -465,9 +507,18 @@ export default function AssetParticipations() {
     return all.filter(p => p.globalDealType === 'ASSET');
   }, [data?.participationInfo]);
 
-  // Filter offline migrated deals to keep only ASSET globalDealType
+  // Filter offline migrated deals to keep only ASSET globalDealType,
+  // plus any deals whose name doesn't start with "sd" / contain "sd lot"
+  // (those are the non-SD migrated deals that don't belong in MyParticipations)
   const migratedAssetDeals = useMemo(() => {
-    return migratedDeals.filter(m => m.globalDealType === 'ASSET');
+    return migratedDeals.filter(m => {
+      const name = (m.dealName ?? '').toLowerCase();
+      const isSdName = name.includes('sd lot') || name.startsWith('sd');
+      if (m.globalDealType === 'ASSET') return true;
+      // Include migrated deals with no/non-SDLOT type that aren't SD-named
+      if ((!m.globalDealType || m.globalDealType === 'SDLOT') && !isSdName) return true;
+      return false;
+    });
   }, [migratedDeals]);
 
   const runningItems = useMemo(() => {

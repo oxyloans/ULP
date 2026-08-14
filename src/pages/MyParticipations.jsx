@@ -897,10 +897,18 @@ export default function MyParticipations() {
 
   useEffect(() => { load(); }, []);
 
-  const participations = (data?.participationInfo ?? []).filter(p => p.globalDealType !== 'ASSET');
+  // SD Deals page: show only SDLOT deals (exclude ASSET and GOLD)
+  // null/undefined globalDealType is treated as SDLOT (legacy data without type set)
+  const participations = (data?.participationInfo ?? []).filter(
+    p => !p.globalDealType || p.globalDealType === 'SDLOT'
+  );
   const runningItems = participations.map((p, i) => ({ source: "running", key: p.dealId ?? `running-${i}`, payload: p }));
   const filteredMigratedDeals = useMemo(() => {
-    return migratedDeals.filter(m => m.globalDealType !== 'ASSET');
+    return migratedDeals.filter(m => {
+      const name = (m.dealName ?? '').toLowerCase();
+      const isSdName = name.includes('sd lot') || name.startsWith('sd');
+      return (!m.globalDealType || m.globalDealType === 'SDLOT') && isSdName;
+    });
   }, [migratedDeals]);
   const mergedMigrated = mergeMigratedByRoi(filteredMigratedDeals);
   const migratedItems = mergedMigrated.map((d, i) => ({ source: "migrated", key: `${d.dealName ?? "deal"}-${d.roi ?? 0}-${i}`, payload: d }));
