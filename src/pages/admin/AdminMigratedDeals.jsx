@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Modal } from 'antd';
 import { listOfMigratedDealsInfo, getDealBasedParticipationDetails, offlineDealsPrincipalReturned, getOfflinePrincipalAndInterestInfo, updateOfflineDealPrincipalStatus } from '../../api/afterlogin-admin';
 
+
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon = () => (
   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
@@ -649,78 +650,140 @@ const CoinsIcon = () => (
   </svg>
 );
 
-// ─── Principal & Interest Modal ───────────────────────────────────────────────
+// ─── Principal & Interest Modal (All Deals — flat combined view) ──────────────
 /**
  * Props:
  *   open      – boolean
  *   onClose   – () => void
- *   dealName  – string
+ *   deals     – [{ dealName, roi, interestDate }]
  */
-function PrincipalInterestModal({ open, onClose, dealName }) {
-  const [records,    setRecords]    = useState([]);
-  const [loading,    setLoading]    = useState(false);
-  const [error,      setError]      = useState('');
-  const [selected,   setSelected]   = useState(new Set()); // Set of record ids
-  const [paidDate,   setPaidDate]   = useState(() => new Date().toISOString().slice(0, 10));
-  const [submitting, setSubmitting] = useState(false);
-  const [result,     setResult]     = useState(null); // { success, message }
+function PrincipalInterestModal({ open, onClose, deals }) {
+  const [recordsMap,  setRecordsMap]  = useState({});   // { dealName: [] }
+  const [loadingMap,  setLoadingMap]  = useState({});   // { dealName: bool }
+  const [errorMap,    setErrorMap]    = useState({});   // { dealName: string }
+  const [selected,    setSelected]    = useState(new Set());
+  const [paidDate,    setPaidDate]    = useState(() => new Date().toISOString().slice(0, 10));
+  const [submitting,  setSubmitting]  = useState(false);
+  const [result,      setResult]      = useState(null);
+  const [search,      setSearch]      = useState('');
+  const [dealFilter,  setDealFilter]  = useState('ALL'); // 'ALL' | dealName
 
-  const loadRecords = useCallback(() => {
-    if (!dealName) return;
-    setLoading(true);
-    setError('');
-    setRecords([]);
-    setSelected(new Set());
-    setResult(null);
-    getOfflinePrincipalAndInterestInfo(dealName)
-      .then(res => setRecords(Array.isArray(res) ? res : []))
-      .catch(e => setError(e.message ?? 'Failed to load data'))
-      .finally(() => setLoading(false));
-  }, [dealName]);
-
-  // Load whenever modal opens
+  // Load ALL deals in parallel when modal opens
   const prevOpen = useRef(false);
   useEffect(() => {
-    if (open && !prevOpen.current) loadRecords();
+    if (open && !prevOpen.current && deals?.length) {
+      // Reset
+      setSelected(new Set());
+      setResult(null);
+      setSearch('');
+      setDealFilter('ALL');
+
+      // Fire all requests at once
+      const initLoading = {};
+      deals.forEach(d => { initLoading[d.dealName] = true; });
+      setLoadingMap(initLoading);
+      setRecordsMap({});
+      setErrorMap({});
+
+      deals.forEach(d => {
+        getOfflinePrincipalAndInterestInfo(d.dealName)
+          .then(res => setRecordsMap(prev => ({ ...prev, [d.dealName]: Array.isArray(res) ? res : [] })))
+          .catch(e  => setErrorMap(prev  => ({ ...prev, [d.dealName]: e.message ?? 'Failed' })))
+          .finally(() => setLoadingMap(prev => ({ ...prev, [d.dealName]: false })));
+      });
+    }
     if (!open) { setResult(null); setSelected(new Set()); }
     prevOpen.current = open;
-  }, [open, loadRecords]);
+  }, [open, deals]);
 
-  const allSelected = records.length > 0 && selected.size === records.length;
-  const someSelected = selected.size > 0 && !allSelected;
-
-  const toggleAll = () => {
-    if (allSelected) setSelected(new Set());
-    else setSelected(new Set(records.map(r => r.id)));
-  };
-
-  const toggleOne = (id) => {
-    setSelected(prev => {
-      const n = new Set(prev);
-      n.has(id) ? n.delete(id) : n.add(id);
-      return n;
+  const reloadAll = () => {
+    if (!deals?.length) return;
+    setSelected(new Set());
+    setResult(null);
+    const initLoading = {};
+    deals.forEach(d => { initLoading[d.dealName] = true; });
+    setLoadingMap(initLoading);
+    setRecordsMap({});
+    setErrorMap({});
+    deals.forEach(d => {
+      getOfflinePrincipalAndInterestInfo(d.dealName)
+        .then(res => setRecordsMap(prev => ({ ...prev, [d.dealName]: Array.isArray(res) ? res : [] })))
+        .catch(e  => setErrorMap(prev  => ({ ...prev, [d.dealName]: e.message ?? 'Failed' })))
+        .finally(() => setLoadingMap(prev => ({ ...prev, [d.dealName]: false })));
     });
   };
 
+  // Flatten all records into one list, each tagged with dealName
+  const allRecords = useMemo(() => {
+    return (deals ?? []).flatMap(d =>
+      (recordsMap[d.dealName] ?? []).map(r => ({ ...r, _dealName: d.dealName }))
+    );
+  }, [deals, recordsMap]);
+
+  const globalLoading = Object.values(loadingMap).some(Boolean);
+  const loadedCount   = (deals ?? []).filter(d => recordsMap[d.dealName] !== undefined).length;
+  const totalDeals    = deals?.length ?? 0;
+
+  // Filter by deal tab + search
+  const filteredRecords = useMemo(() => {
+    let rows = dealFilter === 'ALL' ? allRecords : allRecords.filter(r => r._dealName === dealFilter);
+    const q = search.trim().toLowerCase();
+    if (q) rows = rows.filter(r =>
+      (r.userName  ?? '').toLowerCase().includes(q) ||
+      (r.lenderId  ?? '').toLowerCase().includes(q) ||
+      (r._dealName ?? '').toLowerCase().includes(q)
+    );
+    return rows;
+  }, [allRecords, dealFilter, search]);
+
+  const allSelected  = filteredRecords.length > 0 && filteredRecords.every(r => selected.has(r.id));
+  const someSelected = filteredRecords.some(r => selected.has(r.id)) && !allSelected;
+
+  const toggleAll = () => {
+    if (allSelected) {
+      setSelected(prev => { const n = new Set(prev); filteredRecords.forEach(r => n.delete(r.id)); return n; });
+    } else {
+      setSelected(prev => new Set([...prev, ...filteredRecords.map(r => r.id)]));
+    }
+  };
+  const toggleOne = (id) => {
+    setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  };
+
+  // For "Mark as Paid" we group selected rows by deal and fire one request per deal
+  const selectedRows   = filteredRecords.filter(r => selected.has(r.id));
+  const selectedCount  = selectedRows.length;
+
   const handleMarkPaid = async () => {
-    if (selected.size === 0 || submitting) return;
+    if (selectedCount === 0 || submitting) return;
     setSubmitting(true);
     setResult(null);
     try {
-      const principalReturnedUsers = records
-        .filter(r => selected.has(r.id))
-        .map(r => ({
-          diferenceDays:      r.diferenceDays      ?? 0,
-          id:                 r.id,
-          ifsc:               r.ifsc               ?? '',
-          lenderId:           r.lenderId           ?? '',
-          princInterestAmount: r.princInterestAmount ?? 0,
-          principalAmount:    r.principalAmount    ?? 0,
-        }));
-      await updateOfflineDealPrincipalStatus({ dealName, paidDate, principalReturnedUsers });
-      setResult({ success: true, message: `Marked ${selected.size} record${selected.size !== 1 ? 's' : ''} as paid successfully.` });
+      // Group by dealName
+      const grouped = {};
+      selectedRows.forEach(r => {
+        if (!grouped[r._dealName]) grouped[r._dealName] = [];
+        grouped[r._dealName].push(r);
+      });
+      await Promise.all(
+        Object.entries(grouped).map(([dealName, rows]) =>
+          updateOfflineDealPrincipalStatus({
+            dealName,
+            paidDate,
+            principalReturnedUsers: rows.map(r => ({
+              diferenceDays:       r.diferenceDays       ?? 0,
+              id:                  r.id,
+              ifsc:                r.ifsc                ?? '',
+              lenderId:            r.lenderId            ?? '',
+              princInterestAmount: r.princInterestAmount ?? 0,
+              principalAmount:     r.principalAmount     ?? 0,
+            })),
+          })
+        )
+      );
+      setResult({ success: true, message: `Marked ${selectedCount} record${selectedCount !== 1 ? 's' : ''} as paid successfully.` });
       setSelected(new Set());
-      loadRecords();
+      reloadAll();
     } catch (e) {
       setResult({ success: false, message: e.message ?? 'Failed to update. Please try again.' });
     } finally {
@@ -728,12 +791,23 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
     }
   };
 
+  // Grand totals
+  const totalPrincipal = filteredRecords.reduce((s, r) => s + (r.principalAmount ?? 0), 0);
+  const totalInterest  = filteredRecords.reduce((s, r) => s + (r.princInterestAmount ?? 0), 0);
+
+  // Counts per deal for the tab badges
+  const countPerDeal = useMemo(() => {
+    const m = {};
+    allRecords.forEach(r => { m[r._dealName] = (m[r._dealName] ?? 0) + 1; });
+    return m;
+  }, [allRecords]);
+
   return (
     <Modal
       open={open}
       onCancel={onClose}
       footer={null}
-      width="min(98vw, 860px)"
+      width="min(98vw, 1140px)"
       centered
       styles={{
         content: {
@@ -748,26 +822,38 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
           background: '#161b27',
           borderBottom: '1px solid rgba(255,255,255,0.07)',
           borderRadius: '1.25rem 1.25rem 0 0',
-          padding: '20px 24px 16px',
+          padding: '18px 24px 14px',
           marginBottom: 0,
         },
-        body: { padding: '0', maxHeight: 'calc(88vh - 72px)', overflowY: 'auto', background: '#161b27' },
+        body: { padding: '0', maxHeight: 'calc(90vh - 68px)', overflowY: 'auto', background: '#161b27' },
       }}
       title={
         <D>
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-            style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#c084fc' }}>
-            <CoinsIcon />
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(168,85,247,0.12)', border: '1px solid rgba(168,85,247,0.25)', color: '#c084fc' }}>
+              <CoinsIcon />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-widest m-0" style={{ color: '#a855f7' }}>
+                Principal &amp; Interest
+              </p>
+              <p className="text-sm font-bold m-0" style={{ color: '#f1f5f9' }}>
+                All Migrated Deals
+                {globalLoading
+                  ? <span className="ml-2 text-xs font-normal" style={{ color: '#64748b' }}>Loading {loadedCount}/{totalDeals}…</span>
+                  : <span className="ml-2 text-xs font-normal" style={{ color: '#64748b' }}>{allRecords.length} records across {totalDeals} deal{totalDeals !== 1 ? 's' : ''}</span>
+                }
+              </p>
+            </div>
           </div>
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest m-0" style={{ color: '#a855f7' }}>
-              Principal &amp; Interest
-            </p>
-            <p className="text-sm font-bold m-0" style={{ color: '#f1f5f9' }}>
-              {dealName}
-            </p>
-          </div>
+          {/* Reload */}
+          <button onClick={reloadAll} disabled={globalLoading}
+            className="w-8 h-8 rounded-lg flex items-center justify-center transition-all hover:scale-105 disabled:opacity-40"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: '#64748b' }}>
+            <span className={globalLoading ? 'animate-spin' : ''}><RefreshIcon /></span>
+          </button>
         </div>
         </D>
       }
@@ -775,48 +861,115 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
       <D>
       <div className="flex flex-col">
 
+        {/* ── Deal filter tabs ── */}
+        <div className="flex items-center gap-1.5 px-5 py-3 overflow-x-auto"
+          style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#13192a' }}>
+          {/* ALL tab */}
+          <button
+            onClick={() => { setDealFilter('ALL'); setSelected(new Set()); }}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all"
+            style={{
+              background: dealFilter === 'ALL' ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)',
+              color:      dealFilter === 'ALL' ? '#c084fc' : '#64748b',
+              border:     `1px solid ${dealFilter === 'ALL' ? 'rgba(168,85,247,0.4)' : 'rgba(255,255,255,0.07)'}`,
+            }}>
+            All
+            <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-bold"
+              style={{ background: 'rgba(168,85,247,0.2)', color: '#c084fc', minWidth: 20 }}>
+              {allRecords.length}
+            </span>
+          </button>
+          {/* Per-deal tabs */}
+          {(deals ?? []).map(d => {
+            const isActive = dealFilter === d.dealName;
+            const cnt      = countPerDeal[d.dealName] ?? 0;
+            const isLoading = loadingMap[d.dealName];
+            return (
+              <button
+                key={d.dealName}
+                onClick={() => { setDealFilter(d.dealName); setSelected(new Set()); }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap flex-shrink-0 transition-all"
+                style={{
+                  background: isActive ? 'rgba(168,85,247,0.18)' : 'rgba(255,255,255,0.04)',
+                  color:      isActive ? '#c084fc' : '#64748b',
+                  border:     `1px solid ${isActive ? 'rgba(168,85,247,0.4)' : 'rgba(255,255,255,0.07)'}`,
+                }}>
+                {d.dealName}
+                {isLoading ? (
+                  <div className="w-3 h-3 rounded-full border animate-spin"
+                    style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
+                ) : (
+                  <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded text-xs font-bold"
+                    style={{ background: isActive ? 'rgba(168,85,247,0.25)' : 'rgba(255,255,255,0.08)', color: isActive ? '#c084fc' : '#64748b', minWidth: 20 }}>
+                    {cnt}
+                  </span>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
         {/* ── Toolbar ── */}
-        <div className="flex items-center justify-between gap-4 px-6 py-4"
+        <div className="flex flex-wrap items-center justify-between gap-3 px-5 py-3"
           style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', background: '#1c2333' }}>
-          {/* Paid date */}
-          <div className="flex items-center gap-2.5">
-            <span className="text-xs font-semibold" style={{ color: '#64748b' }}>Paid Date</span>
-            <input
-              type="date"
-              value={paidDate}
-              onChange={e => setPaidDate(e.target.value)}
-              className="px-3 py-1.5 rounded-lg text-sm outline-none tabular-nums"
-              style={{
-                background: 'rgba(255,255,255,0.04)',
-                border: '1px solid rgba(255,255,255,0.08)',
-                color: '#f1f5f9',
-                minWidth: 140,
-              }}
-            />
+
+          {/* Summary + search */}
+          <div className="flex items-center gap-3 flex-wrap">
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
+              style={{ background: 'rgba(96,165,250,0.1)', border: '1px solid rgba(96,165,250,0.2)' }}>
+              <span className="text-xs font-semibold" style={{ color: '#64748b' }}>Principal</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: '#60a5fa' }}>{fmt(totalPrincipal)}</span>
+            </div>
+            <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg"
+              style={{ background: 'rgba(52,211,153,0.1)', border: '1px solid rgba(52,211,153,0.2)' }}>
+              <span className="text-xs font-semibold" style={{ color: '#64748b' }}>Interest</span>
+              <span className="text-sm font-bold tabular-nums" style={{ color: '#34d399' }}>{fmt(totalInterest)}</span>
+            </div>
+            <div className="relative">
+              <span className="absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: '#64748b' }}>
+                <SearchIcon />
+              </span>
+              <input
+                type="text"
+                placeholder="Search lender / deal…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="pl-8 pr-7 py-1.5 rounded-lg text-xs outline-none"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#f1f5f9', width: 175 }}
+              />
+              {search && (
+                <button onClick={() => setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-xs" style={{ color: '#64748b' }}>✕</button>
+              )}
+            </div>
           </div>
 
-          {/* Actions row */}
-          <div className="flex items-center gap-3">
-            {selected.size > 0 && (
-              <span className="text-xs font-semibold" style={{ color: '#64748b' }}>
-                {selected.size} selected
-              </span>
+          {/* Right actions */}
+          <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold" style={{ color: '#64748b' }}>Paid Date</span>
+              <input
+                type="date"
+                value={paidDate}
+                onChange={e => setPaidDate(e.target.value)}
+                className="px-2.5 py-1.5 rounded-lg text-xs outline-none tabular-nums"
+                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)', color: '#f1f5f9', minWidth: 130 }}
+              />
+            </div>
+            {selectedCount > 0 && (
+              <span className="text-xs font-semibold" style={{ color: '#64748b' }}>{selectedCount} selected</span>
             )}
             <button
               onClick={handleMarkPaid}
-              disabled={selected.size === 0 || submitting}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+              disabled={selectedCount === 0 || submitting}
+              className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
               style={{
-                background: selected.size > 0 ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.04)',
-                color:      selected.size > 0 ? '#10b981' : '#64748b',
-                border:     `1px solid ${selected.size > 0 ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
+                background: selectedCount > 0 ? 'rgba(16,185,129,0.14)' : 'rgba(255,255,255,0.04)',
+                color:      selectedCount > 0 ? '#10b981' : '#64748b',
+                border:     `1px solid ${selectedCount > 0 ? 'rgba(16,185,129,0.35)' : 'rgba(255,255,255,0.08)'}`,
               }}>
-              {submitting ? (
-                <div className="w-4 h-4 rounded-full border-2 animate-spin"
-                  style={{ borderColor: '#10b981', borderTopColor: 'transparent' }} />
-              ) : (
-                <CheckIcon />
-              )}
+              {submitting
+                ? <div className="w-3.5 h-3.5 rounded-full border-2 animate-spin" style={{ borderColor: '#10b981', borderTopColor: 'transparent' }} />
+                : <CheckIcon />}
               {submitting ? 'Processing…' : 'Mark as Paid'}
             </button>
           </div>
@@ -824,7 +977,7 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
 
         {/* ── Result banner ── */}
         {result && (
-          <div className="mx-6 mt-4 rounded-xl px-4 py-3 text-sm font-medium flex items-center gap-2"
+          <div className="mx-5 mt-3 rounded-xl px-4 py-2.5 text-sm font-medium flex items-center gap-2"
             style={{
               background: result.success ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.08)',
               color:      result.success ? '#10b981' : '#f87171',
@@ -835,35 +988,64 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
           </div>
         )}
 
-        {/* ── Loading ── */}
-        {loading && (
-          <div className="flex items-center justify-center gap-3 py-16">
-            <div className="w-5 h-5 rounded-full border-2 animate-spin"
-              style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
-            <span className="text-sm" style={{ color: '#64748b' }}>Loading records…</span>
+        {/* ── Loading (initial — all deals still fetching) ── */}
+        {globalLoading && allRecords.length === 0 && (
+          <div className="flex flex-col items-center justify-center gap-3 py-16">
+            <div className="flex items-center gap-3">
+              <div className="w-5 h-5 rounded-full border-2 animate-spin"
+                style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
+              <span className="text-sm font-semibold" style={{ color: '#64748b' }}>
+                Loading all deals… ({loadedCount}/{totalDeals})
+              </span>
+            </div>
+            {/* Per-deal progress */}
+            <div className="flex flex-wrap gap-2 justify-center mt-1">
+              {(deals ?? []).map(d => (
+                <span key={d.dealName}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium"
+                  style={{
+                    background: recordsMap[d.dealName] !== undefined
+                      ? 'rgba(16,185,129,0.1)' : loadingMap[d.dealName]
+                        ? 'rgba(168,85,247,0.08)' : 'rgba(255,255,255,0.04)',
+                    color: recordsMap[d.dealName] !== undefined
+                      ? '#10b981' : loadingMap[d.dealName]
+                        ? '#c084fc' : '#64748b',
+                    border: '1px solid rgba(255,255,255,0.06)',
+                  }}>
+                  {loadingMap[d.dealName]
+                    ? <div className="w-2.5 h-2.5 rounded-full border animate-spin" style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
+                    : recordsMap[d.dealName] !== undefined ? '✓' : '—'}
+                  {d.dealName}
+                </span>
+              ))}
+            </div>
           </div>
         )}
 
-        {/* ── Error ── */}
-        {!loading && error && (
-          <div className="py-14 text-center">
-            <p className="text-sm" style={{ color: '#f87171' }}>{error}</p>
-            <button onClick={loadRecords} className="mt-3 text-xs underline" style={{ color: '#a855f7' }}>Retry</button>
-          </div>
-        )}
-
-        {/* ── Empty ── */}
-        {!loading && !error && records.length === 0 && (
+        {/* ── Empty after load ── */}
+        {!globalLoading && filteredRecords.length === 0 && (
           <div className="py-16 text-center">
-            <p className="text-2xl mb-2">📭</p>
-            <p className="text-sm font-medium" style={{ color: '#f1f5f9' }}>No records found</p>
-            <p className="text-xs mt-1" style={{ color: '#64748b' }}>Nothing pending for this deal</p>
+            <p className="text-2xl mb-2">{search ? '🔍' : '📭'}</p>
+            <p className="text-sm font-medium" style={{ color: '#f1f5f9' }}>
+              {search ? `No records matching "${search}"` : 'No records found'}
+            </p>
+            {search && (
+              <button onClick={() => setSearch('')} className="mt-2 text-xs underline" style={{ color: '#a855f7' }}>Clear search</button>
+            )}
           </div>
         )}
 
-        {/* ── Table ── */}
-        {!loading && !error && records.length > 0 && (
-          <div className="overflow-x-auto" style={{ padding: '16px 24px 24px' }}>
+        {/* ── Flat table (all deals combined) ── */}
+        {filteredRecords.length > 0 && (
+          <div className="overflow-x-auto" style={{ padding: '12px 20px 24px' }}>
+            {/* Partial-load notice */}
+            {globalLoading && (
+              <div className="mb-3 px-4 py-2 rounded-lg text-xs font-medium flex items-center gap-2"
+                style={{ background: 'rgba(168,85,247,0.08)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}>
+                <div className="w-3 h-3 rounded-full border animate-spin" style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />
+                Still loading {totalDeals - loadedCount} deal{totalDeals - loadedCount !== 1 ? 's' : ''}… showing {allRecords.length} records so far
+              </div>
+            )}
             <table className="w-full text-sm border-collapse">
               <thead>
                 <tr style={{ background: '#1c2333' }}>
@@ -872,6 +1054,7 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
                   </th>
                   {[
                     { label: '#',         align: 'left'   },
+                    { label: 'Deal',      align: 'left'   },
                     { label: 'Lender ID', align: 'left'   },
                     { label: 'Name',      align: 'left'   },
                     { label: 'Principal', align: 'right'  },
@@ -888,12 +1071,12 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
                 </tr>
               </thead>
               <tbody>
-                {records.map((r, i) => {
+                {filteredRecords.map((r, i) => {
                   const isChecked = selected.has(r.id);
                   const rowBg     = isChecked ? 'rgba(168,85,247,0.08)' : 'transparent';
                   return (
                     <tr
-                      key={r.id ?? i}
+                      key={`${r._dealName}-${r.id ?? i}`}
                       onClick={() => toggleOne(r.id)}
                       style={{
                         borderBottom: '1px solid rgba(255,255,255,0.05)',
@@ -903,12 +1086,17 @@ function PrincipalInterestModal({ open, onClose, dealName }) {
                       }}
                       onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = 'rgba(168,85,247,0.04)'; }}
                       onMouseLeave={e => { e.currentTarget.style.background = rowBg; }}>
-
                       <td className="py-3 px-3" onClick={e => e.stopPropagation()}>
                         <Checkbox checked={isChecked} onChange={() => toggleOne(r.id)} />
                       </td>
                       <td className="py-3 px-3">
                         <span className="text-xs tabular-nums" style={{ color: '#64748b' }}>{i + 1}</span>
+                      </td>
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className="text-xs font-semibold px-2 py-0.5 rounded-md"
+                          style={{ background: 'rgba(251,146,60,0.1)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.2)' }}>
+                          {r._dealName}
+                        </span>
                       </td>
                       <td className="py-3 px-3 whitespace-nowrap">
                         <span className="font-mono text-xs px-2 py-0.5 rounded"
@@ -964,7 +1152,7 @@ export default function AdminMigratedDeals() {
   const [refreshing, setRefreshing] = useState(false);
   const [search,     setSearch]     = useState('');
   const [modalDeal,  setModalDeal]  = useState(null); // deal name string | null
-  const [piModal,    setPiModal]    = useState(null); // deal name string | null (principal & interest modal)
+  const [piModalOpen, setPiModalOpen] = useState(false); // single P&I modal for all deals
 
   const load = useCallback((isRefresh = false) => {
     if (isRefresh) setRefreshing(true);
@@ -988,7 +1176,7 @@ export default function AdminMigratedDeals() {
     );
   }, [data, search]);
 
-  const cols = ['#', 'Deal Name', 'ROI (%)', 'Interest Date', 'Participants', 'Principal & Interest'];
+  const cols = ['#', 'Deal Name', 'ROI (%)', 'Interest Date', 'Participants'];
 
   return (
     <>
@@ -1012,6 +1200,15 @@ export default function AdminMigratedDeals() {
                 style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.25)' }}>
                 {filtered.length}{filtered.length !== data.length ? `/${data.length}` : ''} deal{data.length !== 1 ? 's' : ''}
               </div>
+            )}
+            {data.length > 0 && (
+              <button
+                onClick={() => setPiModalOpen(true)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                style={{ background: 'rgba(251,146,60,0.12)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>
+                <CoinsIcon />
+                P&amp;I Info
+              </button>
             )}
             <button onClick={() => load(true)} disabled={refreshing}
               className="w-9 h-9 rounded-xl flex items-center justify-center transition-all hover:scale-105 disabled:opacity-50"
@@ -1129,15 +1326,6 @@ export default function AdminMigratedDeals() {
                           View
                         </button>
                       </td>
-                      <td className="py-3.5 px-4 whitespace-nowrap">
-                        <button
-                          onClick={() => setPiModal(deal.dealName)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 active:scale-95"
-                          style={{ background: 'rgba(251,146,60,0.12)', color: '#fb923c', border: '1px solid rgba(251,146,60,0.3)' }}>
-                          <CoinsIcon />
-                          P&amp;I Info
-                        </button>
-                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -1200,11 +1388,11 @@ export default function AdminMigratedDeals() {
         <ParticipationModalContent dealName={modalDeal} />
       </Modal>
 
-      {/* Principal & Interest Modal */}
+      {/* Principal & Interest Modal — all deals */}
       <PrincipalInterestModal
-        open={!!piModal}
-        onClose={() => setPiModal(null)}
-        dealName={piModal}
+        open={piModalOpen}
+        onClose={() => setPiModalOpen(false)}
+        deals={data}
       />
     </>
   );
