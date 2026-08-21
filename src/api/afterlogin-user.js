@@ -69,7 +69,7 @@ export async function walletWithdrawal(amount) {
 
 export async function getWalletWithdrawalRequests() {
   const userId = getUserId();
-  return get(`/api/oxybrick-service/getWalletWithdrawal?userId=${encodeURIComponent(userId)}`);
+  return get(`/oxybrick-service/getWalletWithdrawal?userId=${encodeURIComponent(userId)}`);
 }
 
 export async function getUserUtrDetails() {

@@ -52,7 +52,7 @@ export async function getAdminWalletWithdrawalRequests() {
 }
 
 export async function updateAdminWalletWithdrawalStatus({ id, userId, requestAmount, initiatedDate, approvedBy, comments, walletStatus }) {
-  return patch('/oxybrick-service/walletWithdrawalApprovedAndRejectedByAdmin', {
+  return patch('/oxybrick-service/adminAprroveWithdrawal', {
     id,
     userId,
     requestAmount,
