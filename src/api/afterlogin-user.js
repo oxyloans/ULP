@@ -61,7 +61,7 @@ export async function getAdminBankDetailsInfo() {
 
 export async function walletWithdrawal(amount) {
   const userId = getUserId();
-  return post('/api/oxybrick-service/walletWithdrawal', {
+  return post('/oxybrick-service/walletWithdrawal', {
     amount,
     userId,
   });
