@@ -118,11 +118,6 @@ export default function AdminWalletWithdrawals() {
     try {
       await updateAdminWalletWithdrawalStatus({
         id: activeRow.id,
-        userId: activeRow.userId,
-        requestAmount: activeRow.requestAmount,
-        initiatedDate: activeRow.initiatedDate,
-        approvedBy,
-        comments,
         walletStatus: action,
       });
       setRows(prev => prev.map(r => r.id === activeRow.id ? { ...r, walletStatus: action, approvedBy } : r));

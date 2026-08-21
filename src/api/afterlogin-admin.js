@@ -51,15 +51,12 @@ export async function getAdminWalletWithdrawalRequests() {
   return get('/oxybrick-service/getAllShowingToAdminWalletWithdrawal');
 }
 
-export async function updateAdminWalletWithdrawalStatus({ id, userId, requestAmount, initiatedDate, approvedBy, comments, walletStatus }) {
+export async function updateAdminWalletWithdrawalStatus({ id, walletStatus }) {
+  const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
   return patch('/oxybrick-service/adminAprroveWithdrawal', {
     id,
-    userId,
-    requestAmount,
-    initiatedDate,
-    approvedBy,
-    comments,
-    walletStatus,
+    sheetGeneratedDate: today,
+    walletWithdrawalStatus: walletStatus,
   });
 }
 

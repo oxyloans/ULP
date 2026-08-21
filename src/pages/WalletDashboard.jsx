@@ -18,25 +18,60 @@ function normalizeRequests(res) {
 }
 
 function VirtualCard({ data }) {
+  const hasHold = data.holdAmount > 0;
   return (
     <div className="relative rounded-2xl p-6 overflow-hidden select-none" style={{ background: 'linear-gradient(135deg,#1e1b4b 0%,#312e81 50%,#1e1b4b 100%)', boxShadow: '0 20px 60px rgba(99,102,241,0.35), 0 0 0 1px rgba(99,102,241,0.2)', minHeight: 200 }}>
       <div className="absolute -top-10 -right-10 w-40 h-40 rounded-full pointer-events-none" style={{ background: 'rgba(129,140,248,0.15)', filter: 'blur(20px)' }} />
       <div className="absolute -bottom-8 -left-8 w-32 h-32 rounded-full pointer-events-none" style={{ background: 'rgba(99,102,241,0.2)', filter: 'blur(16px)' }} />
+
+      {/* Header */}
       <div className="relative flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(255,255,255,0.15)', backdropFilter: 'blur(8px)' }}><WalletIcon /></div>
           <span className="text-xs font-bold uppercase tracking-widest text-white opacity-80">Oxy Wallet</span>
         </div>
-        <div className="flex items-center gap-1"><span className="live-dot" style={{ width: 6, height: 6 }} /><span className="text-xs font-semibold text-white opacity-70">Active</span></div>
+        <div className="flex items-center gap-1">
+          <span className="live-dot" style={{ width: 6, height: 6 }} />
+          <span className="text-xs font-semibold text-white opacity-70">Active</span>
+        </div>
       </div>
-      <div className="relative mb-5">
+
+      {/* Available balance */}
+      <div className="relative mb-1">
         <p className="text-xs font-semibold uppercase tracking-widest text-white opacity-60 mb-1">Available Balance</p>
         <p className="text-4xl font-black text-white" style={{ fontFamily: "'JetBrains Mono', 'Fira Code', monospace", letterSpacing: '-0.02em' }}>{fmtINR(data.availableBalance)}</p>
       </div>
+
+      {/* On-hold badge — only shown when there's a pending withdrawal */}
+      {hasHold && (
+        <div className="relative mb-4 mt-2 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+          style={{ background: 'rgba(245,158,11,0.18)', border: '1px solid rgba(245,158,11,0.35)' }}>
+          <span className="w-1.5 h-1.5 rounded-full" style={{ background: '#fbbf24', animation: 'livePulse 1.5s infinite' }} />
+          <span className="text-xs font-bold" style={{ color: '#fbbf24' }}>
+            {fmtINR(data.holdAmount)} on hold
+          </span>
+        </div>
+      )}
+      {!hasHold && <div className="mb-4" />}
+
+      {/* Bottom stats */}
       <div className="relative grid grid-cols-3 gap-3">
-        {[{ label: 'Total Deposited', value: fmtINR(data.totalDeposited) },].map(s => (
-          <div key={s.label}><p className="text-xs text-white opacity-50 mb-0.5" style={{ fontSize: 9 }}>{s.label}</p><p className="text-sm font-bold text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{s.value}</p></div>
-        ))}
+        <div>
+          <p className="text-white opacity-50 mb-0.5" style={{ fontSize: 9 }}>Total Deposited</p>
+          <p className="text-sm font-bold text-white" style={{ fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(data.totalDeposited)}</p>
+        </div>
+        <div>
+          <p className="text-white opacity-50 mb-0.5" style={{ fontSize: 9 }}>On Hold</p>
+          <p className="text-sm font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: hasHold ? '#fbbf24' : 'rgba(255,255,255,0.4)' }}>
+            {fmtINR(data.holdAmount)}
+          </p>
+        </div>
+        <div>
+          <p className="text-white opacity-50 mb-0.5" style={{ fontSize: 9 }}>After Withdrawal</p>
+          <p className="text-sm font-bold" style={{ fontFamily: "'JetBrains Mono', monospace", color: hasHold ? '#86efac' : 'rgba(255,255,255,0.4)' }}>
+            {fmtINR(Math.max(0, data.availableBalance - data.holdAmount))}
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -120,25 +155,26 @@ function DepositSlipForm({ adminBanks }) {
   );
 }
 
-function WithdrawalModal({ open, onClose, availableBalance, requests, onSuccess }) {
+function WithdrawalModal({ open, onClose, availableBalance, rawBalance, requests, onSuccess }) {
   const [amount, setAmount] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  // Requests still waiting for admin action
   const pendingRequests = useMemo(() => requests.filter(r => {
-    const s = String(r?.status ?? r?.walletStatus ?? '').toUpperCase();
+    const s = String(r?.walletStatus ?? r?.status ?? '').toUpperCase();
     return s !== 'APPROVED' && s !== 'REJECTED';
   }), [requests]);
-  const pendingAmount = pendingRequests.reduce((sum, r) => sum + Number(r?.amount ?? 0), 0);
-  const remainingWithdrawable = Math.max(0, Number(availableBalance ?? 0) - pendingAmount);
+
+  // Sum of amounts on hold (pending requests) — use requestAmount to match API shape
+  const holdAmount = pendingRequests.reduce((sum, r) => sum + Number(r?.requestAmount ?? r?.amount ?? 0), 0);
+
+  // How much the user can actually withdraw right now
+  const withdrawable = Math.max(0, Number(availableBalance ?? 0) - holdAmount);
 
   useEffect(() => {
-    if (!open) {
-      setAmount('');
-      setError('');
-      setSuccess('');
-    }
+    if (!open) { setAmount(''); setError(''); setSuccess(''); }
   }, [open]);
 
   if (!open) return null;
@@ -146,11 +182,15 @@ function WithdrawalModal({ open, onClose, availableBalance, requests, onSuccess 
   const submit = async (e) => {
     e.preventDefault();
     const clean = Number(String(amount).replace(/,/g, ''));
-    if (!clean || clean <= 0) return setError('Enter a valid withdrawal amount.');
-    if (Number(availableBalance ?? 0) <= 0) return setError('No wallet balance available for withdrawal.');
-    if (pendingRequests.length > 0) return setError('You already have a pending withdrawal request. Wait for approval/rejection.');
-    if (clean > Number(availableBalance ?? 0)) return setError('Withdrawal amount exceeds available balance.');
-    if (clean > remainingWithdrawable) return setError(`You can withdraw up to ${fmtINR(remainingWithdrawable)} after considering pending requests.`);
+
+    if (!clean || clean <= 0)
+      return setError('Enter a valid withdrawal amount.');
+    if (Number(availableBalance ?? 0) <= 0)
+      return setError('Your wallet balance is zero. Nothing to withdraw.');
+    if (pendingRequests.length > 0)
+      return setError(`You have ${pendingRequests.length} pending request${pendingRequests.length > 1 ? 's' : ''} totalling ${fmtINR(holdAmount)}. Wait for approval or rejection before raising a new one.`);
+    if (clean > Number(availableBalance ?? 0))
+      return setError(`Amount exceeds your available balance of ${fmtINR(availableBalance)}.`);
 
     setLoading(true);
     setError('');
@@ -167,24 +207,81 @@ function WithdrawalModal({ open, onClose, availableBalance, requests, onSuccess 
     }
   };
 
+  const hasPending = pendingRequests.length > 0;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: 'rgba(2,6,23,0.55)', backdropFilter: 'blur(4px)' }}>
       <div className="w-full max-w-lg rounded-3xl overflow-hidden" style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 30px 80px rgba(2,6,23,0.45)' }}>
+
+        {/* Header */}
         <div className="px-6 py-5" style={{ background: 'linear-gradient(135deg,#0f172a,#1d4ed8)' }}>
-          <div className="flex items-center justify-between"><h3 className="text-lg font-black text-white">Wallet Withdraw</h3><button onClick={onClose} className="text-white text-sm font-bold">Close</button></div>
-          <p className="text-xs mt-1 text-blue-100">Smart checks enabled for balance, raised requests and remaining limit.</p>
-        </div>
-        <div className="p-6 grid gap-4">
-          <div className="grid grid-cols-3 gap-3 text-center">
-            <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}><p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Balance</p><p className="text-sm font-bold" style={{ color: '#0ea5e9' }}>{fmtINR(availableBalance)}</p></div>
-            <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}><p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Pending</p><p className="text-sm font-bold" style={{ color: '#f59e0b' }}>{fmtINR(pendingAmount)}</p></div>
-            <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}><p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Remaining</p><p className="text-sm font-bold" style={{ color: '#10b981' }}>{fmtINR(remainingWithdrawable)}</p></div>
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-black text-white">Wallet Withdraw</h3>
+            <button onClick={onClose} className="text-white opacity-70 text-sm font-bold hover:opacity-100">✕ Close</button>
           </div>
+          <p className="text-xs mt-1 text-blue-200">Checks balance, hold amount and pending requests before allowing withdrawal.</p>
+        </div>
+
+        <div className="p-6 grid gap-4">
+
+          {/* Balance breakdown */}
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+              <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Available</p>
+              <p className="text-sm font-bold" style={{ color: '#0ea5e9', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(availableBalance)}</p>
+            </div>
+            <div className="rounded-xl p-3" style={{ background: hasPending ? 'rgba(245,158,11,0.08)' : 'var(--input-bg)', border: `1px solid ${hasPending ? 'rgba(245,158,11,0.3)' : 'var(--border)'}` }}>
+              <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>On Hold</p>
+              <p className="text-sm font-bold" style={{ color: hasPending ? '#f59e0b' : 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(holdAmount)}</p>
+            </div>
+            <div className="rounded-xl p-3" style={{ background: hasPending ? 'rgba(239,68,68,0.06)' : 'rgba(16,185,129,0.06)', border: `1px solid ${hasPending ? 'rgba(239,68,68,0.2)' : 'rgba(16,185,129,0.2)'}` }}>
+              <p className="text-[11px] font-semibold mb-1" style={{ color: 'var(--text-muted)' }}>Withdrawable</p>
+              <p className="text-sm font-bold" style={{ color: hasPending ? '#ef4444' : '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(withdrawable)}</p>
+            </div>
+          </div>
+
+          {/* Pending warning banner */}
+          {hasPending && (
+            <div className="flex items-start gap-3 rounded-xl px-4 py-3" style={{ background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.25)' }}>
+              <span className="text-base mt-0.5">⏳</span>
+              <div>
+                <p className="text-xs font-bold" style={{ color: '#d97706' }}>Pending request in progress</p>
+                <p className="text-xs mt-0.5" style={{ color: '#92400e' }}>
+                  You have {pendingRequests.length} pending withdrawal request{pendingRequests.length > 1 ? 's' : ''} totalling <strong>{fmtINR(holdAmount)}</strong>. New requests are blocked until the existing one is approved or rejected.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Input + submit */}
           <form onSubmit={submit} className="grid gap-3">
-            <input type="text" inputMode="numeric" placeholder="Enter withdrawal amount" value={amount} onChange={e => { setAmount(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')); setError(''); }} style={{ background: 'var(--input-bg)', border: '1.5px solid var(--border)', color: 'var(--text-primary)', borderRadius: 12, padding: '12px 14px', fontSize: 14, fontFamily: "'JetBrains Mono', monospace" }} />
-            <button type="submit" disabled={loading} className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-60" style={{ background: 'linear-gradient(135deg,#0ea5e9,#2563eb)', color: '#fff' }}>{loading ? 'Submitting…' : 'Raise Withdrawal Request'}</button>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder={hasPending ? 'Blocked — pending request exists' : 'Enter withdrawal amount'}
+              disabled={hasPending}
+              value={amount}
+              onChange={e => { setAmount(e.target.value.replace(/\D/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, ',')); setError(''); }}
+              style={{
+                background: 'var(--input-bg)',
+                border: `1.5px solid ${hasPending ? 'rgba(245,158,11,0.3)' : 'var(--border)'}`,
+                color: hasPending ? 'var(--text-muted)' : 'var(--text-primary)',
+                borderRadius: 12, padding: '12px 14px', fontSize: 14,
+                fontFamily: "'JetBrains Mono', monospace",
+                cursor: hasPending ? 'not-allowed' : 'text',
+              }}
+            />
+            <button
+              type="submit"
+              disabled={loading || hasPending}
+              className="w-full py-3 rounded-xl font-bold text-sm disabled:opacity-50"
+              style={{ background: hasPending ? '#94a3b8' : 'linear-gradient(135deg,#0ea5e9,#2563eb)', color: '#fff', cursor: hasPending ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Submitting…' : hasPending ? 'Request Blocked — Pending Exists' : 'Raise Withdrawal Request'}
+            </button>
           </form>
-          {error && <p className="text-xs font-semibold" style={{ color: '#ef4444' }}>{error}</p>}
+
+          {error   && <p className="text-xs font-semibold" style={{ color: '#ef4444' }}>{error}</p>}
           {success && <p className="text-xs font-semibold" style={{ color: '#10b981' }}>{success}</p>}
         </div>
       </div>
@@ -194,7 +291,8 @@ function WithdrawalModal({ open, onClose, availableBalance, requests, onSuccess 
 
 export default function WalletDashboard() {
   const navigate = useNavigate();
-  const [availableBalance, setAvailableBalance] = useState(null);
+  const [rawBalance, setRawBalance] = useState(null);          // server value, unchanged
+  const [availableBalance, setAvailableBalance] = useState(null); // raw − approved withdrawals
   const [totalDeposited, setTotalDeposited] = useState(null);
   const [totalEarnings, setTotalEarnings] = useState(null);
   const [pendingCredits, setPendingCredits] = useState(null);
@@ -205,30 +303,52 @@ export default function WalletDashboard() {
   const [pendingHistory, setPendingHistory] = useState([]);
   const [pendingHistoryLoading, setPendingHistoryLoading] = useState(true);
 
+  /** Compute approved-withdrawal total and update displayed balance from raw. */
+  function applyWithdrawalDeduction(list, serverBalance) {
+    const approved = list
+      .filter(r => String(r?.walletStatus ?? r?.status ?? '').toUpperCase() === 'APPROVED')
+      .reduce((sum, r) => sum + Number(r?.requestAmount ?? r?.amount ?? 0), 0);
+    const base = serverBalance ?? rawBalance ?? 0;
+    setAvailableBalance(Math.max(0, base - approved));
+  }
+
   const loadWithdrawalRequests = async () => {
     try {
-      setWithdrawalRequests(normalizeRequests(await getWalletWithdrawalRequests()));
+      const list = normalizeRequests(await getWalletWithdrawalRequests());
+      setWithdrawalRequests(list);
+      applyWithdrawalDeduction(list, null); // uses stored rawBalance
     } catch {
       setWithdrawalRequests([]);
     }
   };
 
   useEffect(() => {
-    getWalletBalance().then(raw => {
+    // Fetch balance and withdrawal requests in parallel.
+    Promise.all([
+      getWalletBalance().catch(() => null),
+      getWalletWithdrawalRequests().catch(() => []),
+    ]).then(([raw, withdrawalRes]) => {
+      const withdrawals = normalizeRequests(withdrawalRes);
+      setWithdrawalRequests(withdrawals);
+
       if (raw && typeof raw.currentWalletAmount === 'number') {
-        setAvailableBalance(raw.currentWalletAmount);
+        setRawBalance(raw.currentWalletAmount);
+        applyWithdrawalDeduction(withdrawals, raw.currentWalletAmount);
+
         const responses = Array.isArray(raw.walletResponses) ? raw.walletResponses : [];
         const credits = responses.filter(r => (r.transactionType ?? '').toLowerCase() === 'credit');
-        const debits = responses.filter(r => (r.transactionType ?? '').toLowerCase() === 'debit');
+        const debits  = responses.filter(r => (r.transactionType ?? '').toLowerCase() === 'debit');
         const pending = responses.filter(r => !r.approvedBy);
         setTotalDeposited(credits.reduce((s, r) => s + (r.amount ?? 0), 0));
         setTotalEarnings(debits.reduce((s, r) => s + (r.amount ?? 0), 0));
         setPendingCredits(pending.reduce((s, r) => s + (r.amount ?? 0), 0));
       }
-    }).catch(() => {}).finally(() => setBalanceLoading(false));
+    }).finally(() => setBalanceLoading(false));
+
     getUserProfile().catch(() => {});
-    getAdminBankDetailsInfo().then(data => { if (Array.isArray(data)) setAdminBanks(data); else if (data) setAdminBanks([data]); }).catch(() => {});
-    loadWithdrawalRequests();
+    getAdminBankDetailsInfo()
+      .then(data => { if (Array.isArray(data)) setAdminBanks(data); else if (data) setAdminBanks([data]); })
+      .catch(() => {});
     getUserUtrDetails()
       .then(data => setPendingHistory((Array.isArray(data) ? data : []).filter(r => r.walletStatus === 'UPLOADED')))
       .catch(() => setPendingHistory([]))
@@ -236,8 +356,12 @@ export default function WalletDashboard() {
   }, []);
 
   const approvedCount = withdrawalRequests.filter(r => String(r?.status ?? r?.walletStatus ?? '').toUpperCase() === 'APPROVED').length;
+  const pendingCount  = withdrawalRequests.filter(r => { const s = String(r?.walletStatus ?? r?.status ?? '').toUpperCase(); return s !== 'APPROVED' && s !== 'REJECTED'; }).length;
+  const holdAmount    = withdrawalRequests
+    .filter(r => { const s = String(r?.walletStatus ?? r?.status ?? '').toUpperCase(); return s !== 'APPROVED' && s !== 'REJECTED'; })
+    .reduce((sum, r) => sum + Number(r?.requestAmount ?? r?.amount ?? 0), 0);
   const raisedCount = withdrawalRequests.length;
-  const data = { availableBalance: availableBalance ?? 0, totalDeposited: totalDeposited ?? 0, totalEarnings: totalEarnings ?? 0, pendingCredits: pendingCredits ?? 0 };
+  const data = { availableBalance: availableBalance ?? 0, totalDeposited: totalDeposited ?? 0, totalEarnings: totalEarnings ?? 0, pendingCredits: pendingCredits ?? 0, holdAmount };
 
   return (
     <div className="grid gap-6">
@@ -257,7 +381,14 @@ export default function WalletDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <button onClick={() => navigate('/wallet/history')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'var(--surface-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><HistoryIcon />Transaction History</button>
             <button onClick={() => setWithdrawModalOpen(true)} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'linear-gradient(135deg,#0ea5e9,#2563eb)', color: '#fff', border: '1px solid rgba(37,99,235,0.4)', boxShadow: '0 8px 20px rgba(37,99,235,0.28)' }}><WalletIcon />Wallet Withdraw</button>
-            <button onClick={() => navigate('/wallet/withdrawal-requests')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: 'var(--surface-card)', color: 'var(--text-primary)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><TrendUp />Raised Requests ({raisedCount}/{approvedCount})</button>
+            <button onClick={() => navigate('/wallet/withdrawal-requests')} className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl font-bold text-sm transition-all" style={{ background: pendingCount > 0 ? 'rgba(245,158,11,0.08)' : 'var(--surface-card)', color: pendingCount > 0 ? '#d97706' : 'var(--text-primary)', border: `1px solid ${pendingCount > 0 ? 'rgba(245,158,11,0.35)' : 'var(--border)'}`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+              <TrendUp />
+              Requests&nbsp;
+              {pendingCount > 0
+                ? <span className="px-2 py-0.5 rounded-full text-[10px] font-black" style={{ background: 'rgba(245,158,11,0.15)', color: '#d97706' }}>{pendingCount} on hold</span>
+                : <span className="text-xs opacity-60">({raisedCount} total)</span>
+              }
+            </button>
           </div>
           {/* Pending History */}
           <div className="rounded-2xl overflow-hidden" style={{ background: '#fffdf0', border: '1.5px solid #fde68a', boxShadow: '0 2px 12px rgba(234,179,8,0.08)' }}>
@@ -319,6 +450,7 @@ export default function WalletDashboard() {
         open={withdrawModalOpen}
         onClose={() => setWithdrawModalOpen(false)}
         availableBalance={data.availableBalance}
+        rawBalance={rawBalance ?? 0}
         requests={withdrawalRequests}
         onSuccess={loadWithdrawalRequests}
       />
