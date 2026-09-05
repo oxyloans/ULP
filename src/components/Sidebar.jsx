@@ -17,11 +17,13 @@ const ProfileIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="curren
 const Building       = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="4" width="18" height="17" rx="1"/><path d="M3 8h18"/><rect x="6" y="11" width="3" height="3" rx="0.5"/><rect x="10.5" y="11" width="3" height="3" rx="0.5"/><rect x="15" y="11" width="3" height="3" rx="0.5"/><rect x="6" y="16" width="3" height="2" rx="0.5"/><rect x="15" y="16" width="3" height="2" rx="0.5"/><rect x="10" y="16" width="4" height="5" rx="0.5"/><path d="M1 21h22"/></svg>
 const GoldIcon       = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><circle cx="12" cy="12" r="9"/><path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3"/><path d="M9 12h3"/></svg>
 const ParticipateIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+const OxyLoansIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><line x1="19" y1="1" x2="19" y2="7"/><line x1="16" y1="4" x2="22" y2="4"/></svg>
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 // To add more sub-items under Deals, just push to the `children` array.
 const NAV_ITEMS = [
-  { title: 'Dashboard', path: '/dashboard', Icon: BankIcon, comingSoon: false },
+  { title: 'Dashboard',          path: '/dashboard',       Icon: BankIcon,        comingSoon: false },
+  // { title: 'Family Members', path: '/oxyloans-family', Icon: OxyLoansIcon,    comingSoon: true },
   {
     title: 'Offline Deals',
     Icon: DealsIcon,
@@ -35,9 +37,10 @@ const NAV_ITEMS = [
     title: 'My Participations',
     Icon: ParticipateIcon,
     children: [
-      { title: 'SD Deals',   path: '/my-participations',        Icon: SDLotIcon, comingSoon: false },
-      { title: 'Gold Deals', path: '/gold-deals-participation', Icon: GoldIcon,  comingSoon: false },
-      { title: 'Asset',      path: '/asset-deals-participation', Icon: Building,  comingSoon: false },
+      { title: 'SD Deals',        path: '/my-participations',         Icon: SDLotIcon,    comingSoon: false },
+      { title: 'Gold Deals',      path: '/gold-deals-participation',  Icon: GoldIcon,     comingSoon: false },
+      { title: 'Asset',           path: '/asset-deals-participation', Icon: Building,     comingSoon: false },
+      // { title: 'OxyLoans Deals',  path: '/oxyloans-deals',            Icon: OxyLoansIcon, comingSoon: false },
     ],
   },
   { title: 'Wallet',     path: '/wallet',   Icon: WalletIcon,  comingSoon: false },
@@ -46,7 +49,7 @@ const NAV_ITEMS = [
 ];
 
 const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset', '/gold-deals',];
-const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/gold-deals/participation/','/asset-deals-participation'];
+const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/gold-deals/participation/','/asset-deals-participation','/oxyloans-deals'];
 
 function pathMatches(pathname, basePath) {
   return pathname === basePath || pathname.startsWith(`${basePath}/`);

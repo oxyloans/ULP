@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from 'antd';
-import { getRunningDeals, getUserViewInterestStatement, getSdLots, getUserOfflineParticipationDealsInfo } from '../api/afterlogin-user';
+import { getRunningDeals, getUserViewInterestStatement, getSdLots, getUserOfflineParticipationDealsInfo, userWithdrawalReturned } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 
 // ─── SD Lot helpers (mirrors SDLots.jsx mapDeal) ─────────────────────────────
@@ -36,6 +36,7 @@ const EyeIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const ChevronIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="6 9 12 15 18 9"/></svg>;
 const CalIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>;
 const LayersIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>;
+const WithdrawIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M12 2v20M17 7l-5-5-5 5M17 17l-5 5-5-5"/></svg>;
 
 const PAYOUT = {
   MONTHLY:      { label: "Monthly",     months: 1  },
@@ -47,6 +48,138 @@ const PAYOUT = {
 
 function fmtINR(n) {
   return formatINR(n ?? 0);
+}
+
+const RED    = '#ef4444';
+const INDIGO = '#6366f1';
+const GREEN  = '#10b981';
+const AMBER  = '#f59e0b';
+
+function AssetWithdrawalModal({ deal, totalAmount, onClose, onSuccess }) {
+  const [amount, setAmount]   = useState('');
+  const [step, setStep]       = useState('input'); // 'input' | 'confirm' | 'success'
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const parsed  = parseFloat(amount);
+  const isValid = !isNaN(parsed) && parsed > 0 && parsed <= totalAmount;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await userWithdrawalReturned({ dealId: deal.dealId, withdrawalAmount: parsed });
+      setStep('success');
+    } catch (e) {
+      setError(e?.message ?? 'Withdrawal request failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={true}
+      onCancel={step === 'success' ? () => { onSuccess(); onClose(); } : onClose}
+      footer={null}
+      title={
+        <div className="pr-6">
+          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: RED, margin: 0 }}>Withdrawal Request</p>
+          <h2 className="text-base font-black truncate mt-0.5" style={{ color: 'var(--text-primary)', margin: 0 }}>{deal.dealName}</h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header: { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body: { padding: '20px' },
+        close: { color: 'var(--text-muted)' },
+      }}
+      width="min(480px, 96vw)"
+      centered
+    >
+      {step === 'success' ? (
+        <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${GREEN}18`, border: `2px solid ${GREEN}40` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Withdrawal Requested!</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              Your withdrawal of <span className="font-bold" style={{ color: GREEN }}>{fmtINR(parsed)}</span> from <span className="font-semibold">{deal.dealName}</span> has been submitted successfully.
+            </p>
+          </div>
+          <button
+            onClick={() => { onSuccess(); onClose(); }}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-105"
+            style={{ background: `linear-gradient(135deg,${GREEN},#059669)`, boxShadow: `0 4px 14px ${GREEN}40` }}
+          >
+            Done
+          </button>
+        </div>
+      ) : step === 'confirm' ? (
+        <div className="grid gap-4">
+          <div className="rounded-xl p-4" style={{ background: `${RED}08`, border: `1px solid ${RED}25` }}>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Confirm Withdrawal</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>You are about to request a withdrawal of:</p>
+            <p className="text-2xl font-black mt-2" style={{ color: RED, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(parsed)}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>from <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{deal.dealName}</span></p>
+          </div>
+          {error && <p className="text-xs font-semibold" style={{ color: RED }}>{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setStep('input'); setError(''); }}
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+              style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            >
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+              style={{ background: loading ? `${RED}60` : `linear-gradient(135deg,${RED},#dc2626)`, boxShadow: `0 4px 14px ${RED}35`, cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Processing…' : 'Confirm Withdrawal'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Invested</p>
+            <p className="text-lg font-black" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalAmount)}</p>
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Withdrawal Amount</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              min={1}
+              max={totalAmount}
+              className="w-full mt-1.5 px-4 py-3 rounded-xl text-sm font-semibold outline-none"
+              style={{ background: 'var(--input-bg)', border: `1px solid ${amount && !isValid ? RED : 'var(--border)'}`, color: 'var(--text-primary)' }}
+            />
+            {amount && !isValid && (
+              <p className="text-xs mt-1" style={{ color: RED }}>Enter a valid amount between ₹1 and {fmtINR(totalAmount)}</p>
+            )}
+          </div>
+          <button
+            onClick={() => setStep('confirm')}
+            disabled={!isValid}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+            style={{ background: isValid ? `linear-gradient(135deg,${RED},#dc2626)` : `${RED}40`, boxShadow: isValid ? `0 4px 14px ${RED}35` : 'none', cursor: isValid ? 'pointer' : 'not-allowed' }}
+          >
+            Proceed to Confirm
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 function fmtNullable(v, fallback = "-") {
@@ -443,6 +576,7 @@ export default function AssetParticipations() {
   const [error, setError] = useState("");
   const [migratedError, setMigratedError] = useState("");
   const [interestDeal, setInterestDeal] = useState(null);
+  const [withdrawDeal, setWithdrawDeal] = useState(null); // { deal, totalAmount }
   const [sourceFilter, setSourceFilter] = useState("all");
 
   // SD Lot remaining deals state
@@ -608,6 +742,14 @@ export default function AssetParticipations() {
           onClose={() => setInterestDeal(null)}
         />
       )}
+      {withdrawDeal && (
+        <AssetWithdrawalModal
+          deal={withdrawDeal.deal}
+          totalAmount={withdrawDeal.totalAmount}
+          onClose={() => setWithdrawDeal(null)}
+          onSuccess={() => { setWithdrawDeal(null); loadData(); }}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between flex-wrap gap-3 text-left">
@@ -761,6 +903,12 @@ export default function AssetParticipations() {
                             className="px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 flex items-center gap-1.5 border"
                             style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', borderColor: 'var(--border)', cursor: 'pointer' }}>
                             <EyeIcon /> Statement
+                          </button>
+
+                          <button onClick={() => setWithdrawDeal({ deal: p, totalAmount })}
+                            className="px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 flex items-center gap-1.5 border-none"
+                            style={{ background: `${RED}10`, color: RED, border: `1px solid ${RED}28`, cursor: 'pointer' }}>
+                            <WithdrawIcon /> Withdraw
                           </button>
 
                           {canMore && (

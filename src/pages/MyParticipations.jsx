@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
-import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement } from "../api/afterlogin-user";
+import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement, userWithdrawalReturned } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
 
 const INDIGO = '#6366f1';
@@ -61,9 +61,141 @@ const CloseIcon = () => (
     <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
   </svg>
 );
+const WithdrawIcon = () => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+    <path d="M12 2v20M17 7l-5-5-5 5M17 17l-5 5-5-5"/>
+  </svg>
+);
 
 function fmtINR(n) {
   return formatINR(n ?? 0);
+}
+
+function WithdrawalModal({ deal, totalInvested, onClose, onSuccess }) {
+  const [amount, setAmount] = useState('');
+  const [step, setStep]     = useState('input'); // 'input' | 'confirm' | 'success'
+  const [loading, setLoading] = useState(false);
+  const [error, setError]   = useState('');
+
+  const parsed = parseFloat(amount);
+  const isValid = !isNaN(parsed) && parsed > 0 && parsed <= totalInvested;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await userWithdrawalReturned({ dealId: deal.dealId, withdrawalAmount: parsed });
+      setStep('success');
+    } catch (e) {
+      setError(e?.message ?? 'Withdrawal request failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      open={true}
+      onCancel={step === 'success' ? () => { onSuccess(); onClose(); } : onClose}
+      footer={null}
+      title={
+        <div className="pr-6">
+          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: RED, margin: 0 }}>Withdrawal Request</p>
+          <h2 className="text-base font-black truncate mt-0.5" style={{ color: 'var(--text-primary)', margin: 0 }}>{deal.dealName}</h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header: { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body: { padding: '20px' },
+        close: { color: 'var(--text-muted)' },
+      }}
+      width="min(480px, 96vw)"
+      centered
+    >
+      {step === 'success' ? (
+        <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${GREEN}18`, border: `2px solid ${GREEN}40` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Withdrawal Requested!</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              Your withdrawal of <span className="font-bold" style={{ color: GREEN }}>{fmtINR(parsed)}</span> from <span className="font-semibold">{deal.dealName}</span> has been submitted successfully.
+            </p>
+          </div>
+          <button
+            onClick={() => { onSuccess(); onClose(); }}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-105"
+            style={{ background: `linear-gradient(135deg,${GREEN},#059669)`, boxShadow: `0 4px 14px ${GREEN}40` }}
+          >
+            Done
+          </button>
+        </div>
+      ) : step === 'confirm' ? (
+        <div className="grid gap-4">
+          <div className="rounded-xl p-4" style={{ background: `${RED}08`, border: `1px solid ${RED}25` }}>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Confirm Withdrawal</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>You are about to request a withdrawal of:</p>
+            <p className="text-2xl font-black mt-2" style={{ color: RED, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(parsed)}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>from <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>{deal.dealName}</span></p>
+          </div>
+          {error && <p className="text-xs font-semibold" style={{ color: RED }}>{error}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setStep('input'); setError(''); }}
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-all"
+              style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            >
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+              style={{ background: loading ? `${RED}60` : `linear-gradient(135deg,${RED},#dc2626)`, boxShadow: `0 4px 14px ${RED}35`, cursor: loading ? 'not-allowed' : 'pointer' }}
+            >
+              {loading ? 'Processing…' : 'Confirm Withdrawal'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-4">
+          <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Invested</p>
+            <p className="text-lg font-black" style={{ color: INDIGO, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(totalInvested)}</p>
+          </div>
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>Withdrawal Amount</label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              min={1}
+              max={totalInvested}
+              className="w-full mt-1.5 px-4 py-3 rounded-xl text-sm font-semibold outline-none"
+              style={{ background: 'var(--input-bg)', border: `1px solid ${amount && !isValid ? RED : 'var(--border)'}`, color: 'var(--text-primary)' }}
+            />
+            {amount && !isValid && (
+              <p className="text-xs mt-1" style={{ color: RED }}>Enter a valid amount between ₹1 and {fmtINR(totalInvested)}</p>
+            )}
+          </div>
+          <button
+            onClick={() => setStep('confirm')}
+            disabled={!isValid}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+            style={{ background: isValid ? `linear-gradient(135deg,${RED},#dc2626)` : `${RED}40`, boxShadow: isValid ? `0 4px 14px ${RED}35` : 'none', cursor: isValid ? 'pointer' : 'not-allowed' }}
+          >
+            Proceed to Confirm
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 function fmtNullable(v, fallback = "-") {
@@ -428,7 +560,7 @@ function InterestStatementModal({ deal, onClose }) {
   );
 }
 
-function DealRow({ p, index, navigate, onViewInterest }) {
+function DealRow({ p, index, navigate, onViewInterest, onWithdraw }) {
   const [expanded, setExpanded] = useState(false);
   const updates = p.updatedParticipation ?? [];
 
@@ -545,6 +677,13 @@ function DealRow({ p, index, navigate, onViewInterest }) {
                 style={{ background: `${GREEN}12`, color: GREEN, border: `1px solid ${GREEN}30` }}
               >
                 <EyeIcon /> View Interest
+              </button>
+              <button
+                onClick={() => onWithdraw(p, totalInvested)}
+                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                style={{ background: `${RED}10`, color: RED, border: `1px solid ${RED}28` }}
+              >
+                <WithdrawIcon /> Withdraw
               </button>
               {canMore && (
                 <button
@@ -865,6 +1004,7 @@ export default function MyParticipations() {
   const [migratedError, setMigratedError] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [interestDeal, setInterestDeal] = useState(null);
+  const [withdrawDeal, setWithdrawDeal] = useState(null); // { deal, totalInvested }
 
   const load = () => {
     setLoading(true);
@@ -1236,13 +1376,21 @@ export default function MyParticipations() {
           <div className="grid gap-4">
             {filteredItems.map((item, i) => (
               item.source === "running"
-                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} onViewInterest={setInterestDeal} />
+                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} onViewInterest={setInterestDeal} onWithdraw={(p, amt) => setWithdrawDeal({ deal: p, totalInvested: amt })} />
                 : <MigratedDealRow key={item.key} d={item.payload} index={i} />
             ))}
           </div>
         )}
       </div>
       {interestDeal && <InterestStatementModal deal={interestDeal} onClose={() => setInterestDeal(null)} />}
+      {withdrawDeal && (
+        <WithdrawalModal
+          deal={withdrawDeal.deal}
+          totalInvested={withdrawDeal.totalInvested}
+          onClose={() => setWithdrawDeal(null)}
+          onSuccess={() => { setWithdrawDeal(null); load(); }}
+        />
+      )}
     </>
   );
 }

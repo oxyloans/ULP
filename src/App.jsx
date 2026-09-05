@@ -26,6 +26,7 @@ import LoginOTP from './pages/LoginOTP.jsx';
 // User pages
 import UnifiedDashboard from './pages/UnifiedDashboard.jsx';
 import FamilyManagement from './pages/FamilyManagement.jsx';
+import OxyLoansFamily from './pages/OxyLoansFamily.jsx';
 import RevenueReport from './pages/RevenueReport.jsx';
 import ContactUs from './pages/ContactUs.jsx';
 import NotFound from './pages/NotFound.jsx';
@@ -41,10 +42,12 @@ import AssetDeals from './pages/AssetDeals.jsx';
 import AssetDealsTest from './pages/AssetDealsTest.jsx';
 import AssetParticipate from './pages/AssetParticipate.jsx';
 import AssetParticipations from './pages/AssetParticipations.jsx';
+import OxyLoansDeals from './pages/OxyLoansDeals.jsx';
 import GoldDealsParticipated from './pages/GoldDealsParticipated.jsx';
 import GoldDeal from './pages/GoldDeal.jsx';
 import GoldDealContribute from './pages/GoldDealContribute.jsx';
 import GoldParticipationDetails from './pages/GoldParticipationDetails.jsx';
+import GoldLotParticipate from './pages/GoldLotParticipate.jsx';
 import InterestPaymentDates from './pages/InterestPaymentDates.jsx';
 
 import AdminWalletApprovals from './pages/admin/AdminWalletApprovals.jsx';
@@ -61,6 +64,7 @@ import ViewAssets from './pages/admin/ViewAssets.jsx';
 import AllocatedAssets from './pages/admin/AllocatedAssets.jsx';
 import AdminInterestPayments from './pages/admin/AdminInterestPayments.jsx';
 import AdminAssetPayouts from './pages/admin/AdminAssetPayouts.jsx';
+import AdminGoldPayouts from './pages/admin/AdminGoldPayouts.jsx';
 import AdminPrincipalInterest from './pages/admin/AdminPrincipalInterest.jsx';
 import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
@@ -78,6 +82,7 @@ import OxyLoansRunningDeals from './pages/admin/stats/OxyLoansRunningDeals.jsx';
 import OfflineRunningDeals from './pages/admin/stats/OfflineRunningDeals.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
+import GoldDealTest from './pages/GoldDealTest.jsx';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -170,17 +175,20 @@ function RequireAdminPerm({ routeKey, children }) {
 // ─── User Layout ──────────────────────────────────────────────────────────────
 function UserLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [addMemberOpen, setAddMemberOpen] = useState(false);
   return (
     <RequireAuth role="user">
       <div className="min-h-screen flex flex-col" style={{ background: 'var(--surface)' }}>
         <Sidebar mobileOpen={mobileOpen} onClose={() => setMobileOpen(false)} />
-        <Topbar onMenuClick={() => setMobileOpen(true)} />
+        <Topbar onMenuClick={() => setMobileOpen(true)} onAddMember={() => setAddMemberOpen(true)} />
         <main className="main-with-fixed-topbar flex-1 p-4 sm:p-5 lg:p-7 lg:pl-[248px] grid gap-5 content-start">
           <Routes>
             <Route path="/" element={<Navigate replace to="/dashboard" />} />
-            <Route path="/dashboard" element={<UnifiedDashboard />} />
+            <Route path="/dashboard" element={<UnifiedDashboard addMemberOpen={addMemberOpen} onAddMemberClose={() => setAddMemberOpen(false)} />} />
             <Route path="/sd-lots" element={<SDLots />} />
             <Route path="/gold-deals" element={<GoldDeal />} />
+            <Route path="/gold-test" element={<GoldDealTest/>} />
+            <Route path="/gold-lot/participate/:id" element={<GoldLotParticipate />} />
             <Route path="/gold-deals/contribute/:id" element={<GoldDealContribute />} />
             <Route path="/gold-deals/participation/:propertyId" element={<GoldParticipationDetails />} />
             <Route path="/gold-deals-participation" element={<GoldDealsParticipated />} />
@@ -192,11 +200,13 @@ function UserLayout() {
             <Route path="/asset/participate/:id" element={<AssetParticipate />} />
             <Route path="/my-participations" element={<MyParticipations />} />
             <Route path="/asset-deals-participation" element={<AssetParticipations />} />
+            <Route path="/oxyloans-deals" element={<OxyLoansDeals />} />
             <Route path="/wallet" element={<WalletDashboard />} />
             <Route path="/wallet/history" element={<WalletHistory />} />
             <Route path="/wallet/withdrawal-requests" element={<WalletWithdrawalRequests />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/family" element={<FamilyManagement />} />
+            <Route path="/oxyloans-family" element={<OxyLoansFamily />} />
             <Route path="/revenue" element={<RevenueReport />} />
             <Route path="/contact" element={<ContactUs />} />
             <Route path="*" element={<NotFound />} />
@@ -235,6 +245,7 @@ function AdminLayout() {
               <Route path="assets/view"           element={<RequireAdminPerm routeKey="assets/view"><ViewAssets /></RequireAdminPerm>} />
               <Route path="assets/allocated"      element={<RequireAdminPerm routeKey="assets/allocated"><AllocatedAssets /></RequireAdminPerm>} />
               <Route path="interest/sd-lot"       element={<RequireAdminPerm routeKey="interest/sd-lot"><AdminInterestPayments /></RequireAdminPerm>} />
+              <Route path="interest/gold"         element={<RequireAdminPerm routeKey="interest/gold"><AdminGoldPayouts /></RequireAdminPerm>} />
               <Route path="interest/asset"        element={<RequireAdminPerm routeKey="interest/asset"><AdminAssetPayouts /></RequireAdminPerm>} />
               <Route path="interest/principal-interest" element={<RequireAdminPerm routeKey="interest/principal-interest"><AdminPrincipalInterest /></RequireAdminPerm>} />
               <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />

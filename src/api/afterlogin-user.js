@@ -146,6 +146,38 @@ export async function addFamilyMemberRequest({ lrId, relation }) {
   return post('/user-service/family/add-request', { lrId, relation });
 }
 
+/**
+ * GET /user-service/family/oxyloans-members
+ * Returns family members who are linked via the OxyLoans platform.
+ * Used exclusively in the OxyLoans section after "Get OxyLoans Data" completes.
+ * Response: [{ id, name, lrId, relation, phone, email, status, isHeadOfFamily }]
+ */
+export async function getFamilyMembersForOxyloans() {
+  return get('/user-service/family/oxyloans-members');
+}
+
+/**
+ * POST /user-service/family/set-head
+ * Designates a family member as the Head of Family for OxyLoans.
+ * Body: { memberId }
+ * The Head of Family becomes the primary contact for support queries raised
+ * by any member of the family on the OxyLoans platform.
+ */
+export async function setHeadOfFamily(memberId) {
+  const userId = getUserId();
+  return post('/user-service/family/set-head', { memberId, requestedBy: userId });
+}
+
+/**
+ * POST /user-service/family/remove-member
+ * Removes a member from the family group (OxyLoans context).
+ * Only the Head of Family (or the member themselves) can trigger this.
+ */
+export async function removeFamilyMember(memberId) {
+  const userId = getUserId();
+  return post('/user-service/family/remove-member', { memberId, requestedBy: userId });
+}
+
 // ══════════════════════════════════════════════════════════════════════════════
 // DASHBOARD / FINANCIALS
 // ══════════════════════════════════════════════════════════════════════════════
@@ -178,10 +210,11 @@ export async function getRunningDeals() {
 /**
  * GET /oxybrick-service/userOfflineParticipationDealsInfo/{lenderId}
  * Returns migrated/offline participation deal rows for a lender/user.
+ * Pass lenderId from getMigrationOxyloansUserInfo; falls back to userId.
  */
-export async function getUserOfflineParticipationDealsInfo() {
-  const lenderId = getUserId();
-  return get(`/oxybrick-service/userOfflineParticipationDealsInfo/${lenderId}`);
+export async function getUserOfflineParticipationDealsInfo(lenderId) {
+  const id = lenderId ?? getUserId();
+  return get(`/oxybrick-service/userOfflineParticipationDealsInfo/${id}`);
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -319,6 +352,15 @@ export async function updateSlipDescription({ documentId, description }) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
+ * GET /oxybrick-service/getMigrationOxyloansUserInfo/{userId}
+ * Returns lenderId and migration info for the logged-in user.
+ */
+export async function getMigrationOxyloansUserInfo() {
+  const userId = getUserId();
+  return get(`/oxybrick-service/getMigrationOxyloansUserInfo/${userId}`);
+}
+
+/**
  * POST /oxybrick-service/migratedUsersData
  * Body: { lenderId, migrationConsent, mobileNumber, password, userId, userName }
  */
@@ -332,6 +374,97 @@ export async function migrateUserData({ lenderId, migrationConsent = 'yes', mobi
     userId,
     userName,
   });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// OXYLOANS EXTERNAL (fintech.oxyloans.com)
+// ══════════════════════════════════════════════════════════════════════════════
+
+const FINTECH_BASE = 'https://fintech.oxyloans.com';
+
+/**
+ * POST https://fintech.oxyloans.com/oxyloans/v1/user/external/encrypt
+ * Returns encryptedData string used as header for subsequent calls.
+ */
+export async function getOxyloansEncryptKey() {
+  const res = await fetch(`${FINTECH_BASE}/oxyloans/v1/user/external/encrypt`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  });
+  if (!res.ok) throw new Error(`Encrypt failed: ${res.status}`);
+  const data = await res.json();
+  return data.encryptedData ?? data; // extract encryptedData field
+}
+
+/**
+ * GET https://fintech.oxyloans.com/oxyloans/v1/user/external/lender/{lenderId}/contactInfo
+ * Header: encryptedData
+ * Returns: { lenderName, mobileNumber, email, ... }
+ */
+export async function getOxyloansLenderContactInfo(lenderId, encryptedData) {
+  if (!/^\d+$/.test(lenderId)) throw new Error('Invalid lenderId');
+  const res = await fetch(`${FINTECH_BASE}/oxyloans/v1/user/external/lender/${lenderId}/contactInfo`, {
+    method: 'GET',
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': encryptedData },
+  });
+  if (!res.ok) throw new Error(`Contact info failed: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * POST /auth-service/user/send-ulp-mobile-otp
+ * Sends OTP to lender's registered mobile.
+ */
+export async function sendOxyloansUlpMobileOtp({ lenderId, lenderName, mobileNumber }) {
+  const userId = getUserId();
+  return post('/auth-service/user/send-ulp-mobile-otp', { lenderId, lenderName, mobileNumber, templateName: 'OXYBRICKS', userId });
+}
+
+/**
+ * POST /auth-service/user/verify-ulp-otp
+ * Verifies mobile OTP.
+ */
+export async function verifyOxyloansUlpMobileOtp({ mobileNumber, mobileOtp, otpSession }) {
+  const userId = getUserId();
+  return post('/auth-service/user/verify-ulp-otp', { mobileNumber, mobileOtp, otpSession, userId });
+}
+
+/**
+ * POST /auth-service/auth/sendUlpEmailOtp
+ * Sends OTP to lender's registered email.
+ */
+export async function sendOxyloansUlpEmailOtp(email,lenderId) {
+  if (!email || !/^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/.test(email)) {
+    throw new Error('Invalid email address');
+  }
+  const userId = getUserId();
+  return post('/auth-service/auth/sendUlpEmailOtp', { email,lenderId,userId });
+}
+
+/**
+ * POST /auth-service/auth/verifyUlpEmailOtp
+ * Verifies email OTP.
+ */
+export async function verifyOxyloansUlpEmailOtp({ emailOtp, emailOtpSession, salt,lenderId }) {
+  const userId = getUserId();
+  return post('/auth-service/auth/verifyUlpEmailOtp', { emailOtp, emailOtpSession, salt, userId,lenderId });
+}
+
+/**
+ * POST https://fintech.oxyloans.com/oxyloans/v1/user/external/{lenderId}/listOfDealsInformationToLenderUlp
+ * Header: encryptedData
+ * Returns list of participated deals for the lender.
+ */
+// amazonq-ignore-next-line
+export async function getOxyloansLenderDeals(lenderId, encryptedData) {
+  if (!/^\d+$/.test(lenderId)) throw new Error('Invalid lenderId');
+  const res = await fetch(`${FINTECH_BASE}/oxyloans/v1/user/external/${lenderId}/listOfDealsInformationToLenderUlp`, {
+    method: 'POST',
+    body: JSON.stringify({ pageNo: 1, pageSize: 500 }),
+    headers: { 'Content-Type': 'application/json', 'X-Api-Key': encryptedData },
+  });
+  if (!res.ok) throw new Error(`Lender deals failed: ${res.status}`);
+  return res.json();
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -352,6 +485,22 @@ export async function GoldRate(){
  * breakup via `updationParticiInterestStatement` on the first row.
  */
 export async function getUserViewInterestStatement(dealId) {
+  // amazonq-ignore-next-line
   const userId = getUserId();
   return get(`/oxybrick-service/userViewInterestStatement/${userId}/${dealId}`);
 }
+
+/**
+ * POST /oxybrick-service/userWithdrawalReturned
+ * Body: { dealId, userId, withdrawalAmount }
+ */
+export async function userWithdrawalReturned({ dealId, withdrawalAmount }) {
+  const userId = getUserId();
+  return post('/oxybrick-service/userWithdrawalReturned', {
+    dealId,
+    userId,
+    withdrawalAmount,
+  });
+}
+
+

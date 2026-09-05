@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useMode } from '../context/ModeContext';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
-import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getGoldGrowthDetail} from '../api/afterlogin-user';
+import { getMemberFinancials, getFamilyAggregate, getUserProfile, getRunningDeals, migrateUserData, getUserOfflineParticipationDealsInfo, getGoldDealsEarnings, getGoldGrowthDetail, getFamilyMembersForOxyloans, getOxyloansEncryptKey, getOxyloansLenderContactInfo, sendOxyloansUlpMobileOtp, verifyOxyloansUlpMobileOtp, sendOxyloansUlpEmailOtp, verifyOxyloansUlpEmailOtp, getOxyloansLenderDeals, getMigrationOxyloansUserInfo } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 import ProfileWarningBanner from '../components/ProfileWarningBanner';
 
@@ -806,6 +806,7 @@ function RunningDealsSection() {
       .then(d => { if (d) setData(d); })
       .catch(e => setError(e.message ?? 'Failed to load'))
       .finally(() => setLoading(false));
+      
   }, []);
 
   const fmtINR = (n) => formatINR(n ?? 0);
@@ -1247,9 +1248,16 @@ function OfflineSection({ fin, memberColor }) {
   useEffect(() => {
     let ignore = false;
     const load = async () => {
+      // Fetch lenderId for the logged-in user from migration info
+      let migratedLenderId = null;
+      try {
+        const migInfo = await getMigrationOxyloansUserInfo();
+        migratedLenderId = migInfo?.lenderId ?? migInfo?.lender_id ?? null;
+      } catch { /* fall through — getUserOfflineParticipationDealsInfo uses userId as fallback */ }
+
       const [runningRes, migratedRes, goldRes] = await Promise.allSettled([
         getRunningDeals(),
-        getUserOfflineParticipationDealsInfo(),
+        getUserOfflineParticipationDealsInfo(migratedLenderId),
         getGoldDealsEarnings(),
       ]);
       if (ignore) return;
@@ -2062,6 +2070,7 @@ function OxyBricksSection({ data, loading }) {
 function FamilyOverview() {
   const [agg, setAgg] = useState(null);
   const [loading, setLoading] = useState(true);
+  const liveOffline = useOfflineStats();
 
   useEffect(() => {
     getFamilyAggregate()
@@ -2076,17 +2085,33 @@ function FamilyOverview() {
     monthlyFamilyChart: [0,0,0,0,0,0,0,0,0,0,0,0],
   };
 
+  // Live offline values from useOfflineStats — real numbers, no stub zeros
+  const offTotalInvested  = liveOffline?.ready ? formatINR(liveOffline.totalInvested)  : data.offlineTotal;
+  const offMonthlyInterest = liveOffline?.ready ? formatINR(liveOffline.monthlyInterest) : '₹0';
+  const offRunning        = liveOffline?.ready ? liveOffline.running  : 0;
+  const offClosed         = liveOffline?.ready ? liveOffline.closed   : 0;
+  const offTotal          = offRunning + offClosed;
+  const offMonthlyChart   = liveOffline?.ready ? liveOffline.monthlyChart   : Array(12).fill(0);
+  const offInvestedChart  = liveOffline?.ready ? liveOffline.investedChart  : Array(12).fill(0);
+
   const topKpis = [
-    { label: 'Family Revenue',   value: data.totalRevenue,   sub: 'All platforms combined', trend: '+18%', trendUp: true, color: '#f58311', Icon: I.Wallet   },
-    { label: 'OxyLoans Total',   value: data.oxyloansTotal,  sub: 'Lending across family',  trend: '+12%', trendUp: true, color: '#2673bb', Icon: I.Bank     },
-    { label: 'Offline Total',    value: data.offlineTotal,   sub: 'Offline payments',       trend: '+5%',  trendUp: true, color: '#f58311', Icon: I.Package  },
-    { label: 'Properties Value', value: data.oxybricksTotal, sub: `${data.totalProperties} properties`, trend: null, trendUp: true, color: '#35a13e', Icon: I.Building },
-    { label: 'Active Members',   value: String(data.totalMembers), sub: 'Approved family',  trend: null,   trendUp: true, color: '#e95330', Icon: I.Users    },
-    { label: 'Total Deals',      value: String(data.totalDeals),   sub: 'Across all members', trend: null, trendUp: true, color: '#2673bb', Icon: I.BarChart },
+    { label: 'Family Revenue',    value: data.totalRevenue,   sub: 'All platforms combined',              trend: '+18%', trendUp: true, color: '#f58311', Icon: I.Wallet   },
+    { label: 'OxyLoans Total',    value: data.oxyloansTotal,  sub: 'Lending across family',               trend: '+12%', trendUp: true, color: '#2673bb', Icon: I.Bank     },
+    { label: 'Offline Invested',  value: offTotalInvested,    sub: `${offTotal} deals · live`,            trend: '+5%',  trendUp: true, color: '#f58311', Icon: I.Package  },
+    { label: 'Monthly Interest',  value: offMonthlyInterest,  sub: 'Offline est. per month',              trend: null,   trendUp: true, color: '#35a13e', Icon: I.Percent  },
+    { label: 'Active Members',    value: String(data.totalMembers), sub: 'Approved family',               trend: null,   trendUp: true, color: '#e95330', Icon: I.Users    },
+    { label: 'Total Deals',       value: String(data.totalDeals),   sub: 'Across all members',            trend: null,   trendUp: true, color: '#2673bb', Icon: I.BarChart },
   ];
+
+  // Donut segments for running vs closed offline deals
+  const donutTotal    = offRunning + offClosed || 1;
+  const runningPct    = Math.round((offRunning / donutTotal) * 100);
+  const investedMax   = Math.max(...offInvestedChart, 1);
 
   return (
     <div className="grid gap-6">
+
+      {/* ── Header ── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-2xl flex items-center justify-center"
@@ -2104,9 +2129,88 @@ function FamilyOverview() {
           <span className="font-semibold">{data.totalMembers} Members · {loading ? 'Loading…' : 'Live'}</span>
         </div>
       </div>
+
+      {/* ── Combined Analysis — offline charts first, at the very top ── */}
+      <div className="rounded-2xl p-5 grid gap-5"
+        style={{ background: 'var(--surface-card)', border: '1px solid rgba(245,131,17,0.18)', boxShadow: '0 2px 16px rgba(0,0,0,0.06)' }}>
+        {/* Section label */}
+        <div className="flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg flex items-center justify-center"
+            style={{ background: 'rgba(245,131,17,0.12)', border: '1px solid rgba(245,131,17,0.25)', color: '#f58311' }}>
+            <I.PieChart />
+          </div>
+          <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>
+            Combined Analysis
+          </h3>
+          <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full font-semibold"
+            style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.22)' }}>
+            All Platforms
+          </span>
+        </div>
+
+        {/* Charts row: Monthly Interest (2/3) + Running/Closed Donut (1/3) */}
+        <div className="grid gap-4 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <GlassPanel accent="#f58311">
+              <p className="text-xs uppercase tracking-widest font-semibold mb-4" style={{ color: '#f58311' }}>
+                Offline · Monthly Interest Trend
+              </p>
+              <AnimatedBarChart data={offMonthlyChart} accent="#f58311" label="Monthly Interest" />
+            </GlassPanel>
+          </div>
+          <GlassPanel accent="#f58311" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12 }}>
+            <DonutRing
+              pct={runningPct}
+              color="#f58311"
+              size={120}
+              centerLabel="Running"
+              sub={`${offRunning} of ${offTotal}`}
+            />
+            <div className="w-full grid grid-cols-2 gap-2">
+              {[
+                { label: 'Running', value: offRunning, color: '#f58311' },
+                { label: 'Closed',  value: offClosed,  color: '#2673bb' },
+              ].map(s => (
+                <div key={s.label} className="rounded-xl p-2 text-center"
+                  style={{ background: `${s.color}0a`, border: `1px solid ${s.color}22` }}>
+                  <p className="text-lg font-extrabold" style={{ color: s.color }}>{s.value}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+                </div>
+              ))}
+            </div>
+          </GlassPanel>
+        </div>
+
+        {/* Capital Invested mini-bars */}
+        <GlassPanel accent="#2673bb">
+          <p className="text-xs uppercase tracking-widest font-semibold mb-4" style={{ color: '#2673bb' }}>
+            Offline · Capital Invested by Month
+          </p>
+          <div className="flex items-end gap-1 h-14">
+            {offInvestedChart.map((v, i) => (
+              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+                <div className="w-full rounded-t-sm transition-all"
+                  style={{
+                    height: `${Math.round((v / investedMax) * 48)}px`,
+                    minHeight: v > 0 ? 3 : 1,
+                    background: v > 0
+                      ? 'linear-gradient(180deg,#2673bb,#2673bb88)'
+                      : 'var(--bar-track)',
+                    opacity: v > 0 ? 1 : 0.3,
+                  }} />
+                <span style={{ color: 'var(--text-muted)', fontSize: 9 }}>{MONTHS[i].slice(0, 1)}</span>
+              </div>
+            ))}
+          </div>
+        </GlassPanel>
+      </div>
+
+      {/* ── KPI cards ── */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {topKpis.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
+
+      {/* ── Member Revenue Breakdown ── */}
       <TableWrap accent="#f58311">
         <div className="px-5 py-4 flex items-center gap-2"
           style={{ borderBottom: '1px solid var(--table-off-header-border)', background: 'var(--table-off-header-accent)' }}>
@@ -2156,37 +2260,239 @@ function FamilyOverview() {
                   </tr>
                 );
               })}
+              {(data.memberBreakdown ?? []).length === 0 && (
+                <tr>
+                  <td colSpan={8} className="py-10 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
+                    No member data yet — add family members to see their breakdown.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
       </TableWrap>
+
+    </div>
+  );
+}
+
+// ─── useOfflineStats: compute live offline totals (same logic as OfflineSection)
+function useOfflineStats() {
+  const [stats, setStats] = useState({
+    totalInvested: 0, monthlyInterest: 0, running: 0, closed: 0,
+    monthlyChart: Array(12).fill(0), investedChart: Array(12).fill(0), ready: false,
+  });
+
+  useEffect(() => {
+    let ignore = false;
+
+    // --- helpers (duplicated from OfflineSection scope) ---
+    const parseDdMmYyyy = (value) => {
+      if (!value || typeof value !== 'string') return null;
+      const parts = value.split('/');
+      if (parts.length !== 3) return null;
+      const d = Number(parts[0]), m = Number(parts[1]), y = Number(parts[2]);
+      if (!d || !m || !y) return null;
+      const dt = new Date(y, m - 1, d);
+      return Number.isNaN(dt.getTime()) ? null : dt;
+    };
+    const mergeMigratedByRoi = (items) => {
+      const groups = new Map();
+      for (const item of items ?? []) {
+        const cp = Number(item?.currentPrincipalAmount ?? 0);
+        if (!(cp > 0)) continue;
+        const key = `${item?.dealName ?? 'Unknown'}|${item?.roi ?? 0}`;
+        if (!groups.has(key)) groups.set(key, { roi: Number(item?.roi ?? 0), entries: [] });
+        groups.get(key).entries.push(item);
+      }
+      return Array.from(groups.values()).map(g => {
+        const principal = g.entries.reduce((s, e) => s + Number(e?.currentPrincipalAmount ?? 0), 0);
+        let mr = 0;
+        if (principal) mr = principal * (g.roi / 100);   // monthly rate for MONTHLY payout
+        return { participationAmount: principal, monthlyInterest: mr, entryCount: g.entries.length };
+      });
+    };
+    const monthlyEquiv = (amount, payout, roi) => {
+      if (!amount) return 0;
+      if (payout === 'MONTHLY')  return amount * (roi / 100);
+      if (payout === 'QUARTELY') return amount * (roi / 100) / 3;
+      if (payout === 'HALFLY')   return amount * (roi / 100) / 6;
+      if (payout === 'YEARLY')   return amount * (roi / 100) / 12;
+      return 0;
+    };
+
+    const load = async () => {
+      const [runRes, migRes, goldRes] = await Promise.allSettled([
+        getRunningDeals(),
+        getUserOfflineParticipationDealsInfo(),
+        getGoldDealsEarnings(),
+      ]);
+      if (ignore) return;
+
+      const participations = runRes.status === 'fulfilled' ? (runRes.value?.participationInfo ?? []) : [];
+      const rawMigrated    = migRes.status === 'fulfilled' && Array.isArray(migRes.value) ? migRes.value : [];
+      const mergedMigrated = mergeMigratedByRoi(rawMigrated);
+
+      // Gold invested
+      let goldDealsInvested = 0;
+      if (goldRes.status === 'fulfilled' && goldRes.value) {
+        const rows = Array.isArray(goldRes.value?.userEarenInfoResponse) ? goldRes.value.userEarenInfoResponse : [];
+        const seen = new Map();
+        rows.forEach(d => {
+          const k = `${d?.dealId ?? ''}-${d?.participationType ?? ''}`;
+          if (!k || k === '-') return;
+          if (!seen.has(k)) seen.set(k, d);
+        });
+        const deduped = Array.from(seen.values());
+        const ids = [...new Set(deduped.map(d => String(d?.dealId ?? '')).filter(Boolean))];
+        const growthRes = await Promise.allSettled(ids.map(id => getGoldGrowthDetail(id)));
+        if (ignore) return;
+        const amtMap = {};
+        growthRes.forEach((r, i) => {
+          if (r.status !== 'fulfilled') return;
+          const rrows = Array.isArray(r.value) ? r.value : (r.value ? [r.value] : []);
+          amtMap[ids[i]] = rrows.reduce((s, row) => s + Number(row?.approvedAmount ?? row?.participatedAmount ?? row?.amount ?? 0), 0);
+        });
+        deduped.forEach(d => {
+          const id = String(d?.dealId ?? '');
+          const amt = amtMap[id] || Number(d?.participatedAmount ?? d?.amount ?? 0);
+          goldDealsInvested += amt;
+        });
+      }
+
+      // Running invested + monthly interest + per-month charts
+      let runningInvested = 0, runningMonthly = 0, activeCnt = 0, closedCnt = 0;
+      const monthlyInvestedArr = Array(12).fill(0);
+      const monthlyInterestArr = Array(12).fill(0);
+
+      const parseMonthFromDate = (dateStr) => {
+        if (!dateStr || typeof dateStr !== 'string') return -1;
+        const v = dateStr.trim();
+        let parts;
+        if (v.includes('/')) parts = v.split('/');
+        else if (v.includes('-')) parts = v.split('-');
+        else return -1;
+        if (parts.length !== 3) return -1;
+        // DD/MM/YYYY or DD-MM-YYYY
+        if (parts[0].length <= 2) return parseInt(parts[1], 10) - 1;
+        // YYYY-MM-DD
+        return parseInt(parts[1], 10) - 1;
+      };
+
+      participations.forEach(p => {
+        const updates = (p.updatedParticipation ?? []).reduce((s, u) => s + (u.updationParticipation ?? 0), 0);
+        runningInvested += (p.participatedAmount ?? 0) + updates;
+        const roi = p.rateOfInterest ?? 0;
+        const entries = [
+          { amount: p.participatedAmount ?? 0, payout: p.amountTye, date: p.participatedDate },
+          ...(p.updatedParticipation ?? []).map(u => ({ amount: u.updationParticipation ?? 0, payout: u.amountTye ?? p.amountTye, date: u.updatedDate })),
+        ];
+        entries.forEach(e => {
+          const mi = monthlyEquiv(e.amount, e.payout, roi);
+          runningMonthly += mi;
+          const m = parseMonthFromDate(e.date);
+          if (m >= 0 && m < 12) {
+            monthlyInvestedArr[m] += e.amount;
+            for (let mm = m; mm < 12; mm++) monthlyInterestArr[mm] += mi;
+          }
+        });
+        if (p.dealStatus === 'CLOSED' || p.dealStatus === 'ACHIEVED') closedCnt++;
+        else activeCnt++;
+      });
+
+      const migratedInvested = mergedMigrated.reduce((s, d) => s + Number(d?.participationAmount ?? 0), 0);
+      const migratedMonthly  = mergedMigrated.reduce((s, d) => s + Number(d?.monthlyInterest ?? 0), 0);
+      // gold counts as active
+      activeCnt += (goldRes.status === 'fulfilled'
+        ? Array.from(new Set((goldRes.value?.userEarenInfoResponse ?? []).map(d => `${d?.dealId}-${d?.participationType}`))).length
+        : 0);
+
+      if (!ignore) {
+        setStats({
+          totalInvested:   runningInvested + migratedInvested + goldDealsInvested,
+          monthlyInterest: runningMonthly  + migratedMonthly,
+          running:  activeCnt,
+          closed:   closedCnt,
+          monthlyChart:  monthlyInterestArr,
+          investedChart: monthlyInvestedArr,
+          ready: true,
+        });
+      }
+    };
+
+    load().catch(() => {});
+    return () => { ignore = true; };
+  }, []);
+
+  return stats;
+}
+
+// ─── Offline status bar (single row) ─────────────────────────────────────────
+function OfflineStatusBar({ label, count, total, color, glow }) {
+  const [barW, setBarW] = useState(0);
+  useEffect(() => {
+    const t = setTimeout(() => setBarW(Math.round((count / (total || 1)) * 100)), 400);
+    return () => clearTimeout(t);
+  }, [count, total]);
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-1">
+        <div className="flex items-center gap-2">
+          <div className="w-2 h-2 rounded-full" style={{ background: color, boxShadow: `0 0 5px ${glow}` }} />
+          <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{label}</span>
+        </div>
+        <span className="text-xs font-bold" style={{ color }}>{count}</span>
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bar-track)' }}>
+        <div className="h-full rounded-full"
+          style={{ width: `${barW}%`, background: `linear-gradient(90deg,${color},${color}88)`, boxShadow: `0 0 6px ${glow}`, transition: 'width 1.2s cubic-bezier(0.34,1.56,0.64,1)' }} />
+      </div>
     </div>
   );
 }
 
 // ─── Combined Analysis (mode C) ───────────────────────────────────────────────
-function CombinedAnalysis({ fin, memberColor }) {
+function CombinedAnalysis({ fin, memberColor, liveOffline, olAmtOverride, olRunningOverride }) {
   const ol  = fin.oxyloans;
-  const off = fin.offline;
+  // Prefer live offline stats when available
+  const off = liveOffline?.ready ? {
+    ...fin.offline,
+    totalPaid:       formatINR(liveOffline.totalInvested),
+    totalInvested:   formatINR(liveOffline.totalInvested),
+    monthlyInterest: formatINR(liveOffline.monthlyInterest),
+    running:         liveOffline.running,
+    closed:          liveOffline.closed,
+    payments:        fin.offline?.payments ?? [],
+    monthlyChart:    fin.offline?.monthlyChart ?? Array(12).fill(0),
+  } : fin.offline;
 
   const parseAmt = (str) => {
     if (!str) return 0;
     const n = parseFloat(str.replace(/[₹,]/g, ''));
     return str.includes('L') ? n * 100000 : str.includes('K') ? n * 1000 : n;
   };
-  const olTotal  = parseAmt(ol.totalEarned);
-  const offTotal = parseAmt(off.totalPaid);
+
+  // Use real deal amounts when available (override the stale financials API value)
+  const olTotal  = olAmtOverride != null ? olAmtOverride : parseAmt(ol.totalInvested);
+  const offTotal = parseAmt(off.totalInvested);
   const combined = olTotal + offTotal;
   const fmtL = (n) => formatINR(n ?? 0);
+
+  const olRunning = olRunningOverride != null ? olRunningOverride : ol.running;
+
+  const olMonthly  = parseAmt(ol.monthlyInterest);
+  const offMonthly = parseAmt(off.monthlyInterest ?? '₹0');
+  const combinedMonthly = olMonthly + offMonthly;
 
   const olPct  = combined > 0 ? Math.round((olTotal  / combined) * 100) : 50;
   const offPct = 100 - olPct;
 
   const kpis = [
-    { label: 'OxyLoans Earned',   value: ol.totalEarned,     color: '#2673bb', Icon: I.Bank,     sub: `${ol.running} active deals`             },
-    { label: 'Offline Collected', value: off.totalPaid,      color: '#f58311', Icon: I.Wallet,   sub: `${off.payments?.length ?? 0} payments`  },
-    { label: 'Combined Total',    value: fmtL(combined),     color: memberColor, Icon: I.PieChart, sub: 'All platforms'                        },
-    { label: 'Monthly Interest',  value: ol.monthlyInterest, color: '#35a13e', Icon: I.Percent,  sub: 'OxyLoans this month'                    },
+    { label: 'OxyLoans Invested',     value: fmtL(olTotal),                  color: '#2673bb',   Icon: I.Bank,     sub: `${olRunning} active deals`         },
+    { label: 'Offline Invested',      value: off.totalInvested,              color: '#f58311',   Icon: I.Wallet,   sub: `${off.running ?? 0} active deals`  },
+    { label: 'Total Invested',        value: fmtL(combined),                 color: memberColor, Icon: I.PieChart, sub: 'All platforms'                      },
+    { label: 'OxyLoans Monthly Int.', value: ol.monthlyInterest,             color: '#35a13e',   Icon: I.Percent,  sub: 'OxyLoans this month'                },
+    { label: 'Offline Monthly Int.',  value: off.monthlyInterest ?? '₹0',   color: '#6366f1',   Icon: I.Activity, sub: 'Offline this month'                 },
   ];
 
   const pieSegments = [
@@ -2204,21 +2510,26 @@ function CombinedAnalysis({ fin, memberColor }) {
         </div>
         <h3 className="text-sm font-bold uppercase tracking-wider" style={{ color: 'var(--text-primary)' }}>Combined Analysis</h3>
         <span className="ml-auto text-xs px-2.5 py-0.5 rounded-full font-semibold"
-          style={{ background: `${memberColor}12`, color: memberColor, border: `1px solid ${memberColor}22` }}>Mode C · All Platforms</span>
+          style={{ background: `${memberColor}12`, color: memberColor, border: `1px solid ${memberColor}22` }}> · All Platforms</span>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         {kpis.map(k => <KpiCard key={k.label} {...k} />)}
       </div>
       <div className="grid gap-4 lg:grid-cols-[1fr_160px_1fr]">
         <GlassPanel accent={memberColor}>
-          <DualBarChart olData={ol.monthlyChart} offData={off.monthlyChart} memberColor={memberColor} />
+          <DualBarChart olData={ol.monthlyChart} offData={liveOffline?.ready ? liveOffline.monthlyChart : off.monthlyChart} memberColor={memberColor} />
         </GlassPanel>
         <GlassPanel accent={memberColor} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
           <MultiDonut segments={pieSegments} size={130} />
           <p className="text-xs font-bold uppercase tracking-wider mt-1" style={{ color: memberColor }}>Revenue Split</p>
         </GlassPanel>
         <GlassPanel accent={memberColor}>
-          <DealStatusChart olDeals={ol.deals} offPayments={off.payments} memberColor={memberColor} />
+          <DealStatusChart
+            olDeals={ol.deals}
+            offPayments={off.payments}
+            liveOffline={liveOffline}
+            memberColor={memberColor}
+          />
         </GlassPanel>
       </div>
       <div className="grid gap-2">
@@ -2234,8 +2545,8 @@ function CombinedAnalysis({ fin, memberColor }) {
         </div>
         <div className="flex items-center gap-4 flex-wrap">
           {[
-            { label: 'OxyLoans', color: '#2673bb', value: ol.totalEarned },
-            { label: 'Offline',  color: '#f58311', value: off.totalPaid  },
+            { label: 'OxyLoans', color: '#2673bb', value: fmtL(olTotal)     },
+            { label: 'Offline',  color: '#f58311', value: off.totalInvested },
           ].map(p => (
             <div key={p.label} className="flex items-center gap-1.5 text-xs">
               <span className="w-2.5 h-2.5 rounded-full" style={{ background: p.color }} />
@@ -2244,30 +2555,34 @@ function CombinedAnalysis({ fin, memberColor }) {
             </div>
           ))}
           <div className="ml-auto text-xs font-extrabold" style={{ color: memberColor }}>
-            Total: {fmtL(combined)}
+            Total Invested: {fmtL(combined)}
           </div>
         </div>
       </div>
+
+      {/* ── Offline Details removed — data now feeds into charts above ── */}
     </div>
   );
 }
 
 // ─── Deal status grouped bar chart ───────────────────────────────────────────
-function DealStatusChart({ olDeals, offPayments, memberColor }) {
+function DealStatusChart({ olDeals, offPayments, liveOffline, memberColor }) {
   const [anim, setAnim] = useState(false);
   useEffect(() => { const t = setTimeout(() => setAnim(true), 500); return () => clearTimeout(t); }, []);
 
   const olActive  = olDeals.filter(d => d.status === 'Active').length;
   const olPending = olDeals.filter(d => d.status === 'Pending').length;
   const olClosed  = olDeals.filter(d => d.status === 'Closed').length;
-  const offVerified = (offPayments ?? []).filter(p => p.status === 'Verified').length;
-  const offPending  = (offPayments ?? []).filter(p => p.status === 'Pending').length;
-  const offRejected = (offPayments ?? []).filter(p => p.status === 'Rejected').length;
+
+  // Use live offline stats when available, fall back to payments array
+  const offActive   = liveOffline?.ready ? liveOffline.running : (offPayments ?? []).filter(p => p.status === 'Verified' || p.status === 'Active').length;
+  const offPending  = liveOffline?.ready ? 0                   : (offPayments ?? []).filter(p => p.status === 'Pending').length;
+  const offClosed   = liveOffline?.ready ? liveOffline.closed  : (offPayments ?? []).filter(p => p.status === 'Rejected' || p.status === 'Closed').length;
 
   const groups = [
-    { label: 'Active / Verified', ol: olActive,  off: offVerified, color: '#35a13e' },
-    { label: 'Pending',           ol: olPending, off: offPending,  color: '#f58311' },
-    { label: 'Closed / Rejected', ol: olClosed,  off: offRejected, color: '#2673bb' },
+    { label: 'Active / Verified', ol: olActive,  off: offActive,  color: '#35a13e' },
+    { label: 'Pending',           ol: olPending, off: offPending, color: '#f58311' },
+    { label: 'Closed / Rejected', ol: olClosed,  off: offClosed,  color: '#2673bb' },
   ];
   const maxVal = Math.max(...groups.flatMap(g => [g.ol, g.off])) || 1;
 
@@ -2446,6 +2761,1863 @@ function MigrateSuccessModal({ onClose }) {
   );
 }
 
+// ─── Animated OTP input boxes ─────────────────────────────────────────────────
+// ─── OTP Boxes ────────────────────────────────────────────────────────────────
+// React.memo = parent re-renders never touch this component.
+// All digit state is in a ref. The only thing that causes a re-render inside
+// is the `tick` dispatch, which we control precisely.
+const OtpBoxes = React.memo(function OtpBoxes({ length = 6, onChange, disabled, resetKey }) {
+  const digitsRef    = React.useRef(Array(length).fill(''));
+  const onChangeRef  = React.useRef(onChange);          // always-fresh ref, never stale
+  const inputRefs    = React.useRef(
+    Array.from({ length }, () => React.createRef())
+  );
+  const [displayKey, setDisplayKey] = React.useState(0); // controls visual re-render
+  const [focused, setFocused]       = React.useState(-1);
+
+  // Keep onChangeRef current without triggering re-render
+  React.useLayoutEffect(() => { onChangeRef.current = onChange; });
+
+  // Focus box 0 on first mount
+  React.useEffect(() => {
+    const t = setTimeout(() => { inputRefs.current[0]?.current?.focus(); setFocused(0); }, 60);
+    return () => clearTimeout(t);
+  }, []); // eslint-disable-line
+
+  // Resend: resetKey increments → clear. Skip on initial mount via prev-value check.
+  const prevResetKey = React.useRef(resetKey);
+  React.useEffect(() => {
+    if (prevResetKey.current === resetKey) return;   // first mount or same value
+    prevResetKey.current = resetKey;
+    digitsRef.current = Array(length).fill('');
+    setDisplayKey(k => k + 1);
+    setFocused(0);
+    const t = setTimeout(() => inputRefs.current[0]?.current?.focus(), 0);
+    return () => clearTimeout(t);
+  }, [resetKey, length]);
+
+  const focusBox = React.useCallback((i) => {
+    const idx = Math.max(0, Math.min(length - 1, i));
+    inputRefs.current[idx]?.current?.focus();
+    setFocused(idx);
+  }, [length]);
+
+  const handleKeyDown = React.useCallback((i, e) => {
+    if (/^\d$/.test(e.key)) {
+      e.preventDefault();
+      const d = digitsRef.current;
+      if (d.every(v => v !== '')) return;           // all full → ignore
+      const next = [...d];
+      next[i] = e.key;
+      digitsRef.current = next;
+      setDisplayKey(k => k + 1);
+      onChangeRef.current(next.join(''));
+      if (i < length - 1) {
+        focusBox(i + 1);
+      } else {
+        setFocused(-1);
+        inputRefs.current[i]?.current?.blur();
+      }
+      return;
+    }
+    if (e.key === 'Backspace') {
+      e.preventDefault();
+      const next = [...digitsRef.current];
+      if (next[i]) {
+        next[i] = '';
+        digitsRef.current = next;
+        setDisplayKey(k => k + 1);
+        onChangeRef.current(next.join(''));
+      } else if (i > 0) {
+        next[i - 1] = '';
+        digitsRef.current = next;
+        setDisplayKey(k => k + 1);
+        onChangeRef.current(next.join(''));
+        focusBox(i - 1);
+      }
+      return;
+    }
+    if (e.key === 'Delete') {
+      e.preventDefault();
+      const next = [...digitsRef.current];
+      next[i] = '';
+      digitsRef.current = next;
+      setDisplayKey(k => k + 1);
+      onChangeRef.current(next.join(''));
+      return;
+    }
+    if (e.key === 'ArrowLeft')  { e.preventDefault(); focusBox(i - 1); }
+    if (e.key === 'ArrowRight') { e.preventDefault(); focusBox(i + 1); }
+  }, [length, focusBox]);
+
+  const handlePaste = React.useCallback((e) => {
+    e.preventDefault();
+    const pasted = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, length);
+    if (!pasted) return;
+    const next = Array(length).fill('');
+    pasted.split('').forEach((ch, j) => { next[j] = ch; });
+    digitsRef.current = next;
+    setDisplayKey(k => k + 1);
+    onChangeRef.current(next.join(''));
+    if (pasted.length >= length) {
+      setFocused(-1);
+      inputRefs.current[length - 1]?.current?.blur();
+    } else {
+      focusBox(pasted.length);
+    }
+  }, [length, focusBox]);
+
+  // Read snapshot for render — displayKey change triggers this
+  const digits = digitsRef.current;
+
+  return (
+    <div className="flex items-center justify-center gap-3">
+      {digits.map((digit, i) => {
+        const filled = !!digit;
+        const active = focused === i && !disabled;
+        return (
+          <div key={i} className="relative" style={{ width: 46, height: 54 }}>
+            <div style={{
+              position: 'absolute', inset: -2, borderRadius: 14, zIndex: 0,
+              background: filled
+                ? 'linear-gradient(135deg,#2673bb,#35a13e)'
+                : active ? 'linear-gradient(135deg,#2673bb55,#2673bb22)' : 'transparent',
+              transition: 'background 0.2s',
+            }} />
+            <input
+              ref={inputRefs.current[i]}
+              type="text"
+              inputMode="numeric"
+              readOnly
+              value={digit}
+              onKeyDown={e => handleKeyDown(i, e)}
+              onPaste={handlePaste}
+              onFocus={() => setFocused(i)}
+              onBlur={() => setFocused(-1)}
+              onClick={() => setFocused(i)}
+              disabled={disabled}
+              tabIndex={0}
+              className="absolute inset-0 w-full h-full text-center text-xl font-black outline-none rounded-xl select-none"
+              style={{
+                zIndex: 1,
+                background: filled ? 'rgba(38,115,187,0.1)' : 'var(--input-bg)',
+                border: `2px solid ${filled ? '#2673bb' : active ? '#2673bb' : 'var(--border)'}`,
+                color: 'var(--text-primary)',
+                boxShadow: active ? '0 0 0 3px rgba(38,115,187,0.18),0 0 12px rgba(38,115,187,0.2)' : filled ? '0 0 6px rgba(38,115,187,0.12)' : 'none',
+                transform: filled ? 'scale(1.05)' : 'scale(1)',
+                transition: 'border-color 0.18s,box-shadow 0.18s,transform 0.18s,background 0.18s',
+                cursor: disabled ? 'not-allowed' : 'text',
+                caretColor: 'transparent',
+              }}
+            />
+            {filled && (
+              <div style={{
+                position: 'absolute', bottom: 5, left: '50%', transform: 'translateX(-50%)',
+                width: 5, height: 5, borderRadius: '50%', zIndex: 2,
+                background: 'linear-gradient(135deg,#2673bb,#35a13e)',
+                animation: 'olOtpDot 0.22s cubic-bezier(0.34,1.56,0.64,1)',
+              }} />
+            )}
+          </div>
+        );
+      })}
+      <style>{`
+        @keyframes olOtpDot {
+          from { transform: translateX(-50%) scale(0); opacity: 0; }
+          to   { transform: translateX(-50%) scale(1); opacity: 1; }
+        }
+        @keyframes olStepIn {
+          from { opacity: 0; transform: translateY(16px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0)    scale(1); }
+        }
+        @keyframes olTickPop {
+          0%   { transform: scale(0) rotate(-30deg); opacity: 0; }
+          60%  { transform: scale(1.25) rotate(5deg); opacity: 1; }
+          100% { transform: scale(1) rotate(0); opacity: 1; }
+        }
+        @keyframes olShimmer {
+          0%   { background-position: -200% center; }
+          100% { background-position:  200% center; }
+        }
+        .ol-step-in  { animation: olStepIn 0.38s cubic-bezier(0.34,1.2,0.64,1) both; }
+        .ol-tick-pop { animation: olTickPop 0.45s cubic-bezier(0.34,1.56,0.64,1) both; }
+      `}</style>
+    </div>
+  );
+});
+
+// ─── Resend timer ─────────────────────────────────────────────────────────────
+// Isolated with React.memo so parent re-renders never reset the countdown.
+const ResendTimer = React.memo(function ResendTimer({ seconds, onResend, disabled }) {
+  const [left, setLeft] = React.useState(seconds);
+  const onResendRef = React.useRef(onResend);
+  React.useLayoutEffect(() => { onResendRef.current = onResend; });
+
+  React.useEffect(() => {
+    // Count down with setInterval — immune to re-renders
+    setLeft(seconds);
+    const id = setInterval(() => {
+      setLeft(prev => {
+        if (prev <= 1) { clearInterval(id); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(id);
+  }, [seconds]); // only restarts when seconds prop actually changes (i.e. key change)
+
+  if (left > 0) {
+    return (
+      <p className="text-xs text-center mt-2" style={{ color: 'var(--text-muted)' }}>
+        Resend in <span style={{ color: '#2673bb', fontWeight: 700 }}>{left}s</span>
+      </p>
+    );
+  }
+  return (
+    <button
+      onClick={() => onResendRef.current?.()}
+      disabled={disabled}
+      className="text-xs font-bold mt-2 mx-auto block transition-all hover:opacity-80 disabled:opacity-40"
+      style={{ color: '#2673bb' }}>
+      Resend OTP
+    </button>
+  );
+});
+
+// ─── Step progress pill ───────────────────────────────────────────────────────
+function StepPills({ step, steps }) {
+  return (
+    <div className="flex items-center gap-1 justify-center">
+      {steps.map((s, i) => {
+        const done    = i < step;
+        const current = i === step;
+        return (
+          <React.Fragment key={i}>
+            <div
+              className="flex items-center justify-center rounded-full text-xs font-bold transition-all"
+              style={{
+                width: current ? 28 : 22, height: current ? 28 : 22,
+                background: done ? '#35a13e' : current ? '#2673bb' : 'var(--input-bg)',
+                color: done || current ? '#fff' : 'var(--text-muted)',
+                border: `2px solid ${done ? '#35a13e' : current ? '#2673bb' : 'var(--border)'}`,
+                boxShadow: current ? '0 0 10px rgba(38,115,187,0.4)' : 'none',
+                transform: current ? 'scale(1.1)' : 'scale(1)',
+                fontSize: 10,
+              }}>
+              {done
+                ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ width: 11, height: 11 }}><polyline points="20 6 9 17 4 12"/></svg>
+                : i + 1}
+            </div>
+            {i < steps.length - 1 && (
+              <div style={{ flex: 1, height: 2, minWidth: 16, maxWidth: 32, borderRadius: 2, background: i < step ? '#35a13e' : 'var(--border)', transition: 'background 0.4s' }} />
+            )}
+          </React.Fragment>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─── Get OxyLoans Data Modal ──────────────────────────────────────────────────
+const OL_STEPS = ['Lender ID', 'Mobile OTP', 'Email OTP', 'Preview', 'Consent'];
+
+// Panel must be outside the modal — defining it inside causes full remount on every digit
+function OlPanel({ children }) {
+  return <div className="ol-step-in px-6 py-5 grid gap-5">{children}</div>;
+}
+
+function GetOxyloansDataModal({ onClose, onConfirm, mode: modalMode = 'view', migrationInfo = null }) {
+  const isAddMember = modalMode === 'addMember';
+
+  // Derive initial step from migrationInfo verification flags:
+  // - both done          → step 3 (preview/load) — but we still need to fetch deals first, so start at 0 and auto-advance
+  // - mobile done only   → start at step 2 (email OTP)
+  // - email done only    → start at step 1 (mobile OTP)  — email-only scenario is unusual but handle it
+  // - neither done       → start at step 0 for addMember, step 1 for self (lenderId pre-filled)
+  const _mobileVerified = !isAddMember && !!migrationInfo?.mobileNumberVerified;
+  const _emailVerified  = !isAddMember && !!migrationInfo?.emailVerified;
+  const _haslenderId    = !isAddMember && !!(migrationInfo?.lenderId ?? migrationInfo?.lender_id);
+
+  const deriveInitialStep = () => {
+    if (isAddMember) return 0;
+    if (!_haslenderId) return 0;
+    if (_mobileVerified && _emailVerified) return 0; // both done — will auto-advance after fetch
+    if (_mobileVerified && !_emailVerified) return 2; // skip mobile OTP, go to email
+    if (!_mobileVerified && _emailVerified) return 1; // has email verified, still needs mobile
+    return 1; // lenderId known, start at mobile OTP
+  };
+
+  const [step, setStep] = useState(deriveInitialStep);
+  const [lenderId, setLenderId] = useState(() => {
+    if (isAddMember) return '';
+    const lid = migrationInfo?.lenderId ?? migrationInfo?.lender_id ?? '';
+    return lid ? String(lid) : '';
+  });
+  const [lenderInfo, setLenderInfo] = useState(() => {
+    // Pre-fill lenderInfo from migrationInfo so steps 1/2 can show name/mobile/email
+    if (isAddMember || !migrationInfo) return null;
+    return {
+      lenderName:   migrationInfo.userName   ?? null,
+      mobileNumber: migrationInfo.mobileNumber ?? null,
+      email:        migrationInfo.email       ?? null,
+      emailId:      migrationInfo.email       ?? null,
+    };
+  });
+  const [personalInfo, setPersonalInfo] = useState(null);
+  const [deals, setDeals]           = useState([]);
+  const [mobileOtpDone, setMobileOtpDone] = useState(false);
+  const [emailOtpDone, setEmailOtpDone]   = useState(false);
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [resendKey, setResendKey]   = useState(0);
+  const [success, setSuccess]       = useState(false);
+  const [toast, setToast]           = useState(null); // { title, msg1, msg2 }
+  // Store OTP values via ref so reads at submit time don't need state
+  const mobileOtpRef      = React.useRef('');
+  const emailOtpRef       = React.useRef('');
+  const encryptedDataRef  = React.useRef('');
+  const mobileSessionRef  = React.useRef('');
+  const emailSessionRef   = React.useRef('');
+  const emailSaltRef      = React.useRef('');
+
+  const onMobileOtpChange = React.useCallback((v) => {
+    mobileOtpRef.current = v;
+    setMobileOtpDone(v.length === 6);
+    clearError();
+  }, []); // eslint-disable-line
+
+  const onEmailOtpChange = React.useCallback((v) => {
+    emailOtpRef.current = v;
+    setEmailOtpDone(v.length === 6);
+    clearError();
+  }, []); // eslint-disable-line
+
+  const maskMobile = (m) => m ? `${m.slice(0, 2)}${'*'.repeat(m.length - 4)}${m.slice(-4)}` : '---';
+  const maskEmail  = (e) => {
+    if (!e) return '---';
+    const [user, domain] = e.split('@');
+    return `${user.slice(0, 2)}${'*'.repeat(Math.max(0, user.length - 2))}@${domain}`;
+  };
+
+  const clearError = () => setError('');
+
+  // ── Step 0: get encrypt key → fetch contact info → send OTP ──────────────
+  const rawLenderId = () => lenderId.trim().replace(/^LR/i, '');
+
+  const handleCheckLender = async () => {
+    if (!lenderId.trim()) { setError('Please enter your Lender ID'); return; }
+    setLoading(true); clearError();
+    try {
+      const encKey = await getOxyloansEncryptKey();
+      encryptedDataRef.current = encKey;
+      const info = await getOxyloansLenderContactInfo(rawLenderId(), encKey);
+      setLenderInfo(info);
+
+      const mobile = info.mobileNumber ?? info.mobile ?? '';
+      const email  = info.email ?? info.emailId ?? '';
+
+      // Decide which OTP to send first based on what's already verified
+      if (_mobileVerified && _emailVerified) {
+        // Both already verified — fetch deals directly, skip OTPs
+        setLoading(true);
+        const [profile, dealsData] = await Promise.all([
+          getOxyloansLenderContactInfo(rawLenderId(), encKey),
+          getOxyloansLenderDeals(rawLenderId(), encKey),
+        ]);
+        setPersonalInfo(profile);
+        setDeals(Array.isArray(dealsData?.lenderPaticipatedResponseDto)
+          ? dealsData.lenderPaticipatedResponseDto
+          : []);
+        setStep(3);
+      } else if (_mobileVerified && !_emailVerified) {
+        // Mobile already verified — send email OTP
+        const emailRes = await sendOxyloansUlpEmailOtp(email, rawLenderId());
+        emailSessionRef.current = emailRes?.emailOtpSession ?? emailRes?.sessionId ?? '';
+        emailSaltRef.current    = emailRes?.salt ?? '';
+        setStep(2);
+      } else {
+        // Mobile not verified — send mobile OTP
+        const otpRes = await sendOxyloansUlpMobileOtp({
+          lenderId: rawLenderId(),
+          lenderName: info.lenderName ?? info.name ?? '',
+          mobileNumber: mobile,
+        });
+        mobileSessionRef.current = otpRes?.mobileOtpSession ?? otpRes?.sessionId ?? '';
+        setStep(1);
+      }
+    } catch (e) {
+      setError(e.message ?? 'Failed to fetch lender info');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Auto-advance when modal opens with a known lenderId and prefilled lenderInfo
+  // (i.e. migration info has lenderId but step starts at 1 or 2 — we need the encrypt key + send OTP)
+  React.useEffect(() => {
+    if (isAddMember || !_haslenderId || step === 0) return; // only for self-mode with known lenderId
+    // lenderId is already set from migrationInfo; auto-send the correct OTP
+    const autoSend = async () => {
+      setLoading(true); clearError();
+      try {
+        const encKey = await getOxyloansEncryptKey();
+        encryptedDataRef.current = encKey;
+        // Always fetch from the contact info API — migrationInfo.email can be null
+        // and the real email lives in the OxyLoans contact info endpoint
+        const info = await getOxyloansLenderContactInfo(rawLenderId(), encKey);
+        setLenderInfo(info);
+
+        const email  = info.email ?? info.emailId ?? '';
+        const mobile = info.mobileNumber ?? info.mobile ?? '';
+
+        if (_mobileVerified && _emailVerified) {
+          // Both verified — load deals and jump to preview
+          const dealsData = await getOxyloansLenderDeals(rawLenderId(), encKey);
+          setPersonalInfo(info);
+          setDeals(Array.isArray(dealsData?.lenderPaticipatedResponseDto)
+            ? dealsData.lenderPaticipatedResponseDto
+            : []);
+          setStep(3);
+        } else if (step === 2) {
+          // Mobile already verified — send email OTP
+          if (!email) throw new Error('No email address found for this account. Please contact support.');
+          const emailRes = await sendOxyloansUlpEmailOtp(email, rawLenderId());
+          emailSessionRef.current = emailRes?.emailOtpSession ?? emailRes?.sessionId ?? '';
+          emailSaltRef.current    = emailRes?.salt ?? '';
+        } else if (step === 1) {
+          // Send mobile OTP
+          const otpRes = await sendOxyloansUlpMobileOtp({
+            lenderId: rawLenderId(),
+            lenderName: info.lenderName ?? info.name ?? '',
+            mobileNumber: mobile,
+          });
+          mobileSessionRef.current = otpRes?.mobileOtpSession ?? otpRes?.sessionId ?? '';
+        }
+      } catch (e) {
+        setError(e.message ?? 'Failed to initialise verification');
+      } finally {
+        setLoading(false);
+      }
+    };
+    autoSend();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Step 1: verify mobile OTP → send email OTP (or skip if email already verified) ─
+  const handleVerifyMobile = async () => {
+    if (mobileOtpRef.current.replace(/\s/g, '').length < 6) { setError('Enter the 6-digit OTP sent to your mobile'); return; }
+    setLoading(true); clearError();
+    try {
+      await verifyOxyloansUlpMobileOtp({
+        mobileNumber: lenderInfo.mobileNumber ?? lenderInfo.mobile ?? '',
+        mobileOtp: mobileOtpRef.current,
+        otpSession: mobileSessionRef.current,
+      });
+
+      if (_emailVerified) {
+        // Email already verified — skip email OTP, go straight to preview
+        const dealsData = await getOxyloansLenderDeals(rawLenderId(), encryptedDataRef.current);
+        setPersonalInfo(lenderInfo);
+        setDeals(Array.isArray(dealsData?.lenderPaticipatedResponseDto)
+          ? dealsData.lenderPaticipatedResponseDto
+          : []);
+        setStep(3);
+      } else {
+        // Get the real email from lenderInfo (populated by getOxyloansLenderContactInfo)
+        const emailAddr = lenderInfo?.email ?? lenderInfo?.emailId ?? '';
+        if (!emailAddr) {
+          throw new Error('No email address found for this account. Please contact support to update your email.');
+        }
+        const emailRes = await sendOxyloansUlpEmailOtp(emailAddr, rawLenderId());
+        emailSessionRef.current = emailRes?.emailOtpSession ?? emailRes?.sessionId ?? '';
+        emailSaltRef.current    = emailRes?.salt ?? '';
+        setStep(2);
+      }
+    } catch (e) {
+      setError(e.message ?? 'Mobile OTP verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 2: verify email OTP → load profile + deals ─────────────────────
+  const handleVerifyEmail = async () => {
+    if (emailOtpRef.current.replace(/\s/g, '').length < 6) { setError('Enter the 6-digit OTP sent to your email'); return; }
+    setLoading(true); clearError();
+    try {
+      await verifyOxyloansUlpEmailOtp({
+        emailOtp: emailOtpRef.current,
+        emailOtpSession: emailSessionRef.current,
+        salt: emailSaltRef.current,
+        lenderId : rawLenderId()
+      });
+      const [profile, dealsData] = await Promise.all([
+        getOxyloansLenderContactInfo(rawLenderId(), encryptedDataRef.current),
+        getOxyloansLenderDeals(rawLenderId(), encryptedDataRef.current),
+      ]);
+      setPersonalInfo(profile);
+      setDeals(Array.isArray(dealsData) ? dealsData : (dealsData?.deals ?? dealsData?.data ?? []));
+      setStep(3);
+    } catch (e) {
+      setError(e.message ?? 'Email OTP verification failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Step 4: consent confirmed — only save lenderId AFTER user consents ──
+  const showToast = (title, msg1, msg2, onOk) => {
+    setToast({ title, msg1, msg2, onOk });
+  };
+
+  const handleConsent = () => {
+    localStorage.setItem('oxyloansLenderId', lenderId.trim());
+    setSuccess(true);
+    setStep(4);
+    showToast(
+      'Congratulations! 🎉',
+      `${lenderId || 'LR1234'} data has been successfully added to ULP.`,
+      'You can now review the Oxyloans portfolio in ULP',
+      () => { onConfirm?.(deals); onClose();getMigrationOxyloansUserInfo() }
+    );
+  };
+
+  const handleResendMobile = React.useCallback(async () => {
+    setLoading(true); clearError();
+    try {
+      const otpRes = await sendOxyloansUlpMobileOtp({
+        lenderId: rawLenderId(),
+        lenderName: lenderInfo?.lenderName ?? '',
+        mobileNumber: lenderInfo?.mobileNumber ?? '',
+      });
+      mobileSessionRef.current = otpRes?.mobileOtpSession ?? '';
+      mobileOtpRef.current = ''; setMobileOtpDone(false); setResendKey(k => k + 1);
+    } catch (e) { setError(e.message ?? 'Resend failed'); }
+    finally { setLoading(false); }
+  }, [lenderId, lenderInfo]); // eslint-disable-line
+
+  const handleResendEmail = React.useCallback(async () => {
+    setLoading(true); clearError();
+    try {
+      const emailAddr = lenderInfo?.email ?? lenderInfo?.emailId ?? '';
+      if (!emailAddr) {
+        throw new Error('No email address found for this account. Please contact support to update your email.');
+      }
+      const emailRes = await sendOxyloansUlpEmailOtp(emailAddr, rawLenderId());
+      emailSessionRef.current = emailRes?.emailOtpSession ?? '';
+      emailSaltRef.current    = emailRes?.salt ?? '';
+      emailOtpRef.current = ''; setEmailOtpDone(false); setResendKey(k => k + 1);
+    } catch (e) { setError(e.message ?? 'Resend failed'); }
+    finally { setLoading(false); }
+  }, [lenderInfo]); // eslint-disable-line
+
+  const fmtINR = (n) => n != null ? formatINR(Number(n)) : '—';
+
+  // ── header — vary text based on mode and verification state ─────────────
+  const stepTitle = isAddMember
+    ? ['Member Lender ID', 'Verify Mobile', 'Verify Email', 'Member Portfolio Preview', 'Member Added!']
+    : ['Find Your Lender ID', 'Verify Mobile Number', 'Verify Email Address', 'Your OxyLoans Portfolio', 'All Set!'];
+  const stepSub = [
+    isAddMember ? "Enter the new member's OxyLoans Lender ID" : 'Enter your OxyLoans Lender ID to proceed',
+    _emailVerified 
+    ? `Verify mobile to continue — email is already verified · ${lenderInfo ? maskMobile(lenderInfo.mobileNumber ?? lenderInfo.mobile) : '—'}` : `OTP sent to the mobile number registered with your OxyLoans Aggregator account: ${lenderInfo ? maskMobile(lenderInfo.mobileNumber ?? lenderInfo.mobile) : '—'}`, 
+    _mobileVerified 
+    ? `✓ Mobile verified — now verify the email registered with your OxyLoans Aggregator account: ${lenderInfo ? maskEmail(lenderInfo.email ?? lenderInfo.emailId) : '—'}` : `OTP sent to the email registered with your OxyLoans Aggregator account: ${lenderInfo ? maskEmail(lenderInfo.email ?? lenderInfo.emailId) : '—'}`,
+    isAddMember ? "Review the member's details before adding them" : 'Review your personal details and deals before sharing',
+    isAddMember ? 'Family member has been verified and added' : 'Your OxyLoans data will be shown below',
+  ];
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}>
+      <div
+        className="rounded-2xl overflow-hidden w-full flex flex-col"
+        style={{
+          maxWidth: step === 3 ? 680 : 460,
+          maxHeight: '92vh',
+          background: 'var(--surface-card)',
+          border: '1px solid var(--border)',
+          boxShadow: '0 32px 90px rgba(0,0,0,0.35)',
+          transition: 'max-width 0.4s cubic-bezier(0.34,1.2,0.64,1)',
+        }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* ── Header ── */}
+        <div className="px-6 pt-6 pb-4 flex-shrink-0" style={{ borderBottom: '1px solid var(--border)', background: isAddMember ? 'rgba(53,161,62,0.04)' : 'rgba(38,115,187,0.04)' }}>
+          <div className="flex items-start justify-between mb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+                style={isAddMember
+                  ? { background: 'rgba(53,161,62,0.12)', border: '1px solid rgba(53,161,62,0.28)', color: '#35a13e', boxShadow: '0 0 16px rgba(53,161,62,0.2)' }
+                  : { background: 'rgba(38,115,187,0.12)', border: '1px solid rgba(38,115,187,0.28)', color: '#2673bb', boxShadow: '0 0 16px rgba(38,115,187,0.2)' }}>
+                {isAddMember ? (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <line x1="19" y1="8" x2="19" y2="14"/>
+                    <line x1="16" y1="11" x2="22" y2="11"/>
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                    <path d="M9 9h6M9 13h6M9 17h4"/>
+                  </svg>
+                )}
+              </div>
+              <div>
+                <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>{stepTitle[step]}</h2>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{stepSub[step]}</p>
+              </div>
+            </div>
+            <button onClick={onClose}
+              className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110 flex-shrink-0"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+          </div>
+          <StepPills step={step} steps={OL_STEPS} />
+
+          {/* ── Verification status strip (shown on steps 1–3) ── */}
+          {step >= 1 && step <= 3 && (
+            <div className="flex items-center justify-center gap-3 mt-4">
+              {/* Mobile pill */}
+              <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                style={(_mobileVerified || step >= 2)
+                  ? { background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.28)' }
+                  : { background: 'rgba(245,131,17,0.08)', color: '#f58311', border: '1px solid rgba(245,131,17,0.25)' }}>
+                {(_mobileVerified || step >= 2)
+                  ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>}
+                Mobile {(_mobileVerified || step >= 2) ? 'Verified' : 'Pending'}
+              </div>
+
+              {/* Arrow */}
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+              </svg>
+
+              {/* Email pill */}
+              <div className="flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full"
+                style={(_emailVerified || step >= 3)
+                  ? { background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.28)' }
+                  : step === 2
+                    ? { background: 'rgba(38,115,187,0.1)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.25)' }
+                    : { background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                {(_emailVerified || step >= 3)
+                  ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  : step === 2
+                    ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><circle cx="12" cy="12" r="10"/></svg>}
+                Email {(_emailVerified || step >= 3) ? 'Verified' : step === 2 ? 'Pending' : 'Waiting'}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Body ── */}
+        <div className="overflow-y-auto flex-1">
+
+          {/* Error banner */}
+          {error && (
+            <div className="mx-6 mt-4 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2"
+              style={{ background: 'rgba(233,83,48,0.08)', color: '#e95330', border: '1px solid rgba(233,83,48,0.22)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              {error}
+            </div>
+          )}
+
+          {/* ── STEP 0: Enter Lender ID ── */}
+          {step === 0 && (
+            <OlPanel>
+              <div className="grid gap-1.5">
+                <label className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
+                  {isAddMember ? "Member's OxyLoans Lender ID" : 'OxyLoans Lender ID'}
+                </label>
+                <input
+                  autoFocus
+                  type="text"
+                  value={lenderId}
+                  onChange={e => { setLenderId(e.target.value); clearError(); }}
+                  onKeyDown={e => e.key === 'Enter' && handleCheckLender()}
+                  placeholder={isAddMember ? "e.g. LR-XXXXXX (member's ID)" : 'e.g. LR-XXXXXX'}
+                  className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all font-mono"
+                  style={{
+                    background: 'var(--input-bg)',
+                    border: `1px solid ${error ? '#e95330' : 'var(--border)'}`,
+                    color: 'var(--text-primary)',
+                    boxShadow: error ? '0 0 0 3px rgba(233,83,48,0.12)' : 'none',
+                    letterSpacing: 1,
+                  }}
+                />
+              </div>
+              <div className="px-4 py-3 rounded-xl text-xs" style={{ background: isAddMember ? 'rgba(53,161,62,0.06)' : 'rgba(38,115,187,0.06)', border: `1px solid ${isAddMember ? 'rgba(53,161,62,0.15)' : 'rgba(38,115,187,0.15)'}`, color: 'var(--text-muted)', lineHeight: 1.6 }}>
+                <strong style={{ color: isAddMember ? '#35a13e' : '#2673bb' }}>How it works:</strong>{' '}
+                {isAddMember
+                  ? "Enter the family member's Lender ID. We verify their identity via OTP before adding them to your family group."
+                  : 'We verify your identity through mobile and email OTP before showing your OxyLoans portfolio data.'}
+              </div>
+              <button
+                onClick={handleCheckLender}
+                disabled={loading || !lenderId.trim()}
+                className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+                style={isAddMember
+                  ? { background: 'linear-gradient(135deg,#35a13e,#22c55e)', color: '#fff', boxShadow: '0 4px 16px rgba(53,161,62,0.35)' }
+                  : { background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 16px rgba(38,115,187,0.35)' }}>
+                {loading ? <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} /> : null}
+                {loading ? 'Checking…' : 'Continue'}
+                {!loading && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>}
+              </button>
+            </OlPanel>
+          )}
+
+          {/* ── STEP 1: Mobile OTP ── */}
+          {step === 1 && (
+            <OlPanel>
+              {/* Lender info card */}
+              {lenderInfo && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                  style={{ background: 'rgba(53,161,62,0.07)', border: '1px solid rgba(53,161,62,0.2)' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center font-black text-sm flex-shrink-0"
+                    style={{ background: 'rgba(53,161,62,0.15)', border: '1px solid rgba(53,161,62,0.25)', color: '#35a13e' }}>
+                    {(lenderInfo.lenderName ?? lenderInfo.name ?? '?').charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{lenderInfo.lenderName ?? lenderInfo.name ?? 'Lender'}</p>
+                    <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{maskMobile(lenderInfo.mobileNumber ?? lenderInfo.mobile)}</p>
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.2)', fontWeight: 700 }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><polyline points="20 6 9 17 4 12"/></svg>
+                    Found · Step 1 of 2
+                  </div>
+                </div>
+              )}
+
+              {/* "What's next" hint */}
+              <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs"
+                style={{ background: 'rgba(38,115,187,0.06)', border: '1px solid rgba(38,115,187,0.15)', color: 'var(--text-muted)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#2673bb' }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                After mobile verification, you'll verify your <strong style={{ color: '#2673bb' }}>email address</strong> to complete identity confirmation.
+              </div>
+
+              <div>
+                <p className="text-sm font-semibold text-center mb-4" style={{ color: 'var(--text-primary)' }}>Enter 6-digit Mobile OTP</p>
+                <OtpBoxes length={6} resetKey={resendKey} onChange={onMobileOtpChange} disabled={loading} />
+                <ResendTimer key={resendKey} seconds={30} onResend={handleResendMobile} disabled={loading} />
+              </div>
+              <button
+                onClick={handleVerifyMobile}
+                disabled={loading || !mobileOtpDone}
+                className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+                style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 16px rgba(38,115,187,0.35)' }}>
+                {loading ? <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} /> : null}
+                {loading ? 'Verifying…' : 'Verify Mobile OTP'}
+                {!loading && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>}
+              </button>
+            </OlPanel>
+          )}
+
+          {/* ── STEP 2: Email OTP ── */}
+          {step === 2 && (
+            <OlPanel>
+              {/* ── Mobile verified success banner ── */}
+              <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                style={{ background: 'rgba(53,161,62,0.08)', border: '1px solid rgba(53,161,62,0.3)' }}>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(53,161,62,0.15)', border: '1px solid rgba(53,161,62,0.3)', color: '#35a13e' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold" style={{ color: '#35a13e' }}>Mobile Number Verified</p>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                    {lenderInfo ? maskMobile(lenderInfo.mobileNumber ?? lenderInfo.mobile) : '—'} · Now verify your email to continue
+                  </p>
+                </div>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0" style={{ color: '#2673bb' }}>
+                  <line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>
+                </svg>
+              </div>
+
+              {/* ── Email OTP target ── */}
+              {lenderInfo && (
+                <div className="flex items-center gap-3 px-4 py-3 rounded-xl"
+                  style={{ background: 'rgba(38,115,187,0.07)', border: '1px solid rgba(38,115,187,0.2)' }}>
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                    style={{ background: 'rgba(38,115,187,0.15)', border: '1px solid rgba(38,115,187,0.25)', color: '#2673bb' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>OTP sent to</p>
+                    {loading
+                      ? <p className="text-sm font-bold" style={{ color: 'var(--text-muted)' }}>Fetching email…</p>
+                      : (lenderInfo?.email ?? lenderInfo?.emailId)
+                        ? <p className="text-sm font-bold font-mono" style={{ color: 'var(--text-primary)' }}>{maskEmail(lenderInfo.email ?? lenderInfo.emailId)}</p>
+                        : <p className="text-sm font-bold" style={{ color: '#e95330' }}>No email on file — contact support</p>
+                    }
+                  </div>
+                  <div className="ml-auto flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full"
+                    style={{ background: 'rgba(38,115,187,0.1)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.2)', fontWeight: 700 }}>
+                    Step 2 of 2
+                  </div>
+                </div>
+              )}
+
+              {/* Show OTP input only when a valid email is available */}
+              {!loading && !(lenderInfo?.email ?? lenderInfo?.emailId) ? (
+                <div className="px-4 py-4 rounded-xl text-center"
+                  style={{ background: 'rgba(233,83,48,0.07)', border: '1px solid rgba(233,83,48,0.2)' }}>
+                  <p className="text-sm font-semibold" style={{ color: '#e95330' }}>
+                    No email address found for this account
+                  </p>
+                  <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
+                    Please contact OxyLoans support to add or update your registered email address.
+                  </p>
+                </div>
+              ) : (
+                <div>
+                  <p className="text-sm font-semibold text-center mb-4" style={{ color: 'var(--text-primary)' }}>Enter 6-digit Email OTP</p>
+                  <OtpBoxes length={6} resetKey={resendKey} onChange={onEmailOtpChange} disabled={loading} />
+                  <ResendTimer key={resendKey} seconds={30} onResend={handleResendEmail} disabled={loading} />
+                </div>
+              )}
+              <button
+                onClick={handleVerifyEmail}
+                disabled={loading || !emailOtpDone || !(lenderInfo?.email ?? lenderInfo?.emailId)}
+                className="w-full py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+                style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 16px rgba(38,115,187,0.35)' }}>
+                {loading ? <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} /> : null}
+                {loading ? 'Loading…' : 'Verify Email OTP'}
+                {!loading && <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>}
+              </button>
+            </OlPanel>
+          )}
+
+          {/* ── STEP 3: Preview personal details + deals ── */}
+          {step === 3 && (
+            <div className="ol-step-in px-6 py-5 grid gap-5">
+              {/* Personal Details */}
+              {personalInfo && (
+                <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(38,115,187,0.2)' }}>
+                  <div className="px-4 py-3 flex items-center gap-2" style={{ background: 'rgba(38,115,187,0.08)', borderBottom: '1px solid rgba(38,115,187,0.15)' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#2673bb' }}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#2673bb' }}>Personal Details</span>
+                  </div>
+                  <div className="p-4 grid grid-cols-2 gap-3">
+                    {[
+                      { label: 'Full Name',    value: personalInfo.lenderName ?? personalInfo.name    },
+                      { label: 'Date of Birth',value: personalInfo.dateOfBirth ?? personalInfo.dob    },
+                      { label: 'Mobile',       value: maskMobile(personalInfo.mobileNumber ?? personalInfo.mobile) },
+                      { label: 'Email',        value: maskEmail(personalInfo.email ?? personalInfo.emailId)        },
+                      { label: 'Address',      value: personalInfo.address ?? personalInfo.permanentAddress, full: true },
+                    ].filter(f => f.value).map(f => (
+                      <div key={f.label} className={f.full ? 'col-span-2' : ''}>
+                        <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.label}</p>
+                        <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{f.value}</p>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Bank Details */}
+                  {(personalInfo.bankName || personalInfo.accountNumber || personalInfo.ifsc) && (
+                    <>
+                      <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(53,161,62,0.06)', borderTop: '1px solid rgba(53,161,62,0.15)', borderBottom: '1px solid rgba(53,161,62,0.15)' }}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#35a13e' }}><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/></svg>
+                        <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#35a13e' }}>Bank Details</span>
+                      </div>
+                      <div className="p-4 grid grid-cols-2 gap-3">
+                        {[
+                          { label: 'Bank Name',   value: personalInfo.bankName },
+                          { label: 'Account No.', value: personalInfo.accountNumber ?? personalInfo.accNo },
+                          { label: 'IFSC',        value: personalInfo.ifsc ?? personalInfo.ifscCode },
+                          { label: 'Branch',      value: personalInfo.branch },
+                        ].filter(f => f.value).map(f => (
+                          <div key={f.label}>
+                            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.label}</p>
+                            <p className="text-sm font-semibold font-mono mt-0.5" style={{ color: 'var(--text-primary)' }}>{f.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Deals Table */}
+              {deals.length > 0 && (
+                <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(245,131,17,0.2)' }}>
+                  <div className="px-4 py-3 flex items-center justify-between" style={{ background: 'rgba(245,131,17,0.08)', borderBottom: '1px solid rgba(245,131,17,0.15)' }}>
+                    <div className="flex items-center gap-2">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#f58311' }}><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#f58311' }}>OxyLoans Deals</span>
+                    </div>
+                    <span className="text-xs px-2.5 py-1 rounded-full font-bold" style={{ background: 'rgba(245,131,17,0.12)', color: '#f58311', border: '1px solid rgba(245,131,17,0.25)' }}>
+                      {deals.length} deal{deals.length > 1 ? 's' : ''}
+                    </span>
+                  </div>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--table-header-bg)' }}>
+                          {['Deal Name', 'Amount', 'ROI', 'Status', 'Date'].map(h => (
+                            <th key={h} className="text-left py-2.5 px-3 uppercase tracking-wider font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deals.map((d, i) => {
+                          const status = d.dealStatus ?? d.status ?? 'Active';
+                          const statusColor = status === 'ACTIVE' || status === 'Active' ? '#35a13e' : status === 'CLOSED' || status === 'Closed' ? '#2673bb' : '#f58311';
+                          return (
+                            <tr key={i} style={{ borderBottom: '1px solid var(--table-row-border)' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <td className="py-2.5 px-3 font-semibold" style={{ color: 'var(--text-primary)' }}>{d.dealName ?? d.loanId ?? `Deal ${i + 1}`}</td>
+                              <td className="py-2.5 px-3 font-bold tabular-nums" style={{ color: '#2673bb' }}>{fmtINR(d.participationAmount ?? d.loanAmount ?? d.amount)}</td>
+                              <td className="py-2.5 px-3">
+                                <span className="font-black" style={{ color: '#f58311' }}>{d.roi ?? d.rateOfInterest ?? d.interestRate ?? '—'}%</span>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className="px-2 py-0.5 rounded-full font-bold" style={{ background: `${statusColor}12`, color: statusColor, border: `1px solid ${statusColor}25` }}>
+                                  {status}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-3" style={{ color: 'var(--text-muted)' }}>{d.participationDate ?? d.loanDate ?? d.createdDate ?? '—'}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
+
+              {/* Consent */}
+              <div className="rounded-2xl p-4" style={{ background: 'rgba(245,131,17,0.05)', border: '1px solid rgba(245,131,17,0.18)' }}>
+                <div className="flex items-start gap-2.5">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#f58311' }}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                  <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
+                    By clicking <strong style={{ color: 'var(--text-primary)' }}>Confirm &amp; Show Deals</strong>, you consent to display your OxyLoans lending data in this dashboard. Your data is fetched securely and is not stored by us.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={onClose}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80"
+                  style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+                  Cancel
+                </button>
+                <button onClick={handleConsent}
+                  className="flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:scale-[1.02]"
+                  style={{ background: 'linear-gradient(135deg,#35a13e,#22c55e)', color: '#fff', boxShadow: '0 4px 16px rgba(53,161,62,0.35)' }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="20 6 9 17 4 12"/></svg>
+                  Confirm &amp; Show Deals
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ── STEP 4: Success ── */}
+          {step === 4 && (() => {
+            // Merge lenderInfo + personalInfo so we always surface the richest data
+            const pi = personalInfo ?? lenderInfo ?? {};
+            const name      = pi.lenderName    ?? pi.name        ?? lenderInfo?.lenderName ?? lenderInfo?.name;
+            const dob       = pi.dateOfBirth   ?? pi.dob;
+            const mobile    = pi.mobileNumber  ?? pi.mobile      ?? lenderInfo?.mobileNumber ?? lenderInfo?.mobile;
+            const email     = pi.email         ?? pi.emailId     ?? lenderInfo?.email ?? lenderInfo?.emailId;
+            const address   = pi.address       ?? pi.permanentAddress;
+            const nominee   = pi.nomineeName   ?? pi.nominee     ?? pi.nomineeDetails;
+            const nomRel    = pi.nomineeRelation ?? pi.nomineeRelationship;
+            const nomMobile = pi.nomineeMobile ?? pi.nomineeContact;
+            const bankName  = pi.bankName;
+            const accNo     = pi.accountNumber ?? pi.accNo;
+            const ifsc      = pi.ifsc          ?? pi.ifscCode;
+            const branch    = pi.branch;
+            const hasProfile = name || dob || address || mobile || email;
+            const hasNominee = nominee;
+            const hasBank    = bankName || accNo || ifsc || branch;
+
+            return (
+              <div className="ol-step-in px-6 py-6 flex flex-col gap-5">
+                {/* ── Success badge + title ── */}
+                <div className="flex flex-col items-center gap-3 text-center pt-2">
+                  <div className="ol-tick-pop w-16 h-16 rounded-full flex items-center justify-center"
+                    style={{ background: 'linear-gradient(135deg,rgba(53,161,62,0.2),rgba(53,161,62,0.08))', border: '2px solid rgba(53,161,62,0.4)', boxShadow: '0 0 30px rgba(53,161,62,0.25)' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="#35a13e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-9 h-9">
+                      <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                      {isAddMember ? 'Member Verified!' : 'Identity Verified!'}
+                    </h3>
+                    <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                      {isAddMember
+                        ? 'The family member has been verified and added to your group.'
+                        : 'Your OxyLoans portfolio data has been loaded successfully.'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* ── Quick stats bar ── */}
+                <div className="flex items-center justify-center gap-4 px-5 py-3 rounded-2xl" style={{ background: 'rgba(53,161,62,0.07)', border: '1px solid rgba(53,161,62,0.2)' }}>
+                  <div className="text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#35a13e' }}>
+                      {isAddMember ? 'Member LR ID' : 'Deals Loaded'}
+                    </p>
+                    <p className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                      {isAddMember ? (lenderId || '—') : deals.length}
+                    </p>
+                  </div>
+                  <div className="w-px h-8" style={{ background: 'rgba(53,161,62,0.2)' }} />
+                  <div className="text-center">
+                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#2673bb' }}>
+                      {isAddMember ? 'Name' : 'Total Invested'}
+                    </p>
+                    <p className="text-2xl font-extrabold" style={{ color: 'var(--text-primary)' }}>
+                      {isAddMember
+                        ? (lenderInfo?.lenderName ?? lenderInfo?.name ?? '—')
+                        : fmtINR(deals.reduce((s, d) => s + Number(d.participationAmount ?? d.loanAmount ?? d.amount ?? 0), 0))}
+                    </p>
+                  </div>
+                </div>
+
+                {/* ── Personal details card ── */}
+                {hasProfile && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(38,115,187,0.2)' }}>
+                    <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(38,115,187,0.08)', borderBottom: '1px solid rgba(38,115,187,0.15)' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#2673bb' }}>
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
+                      </svg>
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#2673bb' }}>Personal Details</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Full Name',    value: name },
+                        { label: 'Date of Birth',value: dob  },
+                        { label: 'Mobile',       value: mobile  ? maskMobile(mobile)  : null },
+                        { label: 'Email',        value: email   ? maskEmail(email)    : null },
+                        { label: 'Address',      value: address, full: true },
+                      ].filter(f => f.value).map(f => (
+                        <div key={f.label} className={f.full ? 'col-span-2' : ''}>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.label}</p>
+                          <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)', wordBreak: 'break-word' }}>{f.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Nominee details card ── */}
+                {hasNominee && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(147,51,234,0.2)' }}>
+                    <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(147,51,234,0.07)', borderBottom: '1px solid rgba(147,51,234,0.15)' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#9333ea' }}>
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                      </svg>
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#9333ea' }}>Nominee Details</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Nominee Name',     value: nominee    },
+                        { label: 'Relationship',     value: nomRel     },
+                        { label: 'Nominee Mobile',   value: nomMobile  },
+                      ].filter(f => f.value).map(f => (
+                        <div key={f.label}>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.label}</p>
+                          <p className="text-sm font-semibold mt-0.5" style={{ color: 'var(--text-primary)' }}>{f.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Bank details card ── */}
+                {hasBank && (
+                  <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(53,161,62,0.2)' }}>
+                    <div className="px-4 py-2.5 flex items-center gap-2" style={{ background: 'rgba(53,161,62,0.07)', borderBottom: '1px solid rgba(53,161,62,0.15)' }}>
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4" style={{ color: '#35a13e' }}>
+                        <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/>
+                      </svg>
+                      <span className="text-xs font-bold uppercase tracking-wider" style={{ color: '#35a13e' }}>Bank Details</span>
+                    </div>
+                    <div className="p-4 grid grid-cols-2 gap-3">
+                      {[
+                        { label: 'Bank Name',   value: bankName },
+                        { label: 'Account No.', value: accNo    },
+                        { label: 'IFSC',        value: ifsc     },
+                        { label: 'Branch',      value: branch   },
+                      ].filter(f => f.value).map(f => (
+                        <div key={f.label}>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{f.label}</p>
+                          <p className="text-sm font-semibold font-mono mt-0.5" style={{ color: 'var(--text-primary)' }}>{f.value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Close button ── */}
+                <button onClick={onClose}
+                  className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+                  style={{ background: 'linear-gradient(135deg,#2673bb,#1a5a9e)', color: '#fff', boxShadow: '0 4px 16px rgba(38,115,187,0.35)' }}>
+                  {isAddMember ? 'Done' : 'Close'}
+                </button>
+              </div>
+            );
+          })()}
+        </div>
+      </div>
+
+      {/* ── Success modal ── */}
+      {toast && (
+        <div
+          className="fixed inset-0 z-[210] flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}>
+          <div
+            className="flex flex-col items-center gap-4 rounded-3xl px-8 py-8 text-center"
+            style={{
+              background: 'var(--surface-card)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 32px 90px rgba(0,0,0,0.35)',
+              maxWidth: 380,
+              width: '100%',
+              animation: 'olStepIn 0.38s cubic-bezier(0.34,1.2,0.64,1) both',
+            }}>
+            {/* Green circle tick */}
+            <div className="ol-tick-pop w-16 h-16 rounded-full flex items-center justify-center flex-shrink-0"
+              style={{ background: 'linear-gradient(135deg,rgba(53,161,62,0.18),rgba(53,161,62,0.08))', border: '2px solid rgba(53,161,62,0.45)', boxShadow: '0 0 28px rgba(53,161,62,0.25)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="#35a13e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-9 h-9">
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+            </div>
+            {/* Title */}
+            <h3 className="text-xl font-extrabold leading-tight" style={{ color: 'var(--text-primary)' }}>
+              {toast.title}
+            </h3>
+            {/* Messages */}
+            <div className="flex flex-col gap-1.5">
+              <p className="text-sm font-medium leading-snug" style={{ color: 'var(--text-secondary, var(--text-muted))' }}>
+                {toast.msg1}
+              </p>
+              <p className="text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
+                {toast.msg2}
+              </p>
+            </div>
+            {/* OK button */}
+            <button
+              onClick={() => { setToast(null); toast.onOk?.(); }}
+              className="w-full py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02] mt-1"
+              style={{ background: 'linear-gradient(135deg,#35a13e,#22c55e)', color: '#fff', boxShadow: '0 4px 16px rgba(53,161,62,0.35)' }}>
+              OK
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Family Member Modal (OxyLoans only) ─────────────────────────────────────
+// Shown after "Get OxyLoans Data" completes when the user has 2+ family members.
+// Lets the user select a Head of Family who becomes the primary support contact.
+function FamilyMemberModal({ members, currentHeadId, onSetHead, onRemove, onClose }) {
+  const [selectedId, setSelectedId]   = useState(currentHeadId ?? '');
+  const [saving, setSaving]           = useState(false);
+  const [removing, setRemoving]       = useState(null); // memberId being removed
+  const [toast, setToast]             = useState(null); // { msg, type }
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSetHead = async () => {
+    if (!selectedId) { showToast('Please select a member first', 'error'); return; }
+    if (selectedId === currentHeadId) { onClose(); return; }
+    setSaving(true);
+    const result = await onSetHead(selectedId);
+    setSaving(false);
+    if (result?.success) {
+      showToast('Head of Family updated successfully');
+      setTimeout(onClose, 1200);
+    } else {
+      showToast(result?.error ?? 'Failed to update Head of Family', 'error');
+    }
+  };
+
+  const handleRemoveConfirm = async () => {
+    if (!confirmRemoveId) return;
+    setRemoving(confirmRemoveId);
+    setConfirmRemoveId(null);
+    const result = await onRemove(confirmRemoveId);
+    setRemoving(null);
+    if (result?.success) {
+      showToast('Member removed successfully');
+    } else {
+      showToast(result?.error ?? 'Failed to remove member', 'error');
+    }
+  };
+
+  const visibleMembers = members.filter(m => m.id !== (removing));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)' }}
+      onClick={onClose}>
+      <div
+        className="rounded-2xl overflow-hidden w-full flex flex-col"
+        style={{
+          maxWidth: 520,
+          maxHeight: '92vh',
+          background: 'var(--surface-card)',
+          border: '1px solid var(--border)',
+          boxShadow: '0 32px 90px rgba(0,0,0,0.35)',
+        }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="px-6 pt-5 pb-4 flex-shrink-0 flex items-start justify-between"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(245,131,17,0.04)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(245,131,17,0.12)', border: '1px solid rgba(245,131,17,0.3)', color: '#f58311', boxShadow: '0 0 16px rgba(245,131,17,0.2)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            </div>
+            <div>
+              <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Family Members</h2>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                Select the Head of Family for OxyLoans support contact
+              </p>
+            </div>
+          </div>
+          <button onClick={onClose}
+            className="w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-110 flex-shrink-0"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+            </svg>
+          </button>
+        </div>
+
+        {/* Toast */}
+        {toast && (
+          <div className="mx-5 mt-4 px-4 py-2.5 rounded-xl text-xs font-semibold flex items-center gap-2 flex-shrink-0"
+            style={{
+              background: toast.type === 'error' ? 'rgba(233,83,48,0.08)' : 'rgba(53,161,62,0.08)',
+              color: toast.type === 'error' ? '#e95330' : '#35a13e',
+              border: `1px solid ${toast.type === 'error' ? 'rgba(233,83,48,0.22)' : 'rgba(53,161,62,0.22)'}`,
+            }}>
+            {toast.type === 'error'
+              ? <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+              : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            }
+            {toast.msg}
+          </div>
+        )}
+
+        {/* Info banner */}
+        <div className="mx-5 mt-4 px-4 py-3 rounded-xl text-xs flex-shrink-0"
+          style={{ background: 'rgba(38,115,187,0.06)', border: '1px solid rgba(38,115,187,0.15)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+          <strong style={{ color: '#2673bb' }}>Head of Family</strong> is the primary contact for all OxyLoans support
+          queries raised by any family member. They can also manage (remove) members from this group.
+        </div>
+
+        {/* Scrollable member list */}
+        <div className="overflow-y-auto flex-1 px-5 py-4 grid gap-3">
+          {visibleMembers.length === 0 && (
+            <div className="text-center py-10" style={{ color: 'var(--text-muted)' }}>
+              <p className="text-sm font-medium">No family members linked via OxyLoans</p>
+            </div>
+          )}
+          {visibleMembers.map(m => {
+            const isHead     = m.id === currentHeadId || m.isHeadOfFamily;
+            const isSelected = selectedId === m.id;
+            const isRemoving = removing === m.id;
+            return (
+              <div
+                key={m.id}
+                className="relative rounded-2xl p-4 transition-all cursor-pointer"
+                style={{
+                  background: isSelected
+                    ? 'linear-gradient(135deg,rgba(245,131,17,0.1),rgba(245,131,17,0.04))'
+                    : 'var(--card-bg)',
+                  border: isSelected
+                    ? '1.5px solid rgba(245,131,17,0.5)'
+                    : '1px solid var(--border)',
+                  boxShadow: isSelected ? '0 0 0 3px rgba(245,131,17,0.12)' : 'none',
+                  opacity: isRemoving ? 0.5 : 1,
+                }}
+                onClick={() => !isRemoving && setSelectedId(m.id)}>
+
+                {/* Head of Family crown badge */}
+                {isHead && (
+                  <span className="absolute top-3 right-3 text-xs px-2.5 py-0.5 rounded-full font-bold flex items-center gap-1"
+                    style={{ background: 'rgba(245,131,17,0.15)', color: '#f58311', border: '1px solid rgba(245,131,17,0.3)' }}>
+                    <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3"><path d="M2 20h20v2H2zM4 18l4-10 4 4 4-8 4 10H4z"/></svg>
+                    Head of Family
+                  </span>
+                )}
+
+                <div className="flex items-center gap-3">
+                  {/* Radio indicator */}
+                  <div className="w-5 h-5 rounded-full flex-shrink-0 flex items-center justify-center"
+                    style={{
+                      border: `2px solid ${isSelected ? '#f58311' : 'var(--border)'}`,
+                      background: isSelected ? '#f58311' : 'transparent',
+                    }}>
+                    {isSelected && <div className="w-2 h-2 rounded-full bg-white" />}
+                  </div>
+
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0"
+                    style={{ background: 'rgba(245,131,17,0.12)', color: '#f58311', border: '1px solid rgba(245,131,17,0.25)' }}>
+                    {(m.name ?? '?').charAt(0).toUpperCase()}
+                  </div>
+
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{m.name ?? '—'}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {m.lrId && (
+                        <span className="font-mono text-xs font-semibold" style={{ color: '#f58311' }}>{m.lrId}</span>
+                      )}
+                      {m.relation && (
+                        <span className="text-xs px-2 py-0.5 rounded-full"
+                          style={{ background: 'rgba(38,115,187,0.08)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.18)' }}>
+                          {m.relation}
+                        </span>
+                      )}
+                      {m.phone && (
+                        <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{m.phone}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Remove button */}
+                  {!isHead && (
+                    <button
+                      onClick={e => { e.stopPropagation(); setConfirmRemoveId(m.id); }}
+                      disabled={!!removing}
+                      className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 transition-all hover:scale-110 disabled:opacity-40"
+                      style={{ background: 'rgba(233,83,48,0.08)', color: '#e95330', border: '1px solid rgba(233,83,48,0.2)' }}
+                      title="Remove member">
+                      {isRemoving
+                        ? <span className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#e95330', borderTopColor: 'transparent' }} />
+                        : <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+                      }
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Confirm remove dialog */}
+        {confirmRemoveId && (
+          <div className="mx-5 mb-2 px-4 py-3 rounded-xl flex items-center justify-between gap-3 flex-shrink-0"
+            style={{ background: 'rgba(233,83,48,0.06)', border: '1px solid rgba(233,83,48,0.2)' }}>
+            <p className="text-xs font-semibold flex-1" style={{ color: '#e95330' }}>
+              Remove <strong>{visibleMembers.find(m => m.id === confirmRemoveId)?.name ?? 'this member'}</strong> from the family group?
+            </p>
+            <div className="flex gap-2 flex-shrink-0">
+              <button onClick={() => setConfirmRemoveId(null)}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:opacity-80"
+                style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                Cancel
+              </button>
+              <button onClick={handleRemoveConfirm}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold text-white transition-all hover:opacity-90"
+                style={{ background: '#e95330' }}>
+                Remove
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Footer actions */}
+        <div className="px-5 pb-5 pt-3 flex items-center gap-3 flex-shrink-0"
+          style={{ borderTop: '1px solid var(--border)' }}>
+          <button onClick={onClose}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-80 flex-shrink-0"
+            style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+            Cancel
+          </button>
+          <button
+            onClick={handleSetHead}
+            disabled={saving || !selectedId}
+            className="flex-1 py-2.5 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-all hover:opacity-90 hover:scale-[1.02] disabled:opacity-50 disabled:scale-100"
+            style={{ background: 'linear-gradient(135deg,#f58311,#d96b00)', color: '#fff', boxShadow: '0 4px 16px rgba(245,131,17,0.35)' }}>
+            {saving && <span className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#fff', borderTopColor: 'transparent' }} />}
+            {saving ? 'Saving…' : 'Set as Head of Family'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── OxyLoans Deals Section (shown after confirmed OR after auto-load from migration info) ───
+// ── Helper: extract the correct amount from a lenderPaticipatedResponseDto item ──
+function olDealAmt(d) {
+  // API spells it "paticipatedAmount" (typo). Fall back to other common fields.
+  return Number(d?.paticipatedAmount ?? d?.participatedAmount ?? d?.participationAmount ?? d?.loanAmount ?? d?.amount ?? d?.currentValue ?? 0);
+}
+// ── Helper: extract status from API deal ──
+function olDealStatus(d) {
+  return (d?.currentStatus ?? d?.participationStatus ?? d?.dealStatus ?? d?.status ?? '').toString();
+}
+// ── Helper: ROI ──
+function olDealRoi(d) {
+  return d?.rateOfInterest ?? d?.roi ?? d?.interestRate ?? null;
+}
+// ── Helper: return type label ──
+function olReturnTypeLabel(t) {
+  if (!t) return null;
+  const m = { MONTHLY: 'Monthly', YEARLY: 'Yearly', QUARTERLY: 'Quarterly', HALFYEARLY: 'Half-Yearly', ENDOFTHEDEAL: 'End of Deal' };
+  return m[(t ?? '').toUpperCase()] ?? t;
+}
+
+// ── Mini SVG bar chart for ROI distribution ──────────────────────────────────
+function OLRoiBarChart({ deals, accent }) {
+  const [animated, setAnimated] = useState(false);
+  useEffect(() => { const t = setTimeout(() => setAnimated(true), 100); return () => clearTimeout(t); }, []);
+
+  // Group by ROI bucket
+  const buckets = {};
+  deals.forEach(d => {
+    const roi = Number(olDealRoi(d) ?? 0);
+    const bucket = roi.toFixed(2) + '%';
+    if (!buckets[bucket]) buckets[bucket] = { roi, count: 0, amount: 0 };
+    buckets[bucket].count++;
+    buckets[bucket].amount += olDealAmt(d);
+  });
+  const entries = Object.entries(buckets).sort((a, b) => a[1].roi - b[1].roi);
+  if (!entries.length) return null;
+  const maxAmt = Math.max(...entries.map(([, v]) => v.amount));
+
+  return (
+    <div className="rounded-2xl p-4"
+      style={{ background: 'var(--surface-card)', border: `1px solid ${accent}20` }}>
+      <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accent }}>ROI Distribution</p>
+      <div className="flex items-end gap-2" style={{ height: 72 }}>
+        {entries.map(([label, v]) => {
+          const pct = maxAmt > 0 ? (v.amount / maxAmt) * 100 : 0;
+          return (
+            <div key={label} className="flex-1 flex flex-col items-center gap-1 group">
+              <div className="relative w-full flex flex-col justify-end" style={{ height: 60 }}>
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 opacity-0 group-hover:opacity-100 transition-opacity
+                  text-xs px-1.5 py-0.5 rounded whitespace-nowrap pointer-events-none z-10"
+                  style={{ background: `${accent}ee`, color: '#fff', fontSize: 9 }}>
+                  {v.count} deal{v.count !== 1 ? 's' : ''} · {formatINR(v.amount)}
+                </div>
+                <div className="w-full rounded-t transition-all duration-700"
+                  style={{
+                    height: animated ? `${pct}%` : '0%',
+                    background: `linear-gradient(180deg,${accent}99,${accent})`,
+                    boxShadow: `0 0 8px ${accent}44`,
+                    minHeight: animated ? 4 : 0,
+                  }} />
+              </div>
+              <span style={{ color: 'var(--text-muted)', fontSize: 8 }}>{label}</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ── Mini donut: status breakdown ─────────────────────────────────────────────
+function OLStatusDonut({ deals, accent }) {
+  const STATUS_COLORS = { RUNNING: '#35a13e', CLOSED: '#2673bb', PENDING: '#f58311', ACHIEVED: '#818cf8' };
+  const counts = {};
+  deals.forEach(d => {
+    const s = olDealStatus(d).toUpperCase() || 'UNKNOWN';
+    counts[s] = (counts[s] ?? 0) + 1;
+  });
+  const total = deals.length;
+  const entries = Object.entries(counts);
+  if (!entries.length) return null;
+
+  // SVG donut — r=28 cx=36 cy=36
+  const r = 28, cx = 36, cy = 36;
+  const circ = 2 * Math.PI * r;
+  let offset = 0;
+  const segments = entries.map(([status, count]) => {
+    const frac = count / total;
+    const len  = frac * circ;
+    const seg  = { status, count, frac, len, offset };
+    offset += len;
+    return seg;
+  });
+
+  return (
+    <div className="rounded-2xl p-4"
+      style={{ background: 'var(--surface-card)', border: `1px solid ${accent}20` }}>
+      <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accent }}>Status Breakdown</p>
+      <div className="flex items-center gap-4">
+        <svg width={72} height={72} viewBox="0 0 72 72" style={{ flexShrink: 0 }}>
+          {segments.map(seg => {
+            const color = STATUS_COLORS[seg.status] ?? '#999';
+            return (
+              <circle key={seg.status}
+                cx={cx} cy={cy} r={r}
+                fill="none"
+                stroke={color}
+                strokeWidth={10}
+                strokeDasharray={`${seg.len} ${circ - seg.len}`}
+                strokeDashoffset={-seg.offset}
+                style={{ transition: 'stroke-dasharray 0.6s ease' }}
+              />
+            );
+          })}
+          <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="middle"
+            style={{ fontSize: 11, fontWeight: 800, fill: 'var(--text-primary)' }}>
+            {total}
+          </text>
+          <text x={cx} y={cy + 13} textAnchor="middle" dominantBaseline="middle"
+            style={{ fontSize: 7, fill: 'var(--text-muted)' }}>
+            deals
+          </text>
+        </svg>
+        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+          {segments.map(seg => {
+            const color = STATUS_COLORS[seg.status] ?? '#999';
+            return (
+              <div key={seg.status} className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: color }} />
+                <span className="text-xs flex-1 truncate" style={{ color: 'var(--text-muted)' }}>{seg.status.charAt(0) + seg.status.slice(1).toLowerCase()}</span>
+                <span className="text-xs font-bold" style={{ color }}>{seg.count}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Mini bar: return type mix ─────────────────────────────────────────────────
+function OLReturnTypeChart({ deals, accent }) {
+  const counts = {};
+  deals.forEach(d => {
+    const rt = olReturnTypeLabel(d.lederReturnType ?? d.ledgerReturnType ?? d.returnType) ?? 'Unknown';
+    counts[rt] = (counts[rt] ?? 0) + 1;
+  });
+  const entries = Object.entries(counts);
+  if (!entries.length) return null;
+  const max = Math.max(...entries.map(([, v]) => v));
+  const COLORS = ['#2673bb', '#f58311', '#35a13e', '#818cf8', '#06b6d4', '#e95330'];
+
+  return (
+    <div className="rounded-2xl p-4"
+      style={{ background: 'var(--surface-card)', border: `1px solid ${accent}20` }}>
+      <p className="text-xs font-bold uppercase tracking-widest mb-3" style={{ color: accent }}>Return Type Mix</p>
+      <div className="flex flex-col gap-2">
+        {entries.map(([label, count], i) => (
+          <div key={label} className="flex items-center gap-2">
+            <span className="text-xs w-20 flex-shrink-0 truncate" style={{ color: 'var(--text-muted)' }}>{label}</span>
+            <div className="flex-1 h-5 rounded-full overflow-hidden" style={{ background: 'var(--input-bg)' }}>
+              <div className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${(count / max) * 100}%`, background: `linear-gradient(90deg,${COLORS[i % COLORS.length]}99,${COLORS[i % COLORS.length]})` }} />
+            </div>
+            <span className="text-xs font-bold w-5 text-right flex-shrink-0" style={{ color: COLORS[i % COLORS.length] }}>{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function OxyLoansDealsSection({ deals, memberColor, meta }) {
+  const [tab, setTab] = useState('all');
+  const [expandedId, setExpandedId] = useState(null);
+  const accent = '#f58311';
+  const fmtINR = (n) => formatINR(Number(n ?? 0));
+
+  // ── Correct field extraction using actual API field names ──────────────────
+  const getDealAmt    = olDealAmt;
+  const getDealStatus = olDealStatus;
+  const getDealRoi    = olDealRoi;
+
+  // ── Derive status group for filter tabs ───────────────────────────────────
+  const getStatusGroup = (d) => {
+    const s = getDealStatus(d).toUpperCase();
+    if (s === 'RUNNING') return 'running';
+    if (s === 'CLOSED' || s === 'CLOSING') return 'closed';
+    return 'other';
+  };
+
+  const running = deals.filter(d => getStatusGroup(d) === 'running');
+  const closed  = deals.filter(d => getStatusGroup(d) === 'closed');
+  const visible = tab === 'running' ? running : tab === 'closed' ? closed : deals;
+
+  // ── Aggregate KPIs ─────────────────────────────────────────────────────────
+  const totalParticipated = deals.reduce((s, d) => s + getDealAmt(d), 0);
+  const runningAmt        = running.reduce((s, d) => s + getDealAmt(d), 0);
+  const avgRoi            = deals.length
+    ? (deals.reduce((s, d) => s + Number(getDealRoi(d) ?? 0), 0) / deals.length).toFixed(2)
+    : '0.00';
+  const withdrawable      = deals.filter(d => (d.withdrawStatus ?? '').toUpperCase() === 'YES').length;
+
+  const TABS = [
+    { key: 'all',     label: 'All',     count: deals.length,   color: accent    },
+    { key: 'running', label: 'Running', count: running.length, color: '#35a13e' },
+    { key: 'closed',  label: 'Closed',  count: closed.length,  color: '#2673bb' },
+  ];
+
+  const statusChipStyle = (s) => {
+    const u = s.toUpperCase();
+    if (u === 'RUNNING')  return { bg: 'rgba(53,161,62,0.1)',  color: '#35a13e',  border: 'rgba(53,161,62,0.25)'  };
+    if (u === 'CLOSED')   return { bg: 'rgba(38,115,187,0.1)', color: '#2673bb',  border: 'rgba(38,115,187,0.25)' };
+    if (u === 'ACHIEVED') return { bg: 'rgba(129,140,248,0.1)',color: '#818cf8',  border: 'rgba(129,140,248,0.25)'};
+    return                       { bg: `${accent}10`,          color: accent,     border: `${accent}25`           };
+  };
+
+  return (
+    <div className="grid gap-5">
+      {/* ── Section header ── */}
+      <SectionHeader icon={I.BarChart} accent={accent} platform="OxyLoans" title="My OxyLoans Deals" live />
+
+      {/* ── Lender identity strip ── */}
+      {meta && (meta.lenderName || meta.mobile) && (
+        <div className="flex items-center gap-4 px-4 py-3 rounded-2xl flex-wrap"
+          style={{ background: 'rgba(245,131,17,0.05)', border: '1px solid rgba(245,131,17,0.15)' }}>
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+            style={{ background: 'rgba(245,131,17,0.12)', color: accent }}>
+            <I.Users />
+          </div>
+          <div className="flex-1 min-w-0">
+            {meta.lenderName && <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{meta.lenderName}</p>}
+            {meta.mobile     && <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>{meta.mobile}</p>}
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            {meta.totalAmt != null && (
+              <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                style={{ background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.2)' }}>
+                Running: {fmtINR(meta.totalAmt)}
+              </span>
+            )}
+            <span className="text-xs px-2.5 py-1 rounded-full font-semibold"
+              style={{ background: 'rgba(245,131,17,0.1)', color: accent, border: `1px solid rgba(245,131,17,0.25)` }}>
+              {meta.totalCount ?? deals.length} total deals
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── KPI Cards ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Total Participated', value: fmtINR(totalParticipated), sub: `${deals.length} deal${deals.length !== 1 ? 's' : ''}`,   color: accent    },
+          { label: 'Running Amount',     value: fmtINR(runningAmt),        sub: `${running.length} active`,                               color: '#35a13e' },
+          { label: 'Avg ROI',            value: `${avgRoi}%`,              sub: 'across all deals',                                       color: '#818cf8' },
+          { label: 'Withdrawable',       value: String(withdrawable),      sub: 'deals with withdraw: YES',                               color: '#2673bb' },
+        ].map(k => (
+          <div key={k.label} className="rounded-xl p-4 flex flex-col gap-1"
+            style={{ background: `${k.color}08`, border: `1px solid ${k.color}20` }}>
+            <p className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{k.label}</p>
+            <p className="text-xl font-extrabold" style={{ color: k.color }}>{k.value}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{k.sub}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Graphs row ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <OLStatusDonut deals={deals} accent={accent} />
+        <OLRoiBarChart deals={deals} accent={accent} />
+        <OLReturnTypeChart deals={deals} accent={accent} />
+      </div>
+
+      {/* ── Filter tabs ── */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {TABS.map(t => {
+          const active = tab === t.key;
+          return (
+            <button key={t.key} onClick={() => setTab(t.key)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all"
+              style={{
+                background: active ? `${t.color}18` : 'var(--input-bg)',
+                color:      active ? t.color : 'var(--text-muted)',
+                border:     `1.5px solid ${active ? t.color : 'var(--border)'}`,
+                boxShadow:  active ? `0 0 10px ${t.color}22` : 'none',
+              }}>
+              <span className="w-2 h-2 rounded-full" style={{ background: t.color }} />
+              {t.label}
+              <span className="ml-1 text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                style={{ background: `${t.color}18`, color: t.color }}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+        <div className="ml-auto">
+          <span className="text-xs px-3 py-1.5 rounded-full font-semibold"
+            style={{ background: `${accent}0e`, color: accent, border: `1px solid ${accent}25` }}>
+            {fmtINR(visible.reduce((s, d) => s + getDealAmt(d), 0))} shown
+          </span>
+        </div>
+      </div>
+
+      {/* ── Deal cards ── */}
+      <div className="grid gap-3">
+        {visible.length === 0 ? (
+          <div className="py-12 text-center rounded-2xl"
+            style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+            <p className="text-2xl mb-2">📭</p>
+            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>No deals in this view</p>
+          </div>
+        ) : visible.map((d, i) => {
+          const amt        = getDealAmt(d);
+          const roi        = getDealRoi(d);
+          const status     = getDealStatus(d);
+          const sc         = statusChipStyle(status);
+          const returnType = olReturnTypeLabel(d.lederReturnType ?? d.ledgerReturnType ?? d.returnType);
+          const name       = d.dealName ?? `Deal #${d.dealId ?? i + 1}`;
+          const borrower   = d.dealBorrowerName ?? '—';
+          const firstInt   = d.firstInterestDate ?? null;
+          const regDate    = d.registeredDate ?? null;
+          const withdraw   = d.withdrawStatus ?? '—';
+          const isExpanded = expandedId === (d.dealId ?? i);
+          const accentCols = [accent, '#2673bb', '#35a13e', '#818cf8', '#06b6d4', '#e95330'];
+          const cardAccent = accentCols[i % accentCols.length];
+
+          return (
+            <div key={d.dealId ?? i}
+              className="rounded-2xl overflow-hidden transition-all"
+              style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+
+              {/* Main row */}
+              <div className="flex items-stretch">
+                <div className="w-1 flex-shrink-0" style={{ background: cardAccent }} />
+                <div className="flex-1 p-4 min-w-0">
+                  {/* Name + badges */}
+                  <div className="flex items-start justify-between gap-3 flex-wrap">
+                    <div className="min-w-0">
+                      <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{name}</p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {borrower}{d.dealDuration ? ` · ${d.dealDuration} mo` : ''}
+                        {regDate ? ` · ${regDate}` : ''}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-shrink-0 flex-wrap">
+                      <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                        style={{ background: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                        <span className="inline-block w-1.5 h-1.5 rounded-full mr-1"
+                          style={{ background: sc.color, boxShadow: `0 0 4px ${sc.color}` }} />
+                        {status || 'Unknown'}
+                      </span>
+                      {(d.withdrawStatus ?? '').toUpperCase() === 'YES' && (
+                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.2)' }}>
+                          Withdrawable
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* KPI chips */}
+                  <div className="flex items-center gap-4 mt-3 flex-wrap">
+                    <div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Participated</p>
+                      <p className="text-sm font-black" style={{ color: cardAccent }}>{fmtINR(amt)}</p>
+                    </div>
+                    <div className="w-px h-7 flex-shrink-0" style={{ background: 'var(--border)' }} />
+                    <div>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>ROI</p>
+                      <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>{roi != null ? `${roi}%` : '—'}</p>
+                    </div>
+                    {returnType && (
+                      <>
+                        <div className="w-px h-7 flex-shrink-0" style={{ background: 'var(--border)' }} />
+                        <div>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Returns</p>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{returnType}</p>
+                        </div>
+                      </>
+                    )}
+                    {firstInt && (
+                      <>
+                        <div className="w-px h-7 flex-shrink-0" style={{ background: 'var(--border)' }} />
+                        <div>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>1st Interest</p>
+                          <p className="text-xs font-semibold font-mono" style={{ color: 'var(--text-primary)' }}>{firstInt}</p>
+                        </div>
+                      </>
+                    )}
+                    {d.dealAmount != null && (
+                      <>
+                        <div className="w-px h-7 flex-shrink-0" style={{ background: 'var(--border)' }} />
+                        <div>
+                          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Deal Size</p>
+                          <p className="text-xs font-semibold" style={{ color: 'var(--text-primary)' }}>{fmtINR(d.dealAmount)}</p>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Expand toggle */}
+                <button onClick={() => setExpandedId(prev => prev === (d.dealId ?? i) ? null : (d.dealId ?? i))}
+                  className="flex-shrink-0 px-3 flex items-center justify-center"
+                  style={{ color: 'var(--text-muted)' }}>
+                  <span className="transition-transform duration-200"
+                    style={{ display: 'inline-block', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                      strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                </button>
+              </div>
+
+              {/* Expanded detail panel */}
+              {isExpanded && (
+                <div className="px-5 pb-4 pt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-3 border-t"
+                  style={{ borderColor: 'var(--border)', background: `${cardAccent}04` }}>
+                  {[
+                    ['Deal ID',           d.dealId],
+                    ['Deal Duration',     d.dealDuration ? `${d.dealDuration} months` : null],
+                    ['Processing Fee',    d.processingFee != null ? fmtINR(d.processingFee) : null],
+                    ['Fee Status',        d.feeStatus],
+                    ['Current Value',     d.currentValue != null ? fmtINR(d.currentValue) : null],
+                    ['Remaining Limit',   d.remaningingLimitToLender != null ? fmtINR(d.remaningingLimitToLender) : null],
+                    ['First Participated',d.firstParticipationDate],
+                    ['Last Participated', d.lastParticipationDate],
+                    ['Account Type',      d.accountType],
+                    ['Deal Created Type', d.dealCreatedType],
+                    ['Closing Status',    d.borrowerClosingStatus],
+                    ['Withdraw ROI',      d.roiForWithdraw != null ? `${d.roiForWithdraw}%` : null],
+                  ].filter(([, v]) => v != null && v !== '' && v !== '—').map(([lbl, val]) => (
+                    <div key={lbl} className="flex flex-col gap-0.5 pt-2">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{lbl}</span>
+                      <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>{String(val)}</span>
+                    </div>
+                  ))}
+                  {d.groupLink && d.groupLink.trim() !== '' && (
+                    <div className="col-span-2 sm:col-span-4 flex flex-col gap-0.5 pt-2">
+                      <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Group Link</span>
+                      <a href={d.groupLink} target="_blank" rel="noreferrer"
+                        className="text-xs font-semibold break-all hover:underline" style={{ color: '#2673bb' }}>
+                        {d.groupLink}
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 function MigrateDataModal({ displayName,onClose }) {
   const [form, setForm] = useState({ id: '', passcode: '', mobile: '', registerNumber: '' });
   const [errors, setErrors] = useState({});
@@ -2545,7 +4717,7 @@ function MigrateDataModal({ displayName,onClose }) {
               </svg>
             </div>
             <div>
-              <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrate My Data</h2>
+              <h2 className="text-base font-extrabold" style={{ color: 'var(--text-primary)' }}>Migrate My Offline Data</h2>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Enter your credentials to proceed</p>
               <p className="text-xs" style={{ color: 'var(--text-muted)' }}>Only active deals will be migrated</p>
             </div>
@@ -2605,18 +4777,179 @@ function MigrateDataModal({ displayName,onClose }) {
   );
 }
 
-function MemberDashboard({ memberId, mode }) {
+// ─── Family Offline Section ───────────────────────────────────────────────────
+// Rendered instead of OfflineSection when viewing a family member.
+// Reads directly from fin.offline (returned by getMemberFinancials) so we never
+// re-fetch with the logged-in user's own sessionStorage userId.
+function FamilyOfflineSection({ fin, memberColor }) {
+  const off = fin?.offline ?? {};
+  const fmtAmt = (v) => formatINR(Number(v ?? 0));
+
+  const payments = Array.isArray(off.payments) ? off.payments : [];
+  const running  = payments.filter(p => (p.status ?? p.dealStatus ?? '').toLowerCase() === 'active');
+  const closed   = payments.filter(p => (p.status ?? p.dealStatus ?? '').toLowerCase() !== 'active');
+
+  const kpis = [
+    { label: 'Total Invested',    value: off.totalInvested   ?? '₹0', sub: `${payments.length} deals total`,          color: '#f58311', Icon: I.Wallet      },
+    { label: 'Monthly Interest',  value: off.monthlyInterest ?? '₹0', sub: 'Estimated monthly payout',               color: '#35a13e', Icon: I.Percent     },
+    { label: 'Running Deals',     value: String(off.running  ?? running.length),  sub: 'Currently active',           color: memberColor, Icon: I.Activity   },
+    { label: 'Closed Deals',      value: String(off.closed   ?? closed.length),   sub: 'Completed deals',            color: '#2673bb', Icon: I.CheckCircle },
+  ];
+
+  const monthlyChart = Array.isArray(off.monthlyChart) && off.monthlyChart.length === 12
+    ? off.monthlyChart
+    : Array(12).fill(0);
+
+  return (
+    <div className="grid gap-5">
+      <SectionHeader icon={I.Building} accent={memberColor} platform="Offline" title="Offline Portfolio" live />
+
+      {/* KPI cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {kpis.map(k => <KpiCard key={k.label} {...k} />)}
+      </div>
+
+      {/* Monthly interest chart */}
+      <GlassPanel accent={memberColor}>
+        <AnimatedBarChart data={monthlyChart} accent={memberColor} />
+      </GlassPanel>
+
+      {/* Deals table */}
+      {payments.length > 0 ? (
+        <TableWrap accent={memberColor}>
+          <div className="flex items-center justify-between px-5 py-4 flex-wrap gap-3"
+            style={{ borderBottom: '1px solid var(--table-header-border)', background: 'var(--table-off-header-accent)' }}>
+            <div className="flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+              <I.Building />
+              <h3 className="text-sm font-bold ml-1" style={{ color: 'var(--text-primary)' }}>Offline Deals</h3>
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {[{ l: 'Active', c: running.length, col: '#35a13e' }, { l: 'Closed', c: closed.length, col: '#2673bb' }].map(b => (
+                <span key={b.l} className="text-xs px-2.5 py-1 rounded-full font-semibold"
+                  style={{ background: `${b.col}12`, color: b.col, border: `1px solid ${b.col}25` }}>
+                  {b.l} · {b.c}
+                </span>
+              ))}
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--table-header-border)', background: 'var(--table-header-bg)' }}>
+                  {['Deal', 'Amount', 'ROI', 'Payout', 'Date', 'Status'].map(h => (
+                    <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold"
+                      style={{ color: 'var(--text-muted)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {payments.map((p, i) => {
+                  const isActive = (p.status ?? p.dealStatus ?? '').toLowerCase() === 'active';
+                  const sc = isActive ? '#35a13e' : '#2673bb';
+                  return (
+                    <tr key={p.dealId ?? p.id ?? i}
+                      className="transition-colors"
+                      style={{ borderBottom: '1px solid var(--table-row-border)' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                      <td className="py-3.5 px-4 font-semibold" style={{ color: 'var(--text-primary)' }}>
+                        {p.dealName ?? p.name ?? `Deal ${i + 1}`}
+                      </td>
+                      <td className="py-3.5 px-4 font-bold tabular-nums" style={{ color: '#f58311' }}>
+                        {fmtAmt(p.participatedAmount ?? p.amount)}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-md"
+                          style={{ background: 'var(--rate-bg)', color: 'var(--rate-color)', border: '1px solid var(--rate-border)' }}>
+                          {p.rateOfInterest ?? p.roi ?? '—'}%
+                        </span>
+                      </td>
+                      <td className="py-3.5 px-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {p.amountTye ?? p.payoutType ?? '—'}
+                      </td>
+                      <td className="py-3.5 px-4 text-xs" style={{ color: 'var(--text-muted)' }}>
+                        {p.participatedDate ?? p.date ?? '—'}
+                      </td>
+                      <td className="py-3.5 px-4">
+                        <Chip status={isActive ? 'Active' : 'Closed'} />
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </TableWrap>
+      ) : (
+        <div className="rounded-2xl p-10 text-center"
+          style={{ background: 'var(--card-bg)', border: '1px solid var(--border)' }}>
+          <p className="text-3xl mb-2">📂</p>
+          <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+            No offline deals on record for this member
+          </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MemberDashboard({ memberId, mode, openFamilyModal = false, onFamilyModalOpened }) {
   const [fin, setFin]             = useState(null);
   const [loading, setLoading]     = useState(true);
   const [profile, setProfile]     = useState(null);
   const [hasMigratedData, setHasMigratedData] = useState(false);
   const [migrateOpen, setMigrateOpen] = useState(false);
+  const [oxyloansDataOpen, setOxyloansDataOpen] = useState(false);
+  const [confirmedOLDeals, setConfirmedOLDeals] = useState([]);
+  // OxyLoans family member modal state
+  const [familyMemberOpen, setFamilyMemberOpen] = useState(false);
+  // null=still checking, false=no lenderId found, string=valid lenderId
+  const [migrationLenderId, setMigrationLenderId] = useState(null);
+  const [migrationChecked, setMigrationChecked] = useState(false);
+  // Full migration info response — used to pre-fill and skip OTP steps
+  const [migrationInfo, setMigrationInfo] = useState(null);
+  // Real OxyLoans deals from API — null means never fetched, object means fetched (may have empty deals)
+  const [oxyloansApiDeals, setOxyloansApiDeals] = useState(null);
+  const [oxyloansApiLoading, setOxyloansApiLoading] = useState(false);
+  const [oxyloansApiError, setOxyloansApiError] = useState('');
+
+  // When the parent (UnifiedDashboard) signals us to open the family modal
+  // (e.g. after an add-member flow completes), honour it and notify parent.
+  useEffect(() => {
+    if (openFamilyModal) {
+      setFamilyMemberOpen(true);
+      onFamilyModalOpened?.();
+    }
+  }, [openFamilyModal]); // eslint-disable-line
+  const liveOffline = useOfflineStats();
   const { user } = useAuth();
+  const {
+    oxyloansMembers,
+    headOfFamilyId,
+    headOfFamily,
+    refreshOxyloansMembers,
+    setHeadOfFamily,
+    removeOxyFamilyMember,
+    selfMemberId,
+  } = useFamily();
   const memberColor = MEMBER_COLORS[memberId] ?? '#2673bb';
+  // isFamilyMember = we are viewing a family member's record, not the logged-in user's own.
+  // Compare against selfMemberId (the first approved member = the account owner's slot)
+  // and the sentinel 'self'. Both indicate the logged-in user's own view.
+  const isFamilyMember = memberId !== 'self' && memberId !== selfMemberId;
 
   useEffect(() => {
+    // Reset all state when memberId changes so stale data never shows
     setFin(null);
     setLoading(true);
+    setHasMigratedData(false);
+    setMigrationLenderId(null);
+    setMigrationChecked(false);
+    setMigrationInfo(null);
+    setOxyloansApiDeals(null);
+    setOxyloansApiLoading(false);
+    setOxyloansApiError('');
+
     getMemberFinancials(memberId)
       .then(d => { if (d) setFin(d); })
       .catch(() => {})
@@ -2634,7 +4967,54 @@ function MemberDashboard({ memberId, mode }) {
       .catch(() => {
         setHasMigratedData(false);
       });
+
+    // Fetch migration info — lenderId is needed to auto-load OxyLoans deals
+    getMigrationOxyloansUserInfo()
+      .then(info => {
+        const lid = info?.lenderId ?? info?.lender_id ?? null;
+        setMigrationInfo(info ?? null);
+        setMigrationLenderId(lid ? String(lid) : false);
+        setMigrationChecked(true);
+        // If both verifications are already done, auto-load deals immediately
+        // without requiring the user to go through the OTP modal
+        if (lid && info?.mobileNumberVerified && info?.emailVerified) {
+          // auto-load triggered by the migrationLenderId useEffect below
+        }
+      })
+      .catch(() => {
+        // API error (network, 404, etc.) — treat same as no lenderId found
+        setMigrationInfo(null);
+        setMigrationLenderId(false);
+        setMigrationChecked(true);
+      });
   }, [memberId]);
+
+  const loadOxyloansDeals = React.useCallback(async (lenderId) => {
+    if (!lenderId) return;
+    setOxyloansApiLoading(true);
+    setOxyloansApiError('');
+    setOxyloansApiDeals(null); // clear previous data while reloading
+    try {
+      // Always get a fresh encrypt key — required by the OxyLoans external API
+      const encKey = await getOxyloansEncryptKey();
+      const res = await getOxyloansLenderDeals(String(lenderId), encKey);
+      const deals = Array.isArray(res?.lenderPaticipatedResponseDto)
+        ? res.lenderPaticipatedResponseDto
+        : [];
+      setOxyloansApiDeals({ raw: res, deals });
+      setOxyloansApiError(''); // clear any previous error on success
+    } catch (e) {
+      // Keep oxyloansApiDeals as null so the error state in the tab renders correctly
+      setOxyloansApiError(e.message ?? 'Failed to load OxyLoans deals');
+      setOxyloansApiDeals(null);
+    } finally {
+      setOxyloansApiLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (migrationLenderId) loadOxyloansDeals(migrationLenderId);
+  }, [migrationLenderId, loadOxyloansDeals]);
 
   const emptyFin = {
     name: '—', role: '—', lrId: '—',
@@ -2653,7 +5033,24 @@ function MemberDashboard({ memberId, mode }) {
   const showOL   = mode === 'B' || mode === 'C';
   const showOff  = mode === 'A' || mode === 'C';
   const showBoth = mode === 'C';
-  const isOwn = !fin || memberId === user?.userId || memberId === 'self';
+
+  // Master tab — for family members default to 'oxyloans'; for self default to 'both'
+  const [masterTab, setMasterTab] = useState(() => !isFamilyMember ? 'oxyloans' : 'offline');
+  const isOwn = !isFamilyMember;
+  // Button states for OxyLoans in the hero strip:
+  // Derived OxyLoans button/status flags from migration info
+  const mobileVerified  = !!migrationInfo?.mobileNumberVerified;
+  const emailVerified   = !!migrationInfo?.emailVerified;
+  const bothVerified    = mobileVerified && emailVerified;
+  // Show "Load Oxyloans Data" button when:
+  //   - check done AND no lenderId (user hasn't linked account yet), OR
+  //   - lenderId found BUT at least one verification is still pending
+  const showLoadOxyloansBtn = migrationChecked && (
+    migrationLenderId === false ||
+    (!!migrationLenderId && !bothVerified)
+  );
+  // Green "OxyLoans Connected" badge — lenderId found, both verified, deals loaded
+  const oxyloansLinked = migrationChecked && !!migrationLenderId && bothVerified && !!oxyloansApiDeals;
 
   return (
     <div className="grid gap-7">
@@ -2691,17 +5088,340 @@ function MemberDashboard({ memberId, mode }) {
                 <polyline points="17 8 12 3 7 8"/>
                 <line x1="12" y1="3" x2="12" y2="15"/>
               </svg>
-              Migrate My Data
+              Migrate My Offline Data
             </button>
           </div>
         )}
+        {/* ── OxyLoans connection status buttons ── */}
+
+        {/* 1. Still checking migration info */}
+        {/* {!migrationChecked && (
+          <div className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold"
+            style={{ background: 'rgba(245,131,17,0.08)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
+            <span className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: '#f58311', borderTopColor: 'transparent' }} />
+            Checking OxyLoans…
+          </div>
+        )} */}
+
+        {/* 2. Check done — no OxyLoans account linked → show connect button */}
+        {/* {showLoadOxyloansBtn && (
+          <button
+            onClick={() => setOxyloansDataOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+            style={{ background: 'linear-gradient(135deg,#f58311,#d96b00)', color: '#fff', boxShadow: '0 4px 14px rgba(245,131,17,0.3)', border: '1px solid rgba(245,131,17,0.3)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4">
+              <rect x="3" y="3" width="18" height="18" rx="2"/>
+              <path d="M9 9h6M9 13h6M9 17h4"/>
+            </svg>
+            {migrationLenderId && !mobileVerified && emailVerified
+              ? 'Verify Mobile Number'
+              : migrationLenderId && mobileVerified && !emailVerified
+                ? 'Verify Email Address'
+                : migrationLenderId && !mobileVerified && !emailVerified
+                  ? 'Complete Verification'
+                  : 'Load Oxyloans Data'}
+          </button>
+        )} */}
+
+        {/* 3. lenderId found — deals currently loading */}
+        {/* {migrationChecked && migrationLenderId && oxyloansApiLoading && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
+            style={{ background: 'rgba(245,131,17,0.08)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
+            <span className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin"
+              style={{ borderColor: '#f58311', borderTopColor: 'transparent' }} />
+            Loading OxyLoans data…
+          </div>
+        )} */}
+
+        {/* 4. lenderId found — deals loaded successfully → show linked badge */}
+        {/* {oxyloansLinked && !oxyloansApiLoading && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold"
+            style={{ background: 'rgba(53,161,62,0.08)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.22)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+            OxyLoans Connected
+          </div>
+        )} */}
+
+        {/* 5. lenderId found — deals failed to load → retry */}
+        {/* {migrationChecked && migrationLenderId && oxyloansApiError && !oxyloansApiLoading && (
+          <button
+            onClick={() => loadOxyloansDeals(migrationLenderId)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-90"
+            style={{ background: 'rgba(233,83,48,0.1)', color: '#e95330', border: '1px solid rgba(233,83,48,0.25)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+              <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-3"/>
+            </svg>
+            Retry OxyLoans
+          </button>
+        )} */}
+
+        {/* 6. OxyLoans family members available */}
+        {oxyloansMembers.length > 0 && (
+          <button
+            onClick={() => setFamilyMemberOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+            style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.35)', boxShadow: '0 2px 8px rgba(245,131,17,0.1)' }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            Family Members
+            <span className="text-xs font-bold px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(245,131,17,0.18)', color: '#f58311' }}>
+              {oxyloansMembers.length}
+            </span>
+          </button>
+        )}
       </div>
 
-      {migrateOpen && <MigrateDataModal displayName={displayName} onClose={() => setMigrateOpen(false)} />}
+      {/* Head of Family banner — shown once a Head of Family is set */}
+      {headOfFamily && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl"
+          style={{ background: 'linear-gradient(135deg,rgba(245,131,17,0.08),rgba(245,131,17,0.03))', border: '1px solid rgba(245,131,17,0.25)' }}>
+          <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-black flex-shrink-0"
+            style={{ background: 'rgba(245,131,17,0.15)', color: '#f58311', border: '1px solid rgba(245,131,17,0.3)' }}>
+            {(headOfFamily.name ?? '?').charAt(0).toUpperCase()}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#f58311' }}><path d="M2 20h20v2H2zM4 18l4-10 4 4 4-8 4 10H4z"/></svg>
+              <span className="text-xs font-extrabold uppercase tracking-wider" style={{ color: '#f58311' }}>Head of Family</span>
+              <span className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{headOfFamily.name}</span>
+              {headOfFamily.lrId && (
+                <span className="font-mono text-xs" style={{ color: 'var(--text-muted)' }}>{headOfFamily.lrId}</span>
+              )}
+            </div>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Primary OxyLoans support contact for this family
+              {headOfFamily.phone && <> · <span className="font-semibold">{headOfFamily.phone}</span></>}
+            </p>
+          </div>
+          <button
+            onClick={() => setFamilyMemberOpen(true)}
+            className="text-xs px-3 py-1.5 rounded-xl font-semibold flex-shrink-0 transition-all hover:opacity-80"
+            style={{ background: 'rgba(245,131,17,0.12)', color: '#f58311', border: '1px solid rgba(245,131,17,0.25)' }}>
+            Manage
+          </button>
+        </div>
+      )}
 
-      {showBoth && <CombinedAnalysis fin={data} memberColor={memberColor} />}
-      {showOL  && <><Divider /><OxyLoansSection  fin={data} memberColor={memberColor} /></>}
-      {showOff && <><Divider /><OfflineSection   fin={data} memberColor={memberColor} /></>}
+      {migrateOpen && <MigrateDataModal displayName={displayName} onClose={() => setMigrateOpen(false)} />}
+      {oxyloansDataOpen && (
+        <GetOxyloansDataModal
+          migrationInfo={migrationInfo}
+          onClose={() => setOxyloansDataOpen(false)}
+          onConfirm={async (deals) => {
+            setConfirmedOLDeals(deals ?? []);
+            // Also refresh API deals so OxyLoans tab shows fresh data
+            // Re-fetch migration info to get lenderId if not yet known
+            if (!migrationLenderId) {
+              try {
+                const info = await getMigrationOxyloansUserInfo();
+                const lid = info?.lenderId ?? info?.lender_id ?? null;
+                if (lid) {
+                  setMigrationLenderId(String(lid));
+                  setMigrationChecked(true);
+                  loadOxyloansDeals(String(lid));
+                }
+              } catch { /* ignore — confirmedOLDeals already set above */ }
+            } else {
+              loadOxyloansDeals(migrationLenderId);
+            }
+            setOxyloansDataOpen(false);
+            await refreshOxyloansMembers();
+            // Self/view mode: toast is shown inside GetOxyloansDataModal.
+            // FamilyMemberModal is intentionally NOT opened here.
+          }}
+        />
+      )}
+      {familyMemberOpen && (
+        <FamilyMemberModal
+          members={oxyloansMembers}
+          currentHeadId={headOfFamilyId}
+          onSetHead={setHeadOfFamily}
+          onRemove={removeOxyFamilyMember}
+          onClose={() => setFamilyMemberOpen(false)}
+        />
+      )}
+      {/* Add Member flow lives in UnifiedDashboard root, triggered via Topbar dropdown */}
+
+      {/* ── Master platform tab bar ─────────────────────────────────── */}
+      {/* <div className="flex items-center gap-1 p-1 rounded-2xl w-fit"
+        style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+        {[
+          { key: 'both',     label: 'All',      icon: <I.PieChart />, color: memberColor },
+          { key: 'oxyloans', label: 'OxyLoans',  icon: <I.Bank />,     color: '#2673bb'   },
+          { key: 'offline',  label: 'Offline',   icon: <I.Building />, color: '#f58311'   },
+        ].map(t => {
+          const active = masterTab === t.key;
+          return (
+            <button key={t.key} onClick={() => setMasterTab(t.key)}
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all"
+              style={{
+                background: active ? t.color : 'transparent',
+                color: active ? '#fff' : 'var(--text-muted)',
+                boxShadow: active ? `0 2px 10px ${t.color}40` : 'none',
+              }}>
+              <span className="w-4 h-4">{t.icon}</span>
+              {t.label}
+            </button>
+          );
+        })}
+      </div> */}
+
+      {/* ── Both tab: combined KPI overview ─────────────────────────── */}
+      {masterTab === 'both' && (
+        <div className="grid gap-5">
+          {(() => {
+            const apiDeals = oxyloansApiDeals?.deals ?? [];
+            const olDeals  = apiDeals.length > 0 ? apiDeals
+              : confirmedOLDeals.length > 0 ? confirmedOLDeals
+              : [];
+            const olAmt       = olDeals.reduce((s, d) => s + olDealAmt(d), 0);
+            const olRunning   = olDeals.filter(d => olDealStatus(d) === 'Active').length;
+            const offAmt      = liveOffline?.ready ? liveOffline.totalInvested : 0;
+            const totalDeals  = olDeals.length + (liveOffline?.ready ? (liveOffline.running + liveOffline.closed) : 0);
+            const totalAUM    = olAmt + offAmt;
+            return (
+              <>
+                <CombinedAnalysis
+                  fin={data}
+                  memberColor={memberColor}
+                  liveOffline={liveOffline}
+                  olAmtOverride={olAmt}
+                  olRunningOverride={olRunning}
+                />
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { label: 'OxyLoans Deals', value: formatINR(olAmt),                                                             sub: `${olDeals.length} deals`,                color: '#2673bb',   Icon: I.Bank     },
+                    { label: 'Offline Deals',  value: formatINR(offAmt),                                                            sub: `${liveOffline?.ready ? (liveOffline.running + liveOffline.closed) : 0} deals`, color: '#f58311',   Icon: I.Building },
+                    { label: 'Total Deals',    value: String(totalDeals),                                                           sub: 'OxyLoans + Offline',                     color: memberColor, Icon: I.BarChart },
+                    { label: 'Total AUM',      value: formatINR(totalAUM),                                                          sub: 'Combined invested amount',               color: '#35a13e',   Icon: I.Wallet   },
+                  ].map(k => <KpiCard key={k.label} {...k} />)}
+                </div>
+              </>
+            );
+          })()}
+
+          {/* OxyLoans deals are shown in the OxyLoans tab only */}
+        </div>
+      )}
+
+      {/* ── OxyLoans tab ─────────────────────────────────────────────── */}
+      {masterTab === 'oxyloans' && (
+        <div className="grid gap-5">
+
+          {/* State 1: Still checking migration info */}
+          {!migrationChecked && (
+            <div className="flex items-center justify-center gap-3 py-16 rounded-2xl"
+              style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+              <span className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: '#f58311', borderTopColor: 'transparent' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Checking OxyLoans account…
+              </span>
+            </div>
+          )}
+
+          {/* State 2: Check done — no OxyLoans account linked */}
+          {migrationChecked && migrationLenderId === false && !oxyloansApiLoading && (
+            <div className="rounded-2xl py-16 flex flex-col items-center gap-4 text-center"
+              style={{ background: 'var(--surface-card)', border: '1px dashed var(--border)' }}>
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center"
+                style={{ background: 'rgba(245,131,17,0.1)', border: '1px solid rgba(245,131,17,0.25)', color: '#f58311' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+                  <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 9h6M9 13h6M9 17h4"/>
+                </svg>
+              </div>
+              <div>
+                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>OxyLoans account not connected</p>
+                <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+                  Connect your OxyLoans account to view your lending portfolio
+                </p>
+              </div>
+              <button onClick={() => setOxyloansDataOpen(true)}
+                className="flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:opacity-90 hover:scale-[1.02]"
+                style={{ background: 'linear-gradient(135deg,#f58311,#d96b00)', color: '#fff', boxShadow: '0 4px 14px rgba(245,131,17,0.3)' }}>
+                Load Oxyloans Data
+              </button>
+            </div>
+          )}
+
+          {/* State 3: lenderId found — deals loading */}
+          {migrationChecked && migrationLenderId && oxyloansApiLoading && (
+            <div className="flex items-center justify-center gap-3 py-16 rounded-2xl"
+              style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+              <span className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: '#f58311', borderTopColor: 'transparent' }} />
+              <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+                Loading OxyLoans deals…
+              </span>
+            </div>
+          )}
+
+          {/* State 4: lenderId found — deals failed */}
+          {migrationChecked && migrationLenderId && !oxyloansApiLoading && oxyloansApiError && !oxyloansApiDeals && (
+            <div className="rounded-2xl p-8 text-center"
+              style={{ background: 'var(--surface-card)', border: '1px solid rgba(233,83,48,0.2)' }}>
+              <p className="text-2xl mb-3">⚠️</p>
+              <p className="text-sm font-semibold" style={{ color: '#e95330' }}>{oxyloansApiError}</p>
+              <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+                Lender ID: <span className="font-mono font-bold" style={{ color: '#f58311' }}>{migrationLenderId}</span>
+              </p>
+              <button onClick={() => loadOxyloansDeals(migrationLenderId)}
+                className="mt-4 px-5 py-2 rounded-xl text-sm font-bold transition-all hover:opacity-90"
+                style={{ background: 'linear-gradient(135deg,#f58311,#d96b00)', color: '#fff', boxShadow: '0 4px 14px rgba(245,131,17,0.3)' }}>
+                Retry
+              </button>
+            </div>
+          )}
+
+          {/* State 5: Deals loaded — show data */}
+          {migrationChecked && migrationLenderId && !oxyloansApiLoading && !oxyloansApiError && oxyloansApiDeals && (() => {
+            const deals      = oxyloansApiDeals.deals ?? [];
+            const raw        = oxyloansApiDeals.raw;
+            const totalCount = raw?.totalCount ?? deals.length;
+            const totalAmt   = raw?.totalRunningDealsAmount ?? null;
+            const lenderName = raw?.lenderName ?? null;
+            const mobile     = raw?.mobileNumber ?? null;
+            const email      = raw?.email ?? null;
+            const userId     = raw?.userId ?? null;
+
+            if (deals.length === 0) return (
+              <div className="rounded-2xl py-16 flex flex-col items-center gap-4 text-center"
+                style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
+                <p className="text-3xl mb-1">📭</p>
+                <p className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>No active OxyLoans deals</p>
+                {lenderName && (
+                  <div className="flex flex-col items-center gap-1">
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
+                      Account: <strong style={{ color: '#f58311' }}>{lenderName}</strong>
+                    </p>
+                    {mobile && <p className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{mobile}</p>}
+                    {email  && <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{email}</p>}
+                  </div>
+                )}
+                <p className="text-xs px-3 py-1 rounded-full"
+                  style={{ background: 'rgba(245,131,17,0.08)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
+                  Server total count: {totalCount}
+                </p>
+              </div>
+            );
+
+            return (
+              <OxyLoansDealsSection
+                deals={deals}
+                memberColor={memberColor}
+                meta={{ totalCount, totalAmt, lenderName, mobile, email, userId }}
+              />
+            );
+          })()}
+        </div>
+      )}
+
+      {/* ── Offline tab — same live OfflineSection for everyone ──────── */}
+      {masterTab === 'offline' && (
+        <OfflineSection fin={data} memberColor={memberColor} />
+      )}
 
       {/* My Participations — compact table (up to 5) */}
       <Divider />
@@ -2711,19 +5431,25 @@ function MemberDashboard({ memberId, mode }) {
 }
 
 // ─── Root ─────────────────────────────────────────────────────────────────────
-export default function UnifiedDashboard() {
-  const [dismissed, setDismissed] = useState(false);
-
-  useEffect(() => {
-    const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-    const d = new Date();
-    const day = String(d.getDate()).padStart(2, '0');
-    const monthNo = String(d.getMonth() + 1).padStart(2, '0');
-    const year = String(d.getFullYear());
-    const dateStr = `${day}-${monthNo}-${year}`;
-  }, []);
+export default function UnifiedDashboard({ addMemberOpen = false, onAddMemberClose }) {
   const { mode } = useMode();
-  const { selectedMemberId, membersLoading, hasFamily, userId } = useFamily();
+  const { selectedMemberId, membersLoading, hasFamily, userId, selfMemberId, refreshOxyloansMembers } = useFamily();
+  // Internal mirror so the add-member modal can be driven from Topbar dropdown
+  const [localAddOpen, setLocalAddOpen] = useState(false);
+  const showAddMember = addMemberOpen || localAddOpen;
+  const closeAddMember = () => { setLocalAddOpen(false); onAddMemberClose?.(); };
+
+  // Signals MemberDashboard to open FamilyMemberModal after add-member completes
+  const [pendingFamilyModal, setPendingFamilyModal] = useState(false);
+
+  // Resolve the memberId to pass to MemberDashboard:
+  //  'self'       → use selfMemberId (the logged-in user's family slot) if available,
+  //                 otherwise fall back to the raw userId UUID.
+  //  anything else → use as-is (it's a family member's id).
+  const resolveId = (id) => {
+    if (!id || id === 'self') return selfMemberId ?? userId;
+    return id;
+  };
 
   if (membersLoading) return (
     <div className="flex items-center justify-center gap-3 py-20">
@@ -2733,17 +5459,38 @@ export default function UnifiedDashboard() {
     </div>
   );
 
+  // Add-member modal — driven from Topbar "Add Member" button in dropdown
+  const addMemberModal = showAddMember ? (
+    <GetOxyloansDataModal
+      onClose={closeAddMember}
+      onConfirm={async () => {
+        closeAddMember();
+        await refreshOxyloansMembers();
+        // Signal MemberDashboard to open FamilyMemberModal for head-of-family management
+        setPendingFamilyModal(true);
+      }}
+      mode="addMember"
+    />
+  ) : null;
+
   if (!hasFamily) {
     return (
       <div className="grid gap-6">
+        {addMemberModal}
         <ProfileWarningBanner />
-        <MemberDashboard memberId={selectedMemberId === 'self' ? userId : selectedMemberId} mode={mode} isSelf />
+        <MemberDashboard memberId={resolveId(selectedMemberId)} mode={mode} isSelf
+          openFamilyModal={pendingFamilyModal}
+          onFamilyModalOpened={() => setPendingFamilyModal(false)}
+        />
       </div>
     );
   }
 
-  if (!selectedMemberId || selectedMemberId === 'self') return (
+  // null = user explicitly chose "Family Overview" in the switcher
+  // 'self' or selfMemberId = show the logged-in user's own dashboard
+  if (selectedMemberId === null) return (
     <div className="grid gap-6">
+      {addMemberModal}
       <ProfileWarningBanner />
       <FamilyOverview />
     </div>
@@ -2751,8 +5498,12 @@ export default function UnifiedDashboard() {
 
   return (
     <div className="grid gap-6">
+      {addMemberModal}
       <ProfileWarningBanner />
-      <MemberDashboard memberId={selectedMemberId} mode={mode} />
+      <MemberDashboard memberId={resolveId(selectedMemberId)} mode={mode}
+        openFamilyModal={pendingFamilyModal}
+        onFamilyModalOpened={() => setPendingFamilyModal(false)}
+      />
     </div>
   );
 }

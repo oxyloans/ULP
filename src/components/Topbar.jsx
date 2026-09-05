@@ -16,16 +16,16 @@ const CheckIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const LogoutIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>;
 const UserIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const IdCardIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>;
-const ChevronR   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><polyline points="9 18 15 12 9 6"/></svg>;
+const PlusIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
 
-const MEMBER_COLORS = { 'FM-001': '#6366f1', 'FM-002': '#ec4899', 'FM-003': '#10b981' };
-
-function getGreeting() {
-  const h = new Date().getHours();
-  if (h < 12) return 'Morning';
-  if (h < 17) return 'Afternoon';
-  return 'Evening';
-}
+// Member accent colours — extend as needed
+const MEMBER_COLORS = {
+  'FM-001': '#6366f1',
+  'FM-002': '#ec4899',
+  'FM-003': '#10b981',
+  'FM-004': '#f59e0b',
+};
+const getMemberColor = (id) => MEMBER_COLORS[id] ?? '#6366f1';
 
 const PAGE_LABELS = {
   '/dashboard':   'Dashboard',
@@ -40,109 +40,246 @@ const PAGE_LABELS = {
 };
 
 // ─── Family Switcher ──────────────────────────────────────────────────────────
-function FamilySwitcher() {
-  const { approvedMembers, selectedMemberId, setSelectedMemberId, hasFamily } = useFamily();
+function FamilySwitcher({ onAddMember, loggedInName }) {
+  const { approvedMembers, selectedMemberId, setSelectedMemberId, hasFamily, selfMemberId } = useFamily();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
-  // Don't render if no family
-  if (!hasFamily) return null;
-
   useEffect(() => {
+    if (!hasFamily) return;
     const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
     document.addEventListener('mousedown', h);
     return () => document.removeEventListener('mousedown', h);
-  }, []);
+  }, [hasFamily]);
 
-  const isFamily = !selectedMemberId;
-  const color = isFamily ? '#f59e0b' : (MEMBER_COLORS[selectedMemberId] ?? '#6366f1');
+  // Must come AFTER all hooks
+  if (!hasFamily) return null;
+
+  // null = Family Overview; 'self' or selfMemberId = logged-in user's own view
+  const isOverview = selectedMemberId === null;
+  const isSelfView = selectedMemberId === 'self' || selectedMemberId === selfMemberId;
+
+  // Use selfMemberId from context — the first approved member is the account owner's slot
+  const selfMember   = approvedMembers.find(m => m.id === selfMemberId) ?? approvedMembers[0] ?? null;
+  const otherMembers = approvedMembers.filter(m => m.id !== selfMemberId);
+
+  // Trigger pill colour: amber for overview, self color for own view, member color otherwise
+  const activeColor = isOverview
+    ? '#f59e0b'
+    : isSelfView
+      ? getMemberColor(selfMemberId ?? '')
+      : getMemberColor(selectedMemberId);
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen(o => !o)} title="Switch member"
-        className="topbar-icon-btn"
-        style={{ color, borderColor: open ? `${color}50` : undefined, background: open ? `${color}12` : undefined }}>
+      {/* ── Trigger pill — gradient background, white content ── */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        title="Switch view"
+        className="relative flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all hover:opacity-90 hover:scale-[1.03] active:scale-95"
+        style={{
+          background: `linear-gradient(135deg,${activeColor},${activeColor}bb)`,
+          color: '#fff',
+          boxShadow: open
+            ? `0 4px 16px ${activeColor}55, 0 0 0 2px ${activeColor}35`
+            : `0 2px 10px ${activeColor}45`,
+          border: `1px solid ${activeColor}70`,
+        }}>
         <UsersIcon />
-        {selectedMemberId && (
-          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border-2"
-            style={{ background: color, borderColor: 'var(--topbar-bg)' }} />
+        <span className="text-xs font-black tabular-nums leading-none">{approvedMembers.length}</span>
+        {/* green pulse dot only when a family member (not self, not overview) is active */}
+        {!isOverview && !isSelfView && (
+          <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full border-2 border-white"
+            style={{ background: '#10b981' }} />
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 z-50 rounded-2xl overflow-hidden"
+        <div
+          ref={null}
+          className="absolute right-0 mt-2.5 z-50 rounded-2xl flex flex-col overflow-hidden"
           style={{
-            width: 256,
-            background: 'var(--surface-card)',
-            border: '1px solid var(--border)',
-            boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-            backdropFilter: 'blur(24px)',
-            '--text-primary': '#0f172a',
-            '--text-muted': '#64748b',
+            width: 280,
+            maxHeight: 480,
+            /* Hard-code light surface so text is always visible regardless of theme */
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
+            boxShadow: '0 20px 60px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.04)',
           }}>
-          <div className="px-4 py-2.5 flex items-center gap-2"
-            style={{ borderBottom: '1px solid var(--border)', background: 'rgba(99,102,241,0.04)' }}>
-            <UsersIcon />
-            <span className="text-xs font-bold uppercase tracking-widest" style={{ color: '#6366f1' }}>View As</span>
+
+          {/* ── Header ── */}
+          <div className="px-4 py-3 flex items-center justify-between flex-shrink-0"
+            style={{ borderBottom: '1px solid #e2e8f0', background: `linear-gradient(135deg,${activeColor}14,${activeColor}06)` }}>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center"
+                style={{ background: `${activeColor}22`, color: activeColor }}>
+                <UsersIcon />
+              </div>
+              <span className="text-xs font-extrabold uppercase tracking-widest" style={{ color: activeColor }}>
+                View As
+              </span>
+            </div>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: `${activeColor}14`, color: activeColor, border: `1px solid ${activeColor}28` }}>
+              {approvedMembers.length} Members
+            </span>
           </div>
-          {approvedMembers.filter(m => m.id === 'FM-001').map(m => {
-            const mc = MEMBER_COLORS[m.id] ?? '#6366f1';
-            const isSel = selectedMemberId === m.id;
-            return (
-              <button key={m.id} onClick={() => { setSelectedMemberId(m.id); setOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
-                style={{ borderBottom: '1px solid var(--border)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold"
-                  style={{ background: `${mc}20`, border: `1px solid ${mc}30`, color: mc }}>{m.name.charAt(0)}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{m.name}</p>
-                    <span className="text-xs px-1.5 rounded-full" style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', fontSize: 9 }}>You</span>
+
+          {/* ── Scrollable member list ── */}
+          <div className="overflow-y-auto flex-1">
+
+            {/* Self — logged-in user's own dashboard */}
+            {selfMember && (() => {
+              const mc  = getMemberColor(selfMember.id);
+              // Selected when: 'self' sentinel OR the actual selfMemberId is chosen
+              const sel = isSelfView;
+              return (
+                <button
+                  key={selfMember.id}
+                  onClick={() => { setSelectedMemberId('self'); setOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                  style={{
+                    borderBottom: '1px solid #f1f5f9',
+                    background: sel ? `${mc}10` : 'transparent',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!sel) e.currentTarget.style.background = '#f8fafc'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = sel ? `${mc}10` : 'transparent'; }}>
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
+                    style={{ background: `linear-gradient(135deg,${mc},${mc}99)`, color: '#fff', boxShadow: `0 2px 8px ${mc}45` }}>
+                    {(loggedInName ?? selfMember.name ?? '?').charAt(0).toUpperCase()}
                   </div>
-                  <p className="text-xs font-mono font-bold mt-0.5" style={{ color: mc }}>{m.lrId}</p>
-                </div>
-                {isSel && <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: mc, color: '#fff' }}><CheckIcon /></span>}
-              </button>
-            );
-          })}
-          <div className="px-4 py-1.5" style={{ background: 'var(--surface-elevated)' }}>
-            <span style={{ color: 'var(--text-muted)', fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em' }}>Family</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold truncate" style={{ color: '#0f172a' }}>
+                        {loggedInName || selfMember.name}
+                      </p>
+                      <span className="text-xs px-1.5 py-0.5 rounded-full font-bold leading-none"
+                        style={{ background: `${mc}18`, color: mc, fontSize: 10 }}>You</span>
+                    </div>
+                    <p className="text-xs font-mono font-bold mt-0.5" style={{ color: mc }}>
+                      {selfMember.lrId}
+                    </p>
+                  </div>
+                  {sel && (
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: mc, color: '#fff', boxShadow: `0 0 8px ${mc}60` }}>
+                      <CheckIcon />
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
+
+            {/* Family divider */}
+            {otherMembers.length > 0 && (
+              <div className="flex items-center gap-3 px-4 py-1.5"
+                style={{ background: '#f8fafc', borderBottom: '1px solid #f1f5f9' }}>
+                <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
+                <span style={{ color: '#94a3b8', fontSize: 9, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                  Family
+                </span>
+                <div className="flex-1 h-px" style={{ background: '#e2e8f0' }} />
+              </div>
+            )}
+
+            {/* Other family members */}
+            {otherMembers.map((m, idx) => {
+              const mc  = getMemberColor(m.id);
+              const sel = selectedMemberId === m.id;
+              const isLast = idx === otherMembers.length - 1;
+              return (
+                <button
+                  key={m.id}
+                  onClick={() => { setSelectedMemberId(m.id); setOpen(false); }}
+                  className="w-full flex items-center gap-3 px-4 py-3 text-left"
+                  style={{
+                    borderBottom: isLast ? 'none' : '1px solid #f1f5f9',
+                    background: sel ? `${mc}10` : 'transparent',
+                    transition: 'background 0.15s',
+                  }}
+                  onMouseEnter={e => { if (!sel) e.currentTarget.style.background = '#f8fafc'; }}
+                  onMouseLeave={e => { e.currentTarget.style.background = sel ? `${mc}10` : 'transparent'; }}>
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-black flex-shrink-0"
+                    style={{ background: `linear-gradient(135deg,${mc},${mc}99)`, color: '#fff', boxShadow: `0 2px 8px ${mc}45` }}>
+                    {(m.name ?? '?').charAt(0).toUpperCase()}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold truncate" style={{ color: '#0f172a' }}>
+                      {m.name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <p className="text-xs font-mono font-bold" style={{ color: mc }}>{m.lrId}</p>
+                      {m.relation && (
+                        <span className="text-xs px-1.5 py-0 rounded-full font-semibold"
+                          style={{ background: `${mc}14`, color: mc, fontSize: 10 }}>
+                          {m.relation}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {sel && (
+                    <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                      style={{ background: mc, color: '#fff', boxShadow: `0 0 8px ${mc}60` }}>
+                      <CheckIcon />
+                    </span>
+                  )}
+                </button>
+              );
+            })}
           </div>
-          {approvedMembers.filter(m => m.id !== 'FM-001').map(m => {
-            const mc = MEMBER_COLORS[m.id] ?? '#10b981';
-            const isSel = selectedMemberId === m.id;
-            return (
-              <button key={m.id} onClick={() => { setSelectedMemberId(m.id); setOpen(false); }}
-                className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
-                style={{ borderBottom: '1px solid var(--border)' }}
-                onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
-                onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                <div className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold"
-                  style={{ background: `${mc}20`, border: `1px solid ${mc}30`, color: mc }}>{m.name.charAt(0)}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>{m.name}</p>
-                  <p className="text-xs font-mono font-bold mt-0.5" style={{ color: mc }}>{m.lrId}</p>
-                </div>
-                {isSel && <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: mc, color: '#fff' }}><CheckIcon /></span>}
-              </button>
-            );
-          })}
-          <button onClick={() => { setSelectedMemberId(null); setOpen(false); }}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
-            onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
-            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-            <div className="w-8 h-8 rounded-xl flex items-center justify-center"
-              style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.22)', color: '#f59e0b' }}>
-              <GridIcon />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>Family Overview</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>All members combined</p>
-            </div>
-            {isFamily && <span className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: '#f59e0b', color: '#fff' }}><CheckIcon /></span>}
-          </button>
+
+          {/* ── Footer: Family Overview + Add Member ── */}
+          <div style={{ borderTop: '1px solid #e2e8f0' }}>
+            {/* Family Overview row */}
+            <button
+              onClick={() => { setSelectedMemberId(null); setOpen(false); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left"
+              style={{
+                borderBottom: '1px solid #f1f5f9',
+                background: isOverview ? 'rgba(245,158,11,0.07)' : 'transparent',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (!isOverview) e.currentTarget.style.background = '#f8fafc'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = isOverview ? 'rgba(245,158,11,0.07)' : 'transparent'; }}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', color: '#fff', boxShadow: '0 2px 8px rgba(245,158,11,0.4)' }}>
+                <GridIcon />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold" style={{ color: '#0f172a' }}>Family Overview</p>
+                <p className="text-xs" style={{ color: '#64748b' }}>All {approvedMembers.length} members combined</p>
+              </div>
+              {isOverview && (
+                <span className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
+                  style={{ background: '#f59e0b', color: '#fff' }}>
+                  <CheckIcon />
+                </span>
+              )}
+            </button>
+
+            {/* Add Member button */}
+            <button
+              onClick={() => { setOpen(false); onAddMember?.(); }}
+              className="w-full flex items-center gap-3 px-4 py-3 text-left"
+              style={{ background: 'transparent', transition: 'background 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.background = '#f0fdf4'}
+              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+                style={{ background: 'linear-gradient(135deg,#22c55e,#16a34a)', color: '#fff', boxShadow: '0 2px 8px rgba(34,197,94,0.4)' }}>
+                <PlusIcon />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold" style={{ color: '#0f172a' }}>Add Member</p>
+                <p className="text-xs" style={{ color: '#64748b' }}>Verify via OxyLoans ID</p>
+              </div>
+              <svg viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 flex-shrink-0">
+                <polyline points="9 18 15 12 9 6"/>
+              </svg>
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -150,9 +287,9 @@ function FamilySwitcher() {
 }
 
 // ─── Profile Dropdown ─────────────────────────────────────────────────────────
-function ProfileDropdown({ userName, userShort, userLr, userColor, fullName }) {
+function ProfileDropdown({ displayName, displayInitial, displayColor, userLr }) {
   const { logout } = useAuth();
-  const navigate = useNavigate();
+  const navigate   = useNavigate();
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
 
@@ -166,56 +303,64 @@ function ProfileDropdown({ userName, userShort, userLr, userColor, fullName }) {
 
   return (
     <div ref={ref} className="relative">
-      <button onClick={() => setOpen(o => !o)} title="Profile"
+      <button
+        onClick={() => setOpen(o => !o)}
+        title={displayName}
         className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-black transition-all hover:scale-105"
         style={{
-          background: `linear-gradient(135deg,${userColor},${userColor}99)`,
+          background: `linear-gradient(135deg,${displayColor},${displayColor}99)`,
           color: '#fff',
-          boxShadow: open ? `0 0 0 3px ${userColor}35, 0 0 16px ${userColor}30` : `0 0 10px ${userColor}25`,
-          border: `2px solid ${open ? userColor + '60' : 'transparent'}`,
+          boxShadow: open
+            ? `0 0 0 3px ${displayColor}35, 0 0 16px ${displayColor}30`
+            : `0 0 10px ${displayColor}25`,
+          border: `2px solid ${open ? displayColor + '60' : 'transparent'}`,
         }}>
-        {(userShort || userName).charAt(0).toUpperCase()}
+        {displayInitial}
       </button>
 
       {open && (
         <div className="absolute right-0 mt-2 z-50 rounded-2xl overflow-hidden"
           style={{
             width: 224,
-            background: 'var(--surface-card)',
-            border: '1px solid var(--border)',
+            background: '#ffffff',
+            border: '1px solid #e2e8f0',
             boxShadow: '0 24px 64px rgba(0,0,0,0.18)',
-            backdropFilter: 'blur(24px)',
-            '--text-primary': '#0f172a',
-            '--text-muted': '#64748b',
           }}>
+          {/* Profile header */}
           <div className="px-4 py-4 flex items-center gap-3"
-            style={{ borderBottom: '1px solid var(--border)', background: `linear-gradient(135deg,${userColor}0a,transparent)` }}>
+            style={{ borderBottom: '1px solid #f1f5f9', background: `linear-gradient(135deg,${displayColor}0a,transparent)` }}>
             <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-black"
-              style={{ background: `linear-gradient(135deg,${userColor},${userColor}88)`, color: '#fff', boxShadow: `0 0 16px ${userColor}30` }}>
-              {userName.charAt(0)}
+              style={{ background: `linear-gradient(135deg,${displayColor},${displayColor}88)`, color: '#fff', boxShadow: `0 0 16px ${displayColor}30` }}>
+              {displayInitial}
             </div>
             <div className="min-w-0">
-              <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{fullName}</p>
-              <p className="text-xs font-mono font-bold" style={{ color: userColor }}>{userLr}</p>
+              <p className="text-sm font-bold truncate" style={{ color: '#0f172a' }}>{displayName}</p>
+              <p className="text-xs font-mono font-bold" style={{ color: displayColor }}>{userLr}</p>
             </div>
           </div>
-          <div className="px-4 py-2" style={{ borderBottom: '1px solid var(--border)' }}>
+
+          {/* Details rows */}
+          <div className="px-4 py-2" style={{ borderBottom: '1px solid #f1f5f9' }}>
             {[
-              { Icon: UserIcon,   label: 'Full Name', value: fullName },
-              { Icon: IdCardIcon, label: 'User ID',   value: userLr, mono: true },
+              { Icon: UserIcon,   label: 'Name',    value: displayName },
+              { Icon: IdCardIcon, label: 'User ID', value: userLr, mono: true },
             ].map(r => (
               <div key={r.label} className="flex items-center gap-2.5 py-2">
-                <span style={{ color: 'var(--text-muted)' }}><r.Icon /></span>
+                <span style={{ color: '#94a3b8' }}><r.Icon /></span>
                 <div>
-                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{r.label}</p>
+                  <p className="text-xs" style={{ color: '#64748b' }}>{r.label}</p>
                   <p className={`text-xs font-semibold ${r.mono ? 'font-mono' : ''}`}
-                    style={{ color: r.mono ? userColor : 'var(--text-primary)' }}>{r.value}</p>
+                    style={{ color: r.mono ? displayColor : '#0f172a' }}>{r.value}</p>
                 </div>
               </div>
             ))}
           </div>
-          <button onClick={handleLogout}
-            className="w-full flex items-center gap-3 px-4 py-3 text-left transition-colors"
+
+          {/* Logout */}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-left"
+            style={{ transition: 'background 0.15s' }}
             onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.06)'}
             onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
             <span style={{ color: '#ef4444' }}><LogoutIcon /></span>
@@ -228,11 +373,9 @@ function ProfileDropdown({ userName, userShort, userLr, userColor, fullName }) {
 }
 
 // ─── Topbar ───────────────────────────────────────────────────────────────────
-export default function Topbar({ onMenuClick }) {
-  const location = useLocation();
-  const { selectedMember, selectedMemberId, hasFamily } = useFamily();
+export default function Topbar({ onMenuClick, onAddMember }) {
+  const { selectedMemberId, approvedMembers, hasFamily } = useFamily();
   const { user } = useAuth();
-
   const [profile, setProfile] = useState(null);
 
   useEffect(() => {
@@ -244,63 +387,49 @@ export default function Topbar({ onMenuClick }) {
   const userId     = getUserId();
   const uuidSuffix = userId ? `…${userId.slice(-4)}` : '';
 
-  const isFamily = !selectedMemberId;
+  // ── Profile avatar always shows the LOGGED-IN user, never a family member ──
+  // The family switcher handles "view as"; the profile button is the auth identity.
+  const loggedInFirst = profile?.firstName ?? '';
+  const loggedInLast  = profile?.lastName  ?? '';
+  const loggedInName  = (loggedInFirst + ' ' + loggedInLast).trim() || user?.name || '—';
 
-  // Name: merge firstName + lastName from profile API as the real name
-  const firstName = profile?.firstName ?? '';
-  const lastName  = profile?.lastName  ?? '';
-  const fullName  = (firstName + ' ' + lastName).trim() || user?.name || '—';
-  const userName  = fullName.split(' ')[0] || '—';
-
-  const userLr    = uuidSuffix;
-  const userColor = MEMBER_COLORS[selectedMemberId] ?? '#6366f1';
-
-  const pageLabel = Object.entries(PAGE_LABELS).find(([k]) => location.pathname.startsWith(k))?.[1] ?? 'Dashboard';
+  // Fixed indigo for the logged-in user's avatar — consistent regardless of which
+  // family member is currently being viewed in the dashboard.
+  const profileColor   = '#6366f1';
+  const profileInitial = loggedInName.charAt(0).toUpperCase();
 
   return (
     <header className="topbar-shell lg:pl-[55px]">
 
       {/* Hamburger — mobile only */}
-      <button onClick={onMenuClick}
-        className="lg:hidden topbar-icon-btn flex-shrink-0 mr-1">
+      <button onClick={onMenuClick} className="lg:hidden topbar-icon-btn flex-shrink-0 mr-1">
         <MenuIcon />
       </button>
 
-      {/* Brand — end of left section */}
-        <div className="hidden sm:flex items-center gap-2 ml-4 pl-4 flex-shrink-0">
-          <img src={logo} alt="Unified Lending platform" className="w-32 h-13 object-cover flex-shrink-1"
-            style={{ boxShadow: '0 0 10px rgba(99,102,241,0.4)' }} />
-          {/* <span className="text-xs font-black tracking-widest uppercase"
-            style={{ color: 'var(--text-primary)', letterSpacing: '0.1em' }}>
-            Oxy Portfolio
-          </span> */}
-        </div>
-
-      {/* Left: page label + greeting + live + Brand at end */}
-      <div className="flex items-center gap-2 flex-1 min-w-0">
-        {/* <span className="topbar-sep">·</span>
-        <span className="text-xs font-medium truncate" style={{ color: 'var(--text-primary)' }}>
-          Good {getGreeting()},{' '}
-          <span style={{ color: userColor, fontWeight: 700 }}>
-            {hasFamily && !selectedMemberId ? 'Family' : fullName}
-          </span>
-        </span>
-        <div className="topbar-live-badge">
-          <span className="live-dot" style={{ width: 5, height: 5 }} />
-          <span style={{ color: '#10b981', fontSize: 10, fontWeight: 600 }}>Live</span>
-        </div> */}
+      {/* Brand */}
+      <div className="hidden sm:flex items-center gap-2 ml-4 pl-4 flex-shrink-0">
+        <img src={logo} alt="Unified Lending Platform" className="w-32 h-13 object-cover flex-shrink-1"
+          style={{ boxShadow: '0 0 10px rgba(99,102,241,0.4)' }} />
       </div>
 
-      {/* Right: actions */}
+      {/* Spacer */}
+      <div className="flex-1 min-w-0" />
+
+      {/* Right actions */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
-        <FamilySwitcher />
+        <FamilySwitcher onAddMember={onAddMember} loggedInName={loggedInName} />
         <ThemeToggle />
         <button className="topbar-icon-btn relative">
           <BellIcon />
           <span className="absolute top-1 right-1 w-2 h-2 rounded-full"
             style={{ background: '#ef4444', boxShadow: '0 0 6px rgba(239,68,68,0.6)' }} />
         </button>
-        <ProfileDropdown userName={fullName} userShort={userName} userLr={userLr} userColor={userColor} fullName={fullName} />
+        <ProfileDropdown
+          displayName={loggedInName}
+          displayInitial={profileInitial}
+          displayColor={profileColor}
+          userLr={uuidSuffix}
+        />
       </div>
 
     </header>

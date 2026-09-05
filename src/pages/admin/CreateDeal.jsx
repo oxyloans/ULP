@@ -5,7 +5,8 @@ import { formatINR } from "../../utils/currency";
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
 const DEAL_TYPES       = ["NORMAL", "TEST"];
-const DEAL_SUB_TYPES   = ["STUDENT"];
+const DEAL_SUB_TYPES      = ["STUDENT"];
+const GOLD_SUB_TYPES      = ["INVESTMENT", "PLEDGINGGOLD"];
 const DEAL_TABS = [
   { key: "ASSET",    label: "Asset - Fractional Lending" },
   { key: "SDLOT",   label: "SD Lot" },
@@ -369,6 +370,15 @@ function toLocale(s) {
 // Convert YYYY-MM-DD → DD/MM/YYYY for display, keep YYYY-MM-DD for API
 function toApiDate(d) { return d; } // already YYYY-MM-DD from <input type="date">
 
+// Add N months to a YYYY-MM-DD string, returns YYYY-MM-DD
+function addMonthsToDate(dateStr, months) {
+  if (!dateStr || !months) return "";
+  const d = new Date(dateStr);
+  if (isNaN(d)) return "";
+  d.setMonth(d.getMonth() + parseInt(months, 10));
+  return d.toISOString().slice(0, 10);
+}
+
 // Convert API date (DD/MM/YYYY or YYYY-MM-DD) → YYYY-MM-DD for <input type="date">
 function fromApiDate(d) {
   if (!d) return "";
@@ -477,6 +487,14 @@ const EMPTY_FORM = {
   transferFundsId: "",   // bank account id
   transferFunds:   "",   // bank name (auto from selection)
   transferTo:      "",   // company name (auto from selection)
+  // Gold-specific fields
+  monthlyGoldGrowth:    "",
+  quarterlyGoldGrowth:  "",
+  halfGoldGrowth:       "",
+  yearlyGoldGrowth:     "",
+  propertyTds:          "",
+  tdsPercentage:        "",
+  description:          "",
 };
 
 const EMPTY_ASSET_FORM = {
@@ -773,12 +791,36 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         transferFundsId:           editDeal.transferFundsId           ?? "",
         transferFunds:             editDeal.transferFunds             ?? "",
         transferTo:                editDeal.transferTo                ?? "",
+        // Gold-specific fields
+        monthlyGoldGrowth:         editDeal.monthlyGoldGrowth         ? String(editDeal.monthlyGoldGrowth)   : "",
+        quarterlyGoldGrowth:       editDeal.quarterlyGoldGrowth       ? String(editDeal.quarterlyGoldGrowth) : "",
+        halfGoldGrowth:            editDeal.halfGoldGrowth            ? String(editDeal.halfGoldGrowth)      : "",
+        yearlyGoldGrowth:          editDeal.yearlyGoldGrowth          ? String(editDeal.yearlyGoldGrowth)    : "",
+        propertyTds:               editDeal.propertyTds               ?? "",
+        tdsPercentage:             editDeal.tdsPercentage             ? String(editDeal.tdsPercentage)       : "",
+        description:               editDeal.description               ?? "",
       });
     }
   }, [editDeal]);
 
   const set = (k, v) => { setForm(f => ({ ...f, [k]: v })); setErrors(e => ({ ...e, [k]: "" })); };
   const setAsset = (k, v) => { setAssetForm(f => ({ ...f, [k]: v })); setAssetErrors(e => ({ ...e, [k]: "" })); };
+
+  // Auto-fill EMI End Date = Loan Active Date + Duration months
+  useEffect(() => {
+    const computed = addMonthsToDate(form.loanActiveDate, form.duration);
+    if (computed) setForm(f => ({ ...f, emiEndDate: computed }));
+  }, [form.loanActiveDate, form.duration]);
+
+  useEffect(() => {
+    const computed = addMonthsToDate(assetForm.loanActiveDate, assetForm.duration);
+    if (computed) setAssetForm(f => ({ ...f, emiEndDate: computed }));
+  }, [assetForm.loanActiveDate, assetForm.duration]);
+
+  useEffect(() => {
+    const computed = addMonthsToDate(borrowerForm.loanActiveDate, borrowerForm.duration);
+    if (computed) setBorrowerForm(f => ({ ...f, emiEndDate: computed }));
+  }, [borrowerForm.loanActiveDate, borrowerForm.duration]);
 
   const changeTab = (tab) => {
     setActiveTab(tab);
@@ -787,7 +829,10 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     setErrors({});
     setAssetErrors({});
     setBorrowerErrors({});
-    if (tab === "SDLOT" || tab === "GOLD") set("globalDealType", tab);
+    if (tab === "SDLOT" || tab === "GOLD") {
+      set("globalDealType", tab);
+      set("dealSubType", tab === "GOLD" ? "INVESTMENT" : "STUDENT");
+    }
   };
 
   // Derive selected bank object from transferFundsId
@@ -801,7 +846,6 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     if (!form.duration)                     e.duration              = "Duration is required";
     if (!form.minimumParticipation)         e.minimumParticipation  = "Minimum participation is required";
     if (!form.maxParticipation)             e.maxParticipation      = "Maximum participation is required";
-    if (!form.monthlyInterest)              e.monthlyInterest       = "Monthly interest is required";
     if (!form.fundsAcceptanceStartDate)     e.fundsAcceptanceStartDate = "Start date is required";
     if (!form.fundsAcceptanceEndDate)       e.fundsAcceptanceEndDate   = "End date is required";
     if (!form.loanActiveDate)               e.loanActiveDate        = "Loan active date is required";
@@ -872,6 +916,16 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         transferTo:                form.transferTo,                // company name
         userIds:                   IdsField
       };
+      // Gold-specific fields — only include when the deal is a GOLD deal
+      if (form.globalDealType === "GOLD") {
+        if (form.monthlyGoldGrowth)   payload.monthlyGoldGrowth   = parseFloat(form.monthlyGoldGrowth)   || 0;
+        if (form.quarterlyGoldGrowth) payload.quarterlyGoldGrowth = parseFloat(form.quarterlyGoldGrowth) || 0;
+        if (form.halfGoldGrowth)      payload.halfGoldGrowth      = parseFloat(form.halfGoldGrowth)      || 0;
+        if (form.yearlyGoldGrowth)    payload.yearlyGoldGrowth    = parseFloat(form.yearlyGoldGrowth)    || 0;
+        if (form.propertyTds)         payload.propertyTds         = form.propertyTds.trim();
+        if (form.tdsPercentage)       payload.tdsPercentage       = parseFloat(form.tdsPercentage)       || 0;
+        if (form.description)         payload.description         = form.description.trim();
+      }
       if (isEdit && editDeal?.id) payload.id = editDeal.id;
 
       await createOrUpdateDeal(payload);
@@ -1017,7 +1071,10 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
             type="button"
             onClick={() => {
               setActiveTab(card.key === "BORROWER" ? "BORROWER" : card.key);
-              if (card.key === "SDLOT" || card.key === "GOLD") set("globalDealType", card.key);
+              if (card.key === "SDLOT" || card.key === "GOLD") {
+                set("globalDealType", card.key);
+                set("dealSubType", card.key === "GOLD" ? "INVESTMENT" : "STUDENT");
+              }
               setDealTypeSelected(true);
             }}
             className="text-left rounded-2xl p-5 flex flex-col gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -1321,7 +1378,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               <input type="date" value={assetForm.loanActiveDate} onChange={e => setAsset("loanActiveDate", e.target.value)}
                 style={inp(assetErrors.loanActiveDate)} />
             </Field>
-            <Field label="EMI End Date" required error={assetErrors.emiEndDate}>
+            <Field label="EMI End Date" required error={assetErrors.emiEndDate} hint={assetForm.loanActiveDate && assetForm.duration ? "Auto-filled from Loan Active Date + Duration" : undefined}>
               <input type="date" value={assetForm.emiEndDate} onChange={e => setAsset("emiEndDate", e.target.value)}
                 style={inp(assetErrors.emiEndDate)} />
             </Field>
@@ -1687,7 +1744,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                 onChange={e => setBorrower("loanActiveDate", e.target.value)}
                 style={inp(borrowerErrors.loanActiveDate)} />
             </Field>
-            <Field label="EMI End Date" required error={borrowerErrors.emiEndDate}>
+            <Field label="EMI End Date" required error={borrowerErrors.emiEndDate} hint={borrowerForm.loanActiveDate && borrowerForm.duration ? "Auto-filled from Loan Active Date + Duration" : undefined}>
               <input type="date" value={borrowerForm.emiEndDate}
                 onChange={e => setBorrower("emiEndDate", e.target.value)}
                 style={inp(borrowerErrors.emiEndDate)} />
@@ -1812,7 +1869,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
             <Field label="Sub Type" required>
               <select value={form.dealSubType} onChange={e => set("dealSubType", e.target.value)}
                 style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
-                {DEAL_SUB_TYPES.map(t => <option key={t} value={t}>{t}</option>)}
+                {(activeTab === "GOLD" ? GOLD_SUB_TYPES : DEAL_SUB_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </Field>
           </div>
@@ -1931,7 +1988,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           </div>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {[
-              { key: "monthlyInterest",  label: "Monthly",    required: true  },
+              { key: "monthlyInterest",  label: "Monthly",    required: false },
               { key: "quartelyInterest", label: "Quarterly",  required: false },
               { key: "halfInterest",     label: "Half-Yearly",required: false },
               { key: "yearlyInterest",   label: "Yearly",     required: false },
@@ -1947,6 +2004,58 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
             ))}
           </div>
         </div>
+
+        {/* Gold Growth Rates — only for GOLD deals */}
+        {activeTab === "GOLD" && (
+          <div className="rounded-2xl p-5 grid gap-4"
+            style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+            <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>Gold Growth (%)</p>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { key: "monthlyGoldGrowth",   label: "Monthly"    },
+                { key: "quarterlyGoldGrowth", label: "Quarterly"  },
+                { key: "halfGoldGrowth",      label: "Half-Yearly"},
+                { key: "yearlyGoldGrowth",    label: "Yearly"     },
+              ].map(f => (
+                <Field key={f.key} label={f.label} error={errors[f.key]}>
+                  <div className="relative">
+                    <input type="text" inputMode="decimal" placeholder="0.0"
+                      value={form[f.key]} onChange={e => set(f.key, e.target.value.replace(/[^0-9.]/g, ""))}
+                      style={{ ...inp(errors[f.key]), paddingRight: 28 }} />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold" style={{ color: "var(--text-muted)" }}>%</span>
+                  </div>
+                </Field>
+              ))}
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Property TDS" error={errors.propertyTds}>
+                <select
+                  value={form.propertyTds} onChange={e => set("propertyTds", e.target.value)}
+                  style={{ ...inp(errors.propertyTds), appearance: "none", cursor: "pointer" }}>
+                  <option value="">— Select —</option>
+                  <option value="OPTIONAL">OPTIONAL</option>
+                  <option value="MANDATORY">MANDATORY</option>
+                </select>
+              </Field>
+              <Field label="TDS Percentage (%)" error={errors.tdsPercentage}>
+                <div className="relative">
+                  <input type="text" inputMode="decimal" placeholder="0.0"
+                    value={form.tdsPercentage} onChange={e => set("tdsPercentage", e.target.value.replace(/[^0-9.]/g, ""))}
+                    style={{ ...inp(errors.tdsPercentage), paddingRight: 28 }} />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold" style={{ color: "var(--text-muted)" }}>%</span>
+                </div>
+              </Field>
+            </div>
+
+            <Field label="Description" error={errors.description}>
+              <textarea rows={3} placeholder="Enter deal description…"
+                value={form.description} onChange={e => set("description", e.target.value)}
+                className="w-full resize-none"
+                style={{ ...inp(errors.description), padding: "10px 14px" }} />
+            </Field>
+          </div>
+        )}
 
         {/* Dates */}
         <div className="rounded-2xl p-5 grid gap-4"
@@ -1965,7 +2074,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
               <input type="date" value={form.loanActiveDate} onChange={e => set("loanActiveDate", e.target.value)}
                 style={inp(errors.loanActiveDate)} />
             </Field>
-            <Field label="EMI End Date" required error={errors.emiEndDate}>
+            <Field label="EMI End Date" required error={errors.emiEndDate} hint={form.loanActiveDate && form.duration ? "Auto-filled from Loan Active Date + Duration" : undefined}>
               <input type="date" value={form.emiEndDate} onChange={e => set("emiEndDate", e.target.value)}
                 style={inp(errors.emiEndDate)} />
             </Field>

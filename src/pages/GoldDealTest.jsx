@@ -12,7 +12,7 @@ const GoldIcon = () => (
   </svg>
 );
 
-export default function GoldDeal() {
+export default function GoldDealTest() {
   const { user } = useAuth();
   const [allDeals, setAllDeals] = useState([]);
   const [loading,  setLoading]  = useState(true);
@@ -23,7 +23,7 @@ export default function GoldDeal() {
 
   useEffect(() => {
     setLoading(true);
-    getSdLots("NORMAL")
+    getSdLots("TEST")
       .then(data => {
         if (Array.isArray(data)) {
           setAllDeals(data.map(mapDeal).filter(l => l.globalDealType === 'GOLD'));

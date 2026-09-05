@@ -26,8 +26,9 @@ const assetSubItems = [
 ];
 
 const interestSubItems = [
-  { title: 'SD Lot',       path: '/admin/interest/sd-lot', perm: PERM.INTEREST },
-  { title: 'Asset Payout', path: '/admin/interest/asset',  perm: PERM.INTEREST },
+  { title: 'SD Lot',           path: '/admin/interest/sd-lot', perm: PERM.INTEREST },
+  // { title: 'Gold Payout',      path: '/admin/interest/gold',   perm: PERM.INTEREST },
+  { title: 'Asset Payout',     path: '/admin/interest/asset',  perm: PERM.INTEREST },
   { title: 'Principal & Interest', path: '/admin/interest/principal-interest', perm: PERM.INTEREST },
 ];
 const migratedSubItems = [

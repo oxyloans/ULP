@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { getRunningClosedDeals, getDealParticipants, getAdminDeals, returnPrincipal, closeDealManually } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
@@ -10,6 +11,7 @@ const BankIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 const SpinnerIcon  = () => <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#a855f7', borderTopColor: 'transparent' }} />;
 const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const SearchIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
+const EditIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 
 
 function fmtINR(n) {
@@ -18,10 +20,11 @@ function fmtINR(n) {
 }
 
 const TABS = [
-  { key: 'NORMAL', label: 'Running SD Lots', color: '#10b981' },
-  { key: 'ASSET',  label: 'Asset Deals',      color: '#06b6d4' },
+  { key: 'NORMAL', label: 'SD Lots',         color: '#10b981' },
+  { key: 'GOLD',   label: 'Gold Lots',       color: '#f59e0b' },
+  { key: 'ASSET',  label: 'Asset Deals',     color: '#06b6d4' },
   { key: 'closed', label: 'Closed',          color: '#6366f1' },
-  { key: 'TEST',   label: 'Test',            color: '#f59e0b' },
+  { key: 'TEST',   label: 'Test',            color: '#a855f7' },
 ];
 
 // ─── Feedback modal for success / error messages ──────────────────────────────
@@ -415,7 +418,7 @@ function ParticipantsPanel({ dealId }) {
 }
 
 // ─── Deal row ─────────────────────────────────────────────────────────────────
-function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, onDeactivate }) {
+function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, onDeactivate, onEdit }) {
   const dealKey = deal.dealId ?? deal.id;
   const expanded = expandedId === dealKey;
 
@@ -511,7 +514,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
           {deal.rateofinterest ?? deal.monthlyInterest ?? '—'}%
         </td>
 
-        {/* Status */}
+        {/* Status + Actions */}
         <td className="py-3.5 px-4">
           {isAchieved ? (
             <span className="text-xs px-2.5 py-1 rounded-full font-bold whitespace-nowrap"
@@ -519,16 +522,30 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
               ✓ Achieved
             </span>
           ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onDeactivate(deal);
-              }}
-              className="text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
-              style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}
-            >
-              Close Manually
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Edit button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(deal);
+                }}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #4338ca)', boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }}
+              >
+                <EditIcon /> Edit
+              </button>
+              {/* Close Manually button */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDeactivate(deal);
+                }}
+                className="text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
+                style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}
+              >
+                Close
+              </button>
+            </div>
           )}
         </td>
 
@@ -577,13 +594,15 @@ export default function AdminOffline() {
   const [dealToClose, setDealToClose] = useState(null);
   const [closingDealLoader, setClosingDealLoader] = useState(false);
 
+  const navigate = useNavigate();
+
   const handleToggle = (dealId) => {
     setExpandedDealId(prev => prev === dealId ? null : dealId);
   };
 
   const load = (tab = activeTab) => {
     setLoading(true); setError(''); setDeals([]);
-    const apiTab = tab === 'ASSET' ? 'NORMAL' : tab;
+    const apiTab = (tab === 'ASSET' || tab === 'GOLD') ? 'NORMAL' : tab;
     getAdminDeals(apiTab)
       .then(res => {
         const list = res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
@@ -625,7 +644,10 @@ export default function AdminOffline() {
     if (!matchesSearch) return false;
 
     if (activeTab === 'NORMAL') {
-      return d.globalDealType !== 'ASSET';
+      return d.globalDealType !== 'ASSET' && d.globalDealType !== 'GOLD';
+    }
+    if (activeTab === 'GOLD') {
+      return d.globalDealType === 'GOLD';
     }
     if (activeTab === 'ASSET') {
       return d.globalDealType === 'ASSET';
@@ -754,7 +776,7 @@ export default function AdminOffline() {
             <table className="w-full text-sm">
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                  {['#', 'Deal Name', 'Deal Value', 'Invested', 'Remaining', 'Fill %', 'ROI', 'Status', 'Participants'].map(h => (
+                  {['#', 'Deal Name', 'Deal Value', 'Invested', 'Remaining', 'Fill %', 'ROI', 'Actions', 'Participants'].map(h => (
                     <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
                       style={{ color: 'var(--text-muted)' }}>{h}</th>
                   ))}
@@ -777,6 +799,7 @@ export default function AdminOffline() {
                     onToggle={handleToggle}
                     showDeactivate={activeTab !== 'closed'}
                     onDeactivate={setDealToClose}
+                    onEdit={(d) => navigate(`/admin/create-deal/${d.dealId ?? d.id}`)}
                   />
                 ))}
               </tbody>

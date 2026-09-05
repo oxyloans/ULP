@@ -119,6 +119,55 @@ export async function getAdminOxyLoansDeals() {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
+// OXYLOANS — FAMILY MANAGEMENT (admin support)
+// These endpoints let admins look up which member is the Head of Family so they
+// can route and resolve support queries raised by any family member on OxyLoans.
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /admin-service/oxyloans/family-groups
+ * Returns all OxyLoans family groups with their members and the current Head.
+ * Response: [{
+ *   groupId: string,
+ *   headOfFamily: { id, name, lrId, phone, email },
+ *   members: [{ id, name, lrId, relation, phone, email, status }],
+ *   totalMembers: number,
+ *   createdAt: string,
+ * }]
+ */
+export async function getAdminOxyLoansFamilyGroups() {
+  return get('/admin-service/oxyloans/family-groups');
+}
+
+/**
+ * GET /admin-service/oxyloans/family-groups/user/{userId}
+ * Look up the family group for a specific user — returns the Head of Family
+ * contact so support staff can reach them when a member raises a query.
+ * Response: { groupId, headOfFamily: { id, name, lrId, phone, email }, members: [...] }
+ */
+export async function getAdminFamilyGroupByUser(userId) {
+  return get(`/admin-service/oxyloans/family-groups/user/${userId}`);
+}
+
+/**
+ * POST /admin-service/oxyloans/family/set-head
+ * Admin override: set a different member as Head of Family for a group.
+ * Body: { groupId, memberId, reason }
+ */
+export async function adminSetHeadOfFamily({ groupId, memberId, reason = '' }) {
+  return post('/admin-service/oxyloans/family/set-head', { groupId, memberId, reason });
+}
+
+/**
+ * POST /admin-service/oxyloans/family/remove-member
+ * Admin override: remove a member from a family group (e.g. for compliance).
+ * Body: { groupId, memberId, reason }
+ */
+export async function adminRemoveFamilyMember({ groupId, memberId, reason = '' }) {
+  return post('/admin-service/oxyloans/family/remove-member', { groupId, memberId, reason });
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
 // OFFLINE PAYMENTS
 // ══════════════════════════════════════════════════════════════════════════════
 
@@ -345,6 +394,92 @@ export async function submitInterestApprovals(payload) {
  * }
  */
 export async function updateLenderInterestPayments(payload) {
+  return patch('/oxybrick-service/updateLenderInterestPayments', payload);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// GOLD DEAL INTEREST PAYOUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/allLoanActiveDeals/{monthName}/{year}/{startDate}/{endDate}
+ * Fetches Gold deals (globalDealType=GOLD) active in the selected period.
+ * Uses the same route as SD Lot but filters by globalDealType on the client.
+ */
+export async function getGoldAdminInterestDeals({ monthName, year, startDate, endDate }) {
+  const month = encodeURIComponent(String(monthName ?? '').trim());
+  const y = encodeURIComponent(String(year ?? '').trim());
+  const sd = encodeURIComponent(String(startDate ?? '').trim());
+  const ed = encodeURIComponent(String(endDate ?? '').trim());
+  return get(`/oxybrick-service/allLoanActiveDeals/${month}/${y}/${sd}/${ed}`);
+}
+
+/**
+ * GET /oxybrick-service/interestBreakUpByDeal?dealId={dealId}
+ * Lender-level interest breakup for a Gold deal — same endpoint as SD Lot.
+ */
+export async function getGoldInterestBreakUpByDeal(dealId) {
+  return get(`/oxybrick-service/interestBreakUpByDeal?dealId=${encodeURIComponent(dealId)}`);
+}
+
+/**
+ * PATCH /oxybrick-service/interestApprovals
+ * Generate interest approval sheet for a Gold deal — same endpoint as SD Lot.
+ * Body: { dealId, sheetGeneratedDate, usersDealsBasedInterestInfoDto }
+ */
+export async function submitGoldInterestApprovals(payload) {
+  return patch('/oxybrick-service/interestApprovals', payload);
+}
+
+/**
+ * PATCH /oxybrick-service/updateLenderInterestPayments
+ * Mark Gold deal lenders as paid — same endpoint as SD Lot.
+ * Body: { actualInterestDate, dealId, paidDate, sheetGeneratedDate, usersDealsBasedInterestInfoDto }
+ */
+export async function updateGoldLenderInterestPayments(payload) {
+  return patch('/oxybrick-service/updateLenderInterestPayments', payload);
+}
+
+// ══════════════════════════════════════════════════════════════════════════════
+// ASSET DEAL INTEREST PAYOUTS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/allLoanActiveDeals/{monthName}/{year}/{startDate}/{endDate}
+ * Fetches Asset deals (globalDealType=REALGOLD) active in the selected period.
+ * Uses the same route as SD Lot but filters by globalDealType on the client.
+ */
+export async function getAssetAdminInterestDeals({ monthName, year, startDate, endDate }) {
+  const month = encodeURIComponent(String(monthName ?? '').trim());
+  const y = encodeURIComponent(String(year ?? '').trim());
+  const sd = encodeURIComponent(String(startDate ?? '').trim());
+  const ed = encodeURIComponent(String(endDate ?? '').trim());
+  return get(`/oxybrick-service/allLoanActiveDeals/${month}/${y}/${sd}/${ed}`);
+}
+
+/**
+ * GET /oxybrick-service/interestBreakUpByDeal?dealId={dealId}
+ * Lender-level interest breakup for an Asset deal — same endpoint as SD Lot.
+ */
+export async function getAssetInterestBreakUpByDeal(dealId) {
+  return get(`/oxybrick-service/interestBreakUpByDeal?dealId=${encodeURIComponent(dealId)}`);
+}
+
+/**
+ * PATCH /oxybrick-service/interestApprovals
+ * Generate interest approval sheet for an Asset deal — same endpoint as SD Lot.
+ * Body: { dealId, sheetGeneratedDate, usersDealsBasedInterestInfoDto }
+ */
+export async function submitAssetInterestApprovals(payload) {
+  return patch('/oxybrick-service/interestApprovals', payload);
+}
+
+/**
+ * PATCH /oxybrick-service/updateLenderInterestPayments
+ * Mark Asset deal lenders as paid — same endpoint as SD Lot.
+ * Body: { actualInterestDate, dealId, paidDate, sheetGeneratedDate, usersDealsBasedInterestInfoDto }
+ */
+export async function updateAssetLenderInterestPayments(payload) {
   return patch('/oxybrick-service/updateLenderInterestPayments', payload);
 }
 

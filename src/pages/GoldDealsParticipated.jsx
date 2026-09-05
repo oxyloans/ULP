@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { downloadGoldMouForCurrentUser, getAllParticipationByUser, getGoldDealsEarnings, getGoldGrowthDetail } from '../api/afterlogin-user';
+import { downloadGoldMouForCurrentUser, getAllParticipationByUser, getGoldDealsEarnings, getGoldGrowthDetail, getRunningDeals } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -730,7 +730,7 @@ function ProcessedDealCard({ deal, onDownloadMou, onRealizationPayout, onOpenDet
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function GoldDealsParticipated() {
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('running');
+  const [activeTab, setActiveTab] = useState('ulp');
   const [search, setSearch] = useState('');
   const [runningPayoutFilter, setRunningPayoutFilter] = useState('all');
   const [processedStatusFilter, setProcessedStatusFilter] = useState('all');
@@ -746,6 +746,11 @@ export default function GoldDealsParticipated() {
   const [processedBonusTotal, setProcessedBonusTotal] = useState(0);
   const [processedGrowthDealsCount, setProcessedGrowthDealsCount] = useState(0);
   const [processedBonusLoading, setProcessedBonusLoading] = useState(false);
+
+  // ULP tab — GOLD deals from getRunningDeals
+  const [ulpData, setUlpData]         = useState(null);
+  const [ulpLoading, setUlpLoading]   = useState(false);
+  const [ulpError, setUlpError]       = useState('');
 
   const loadRunning = () => {
     setRunningLoading(true);
@@ -774,6 +779,20 @@ export default function GoldDealsParticipated() {
   const openProcessedTab = () => {
     setActiveTab('processed');
     if (!processedData && !processedLoading) loadProcessed();
+  };
+
+  const loadUlp = () => {
+    setUlpLoading(true);
+    setUlpError('');
+    getRunningDeals()
+      .then(res => setUlpData(res))
+      .catch(e => setUlpError(e.message ?? 'Failed to load ULP deals'))
+      .finally(() => setUlpLoading(false));
+  };
+
+  const openUlpTab = () => {
+    setActiveTab('ulp');
+    if (!ulpData && !ulpLoading) loadUlp();
   };
 
   const runningDeals = useMemo(
@@ -887,6 +906,19 @@ export default function GoldDealsParticipated() {
   const isLoading = activeTab === 'running' ? runningLoading : processedLoading;
   const error = activeTab === 'running' ? runningError : processedError;
 
+  // ULP tab deals: GOLD participations from getRunningDeals
+  const ulpDeals = useMemo(() => {
+    return (ulpData?.participationInfo ?? []).filter(p => p.globalDealType === 'GOLD');
+  }, [ulpData]);
+
+  const filteredUlpDeals = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return ulpDeals;
+    return ulpDeals.filter(d =>
+      (d.dealName ?? '').toLowerCase().includes(q) ||
+      String(d.dealId ?? '').toLowerCase().includes(q)
+    );
+  }, [ulpDeals, search]);
   const handleDownloadMou = async (deal) => {
     try {
       const blob = await downloadGoldMouForCurrentUser(deal.dealId);
@@ -986,7 +1018,7 @@ export default function GoldDealsParticipated() {
           </div>
 
           {/* Right: refresh */}
-          <button onClick={() => activeTab === 'running' ? loadRunning() : loadProcessed()} style={{
+          <button onClick={() => activeTab === 'running' ? loadRunning() : activeTab === 'ulp' ? loadUlp() : loadProcessed()} style={{
             display: 'flex', alignItems: 'center', gap: 7,
             padding: '9px 18px', borderRadius: 12,
             background: 'rgba(255,255,255,0.15)',
@@ -1047,10 +1079,25 @@ export default function GoldDealsParticipated() {
             }}>
             Processed
           </button>
+          <button
+            onClick={openUlpTab}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 800,
+              color: activeTab === 'ulp' ? '#fff' : 'var(--text-muted, #888)',
+              background: activeTab === 'ulp' ? `linear-gradient(135deg, #10b981, #059669)` : 'var(--input-bg)',
+              border: `1px solid ${activeTab === 'ulp' ? '#10b981' : 'var(--border, rgba(255,255,255,0.12))'}`,
+              cursor: 'pointer',
+              boxShadow: activeTab === 'ulp' ? `0 4px 14px #10b98145` : 'none',
+            }}>
+            ULP
+          </button>
         </div>
 
         <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted, #888)', margin: 0 }}>
-          {activeTab === 'running' ? 'Showing running deals' : 'Showing processed deals'}
+          {activeTab === 'running' ? 'Showing running deals' : activeTab === 'ulp' ? 'Showing ULP gold deals' : 'Showing processed deals'}
         </p>
       </div>
 
@@ -1069,7 +1116,7 @@ export default function GoldDealsParticipated() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder={activeTab === 'running' ? 'Search by deal name, id, payout' : 'Search by property name, id'}
+            placeholder={activeTab === 'running' ? 'Search by deal name, id, payout' : activeTab === 'ulp' ? 'Search by deal name, id' : 'Search by property name, id'}
             style={{
               borderRadius: 10,
               padding: '9px 10px',
@@ -1194,7 +1241,7 @@ export default function GoldDealsParticipated() {
         </div>
       )}
 
-      {isLoading ? (
+      {activeTab !== 'ulp' && (isLoading ? (
         <div style={{
           display: 'flex', flexDirection: 'column', alignItems: 'center',
           justifyContent: 'center', gap: 20, padding: '80px 0',
@@ -1229,7 +1276,7 @@ export default function GoldDealsParticipated() {
           justifyContent: 'center', gap: 16, padding: '80px 0',
         }}>
           <p style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{error}</p>
-          <button onClick={() => activeTab === 'running' ? loadRunning() : loadProcessed()} style={{
+          <button onClick={() => activeTab === 'running' ? loadRunning() : activeTab === 'ulp' ? loadUlp() : loadProcessed()} style={{
             padding: '8px 20px', borderRadius: 12, fontSize: 13, fontWeight: 700,
             background: `${GOLD}18`, color: GOLD, border: `1px solid ${GOLD}30`,
             cursor: 'pointer',
@@ -1316,6 +1363,84 @@ export default function GoldDealsParticipated() {
                   })}
                 />
               ))}
+            </div>
+          )}
+        </>
+      ))}
+
+      {/* ── ULP Tab ── */}
+      {activeTab === 'ulp' && (
+        <>
+          {ulpLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12, padding: '48px 0' }}>
+              <div style={{ width: 20, height: 20, borderRadius: '50%', border: '2px solid #10b98140', borderTopColor: '#10b981', animation: 'spin 0.8s linear infinite' }} />
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted, #888)' }}>Loading ULP deals…</span>
+            </div>
+          )}
+          {!ulpLoading && ulpError && (
+            <div style={{ textAlign: 'center', padding: '48px 0' }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: '#ef4444' }}>{ulpError}</p>
+              <button onClick={loadUlp} style={{ marginTop: 12, padding: '8px 20px', borderRadius: 12, fontSize: 13, fontWeight: 700, background: '#10b98118', color: '#10b981', border: '1px solid #10b98130', cursor: 'pointer' }}>Retry</button>
+            </div>
+          )}
+          {!ulpLoading && !ulpError && filteredUlpDeals.length === 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '64px 0', textAlign: 'center' }}>
+              <div style={{ width: 64, height: 64, borderRadius: 18, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#10b98112', border: '1px solid #10b98130', color: '#10b981' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" style={{ width: 32, height: 32 }}>
+                  <circle cx="12" cy="12" r="10"/><path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3"/><path d="M9 12h3"/>
+                </svg>
+              </div>
+              <div>
+                <p style={{ fontSize: 16, fontWeight: 800, color: 'var(--text-primary, #fff)', margin: 0 }}>No ULP participations found</p>
+                <p style={{ fontSize: 13, marginTop: 6, color: 'var(--text-muted, #888)' }}>Your Gold deal participations will appear here.</p>
+              </div>
+            </div>
+          )}
+          {!ulpLoading && !ulpError && filteredUlpDeals.length > 0 && (
+            <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr' }}>
+              {filteredUlpDeals.map((p, i) => {
+                const PAYOUT_MAP = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
+                const payLabel = PAYOUT_MAP[p.amountTye] ?? p.amountTye ?? '—';
+                const allEntries = [
+                  { amount: p.participatedAmount ?? 0, roi: p.rateOfInterest ?? 0 },
+                  ...(p.updatedParticipation ?? []).map(u => ({ amount: u.updationParticipation ?? 0, roi: u.rateOfInterest ?? p.rateOfInterest ?? 0 })),
+                ];
+                const totalInvested = allEntries.reduce((s, e) => s + e.amount, 0);
+                return (
+                  <div key={p.dealId ?? i} style={{
+                    borderRadius: 18, overflow: 'hidden',
+                    background: 'var(--surface-card, #1a1a2e)',
+                    border: '1px solid #10b98128',
+                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+                  }}>
+                    <div style={{ height: 3, background: 'linear-gradient(90deg,#10b981,#059669)' }} />
+                    <div style={{ padding: '16px 20px', display: 'grid', gap: 10 }}>
+                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                        <div>
+                          <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary, #fff)', margin: 0 }}>{p.dealName}</p>
+                          <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: 'var(--text-muted, #888)', marginTop: 4 }}>{String(p.dealId ?? '').slice(0, 18)}…</p>
+                        </div>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#10b98118', color: '#10b981', border: '1px solid #10b98128' }}>
+                          {payLabel}
+                        </span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                        {[
+                          { label: 'Total Invested', value: formatINR(totalInvested), color: '#6366f1' },
+                          { label: 'ROI',            value: `${p.rateOfInterest ?? 0}%`, color: '#f59e0b' },
+                          { label: 'Since',          value: p.participatedDate ?? '—', color: '#10b981' },
+                          { label: 'Entries',        value: String(allEntries.length), color: '#818cf8' },
+                        ].map(s => (
+                          <div key={s.label} style={{ padding: '8px 14px', borderRadius: 12, background: `${s.color}0d`, border: `1px solid ${s.color}20` }}>
+                            <p style={{ fontSize: 10, color: 'var(--text-muted, #888)', margin: 0 }}>{s.label}</p>
+                            <p style={{ fontSize: 14, fontWeight: 800, color: s.color, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{s.value}</p>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </>

@@ -522,7 +522,7 @@ export default function AssetDeals() {
           )}
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap gap-4">
-          <FilterGroup label="Monthly ROI" options={roiOptions} value={roiFilter} onChange={setRoiFilter} />
+          <FilterGroup label="ROI" options={roiOptions} value={roiFilter} onChange={setRoiFilter} />
           <FilterGroup label="Asset Type"  options={areaOptions} value={areaFilter} onChange={setAreaFilter} />
         </div>
       </div>

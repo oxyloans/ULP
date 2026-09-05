@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getFamilyMembers, addFamilyMemberRequest } from '../api/afterlogin-user';
+import { useFamily } from '../context/FamilyContext';
 
 const platformColor = { OxyLoans: '#6366f1', OxyBricks: '#10b981', Offline: '#f59e0b' };
 const statusChip    = { Approved: 'chip-green', Pending: 'chip-orange', Rejected: 'chip-red' };
@@ -178,7 +179,7 @@ function AddMemberForm({ onSubmitted }) {
   );
 }
 
-// ─── Member Card ──────────────────────────────────────────────────────────────
+// ─── Member Card (general — unchanged behaviour) ──────────────────────────────
 function MemberCard({ member, onViewLog }) {
   return (
     <div className="rounded-2xl p-5 flex flex-col gap-4"
@@ -229,12 +230,235 @@ function MemberCard({ member, onViewLog }) {
   );
 }
 
+// ─── OxyLoans Family Member Card ───────────────────────────────────────────────
+// Separate card for members linked via OxyLoans — shows Head of Family badge,
+// Set as Head button, and Remove button. Only rendered in the OxyLoans section.
+function OxyMemberCard({ member, isHead, onSetHead, onRemove }) {
+  const [settingHead, setSettingHead]   = useState(false);
+  const [removing, setRemoving]         = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
+  const [toast, setToast]               = useState(null);
+
+  const showToast = (msg, type = 'success') => {
+    setToast({ msg, type });
+    setTimeout(() => setToast(null), 3000);
+  };
+
+  const handleSetHead = async () => {
+    setSettingHead(true);
+    const result = await onSetHead(member.id);
+    setSettingHead(false);
+    if (result?.success) {
+      showToast('Set as Head of Family');
+    } else {
+      showToast(result?.error ?? 'Failed to update', 'error');
+    }
+  };
+
+  const handleRemove = async () => {
+    setConfirmRemove(false);
+    setRemoving(true);
+    const result = await onRemove(member.id);
+    setRemoving(false);
+    if (!result?.success) {
+      showToast(result?.error ?? 'Failed to remove member', 'error');
+    }
+  };
+
+  return (
+    <div className="rounded-2xl p-5 flex flex-col gap-4 transition-all"
+      style={{
+        background: isHead
+          ? 'linear-gradient(135deg,rgba(245,131,17,0.09),rgba(245,131,17,0.03))'
+          : 'var(--card-bg)',
+        border: isHead ? '1.5px solid rgba(245,131,17,0.4)' : '1px solid var(--border)',
+        boxShadow: isHead ? '0 0 0 3px rgba(245,131,17,0.08)' : 'none',
+        opacity: removing ? 0.5 : 1,
+      }}>
+
+      {/* Toast */}
+      {toast && (
+        <div className="px-3 py-2 rounded-xl text-xs font-semibold flex items-center gap-2"
+          style={{
+            background: toast.type === 'error' ? 'rgba(233,83,48,0.08)' : 'rgba(53,161,62,0.08)',
+            color: toast.type === 'error' ? '#e95330' : '#35a13e',
+            border: `1px solid ${toast.type === 'error' ? 'rgba(233,83,48,0.2)' : 'rgba(53,161,62,0.2)'}`,
+          }}>
+          {toast.msg}
+        </div>
+      )}
+
+      {/* Header row */}
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <div className="w-11 h-11 rounded-full flex items-center justify-center text-base font-bold flex-shrink-0"
+            style={{
+              background: isHead ? 'rgba(245,131,17,0.15)' : 'rgba(99,102,241,0.1)',
+              color: isHead ? '#f58311' : 'var(--brand)',
+              border: isHead ? '2px solid rgba(245,131,17,0.35)' : '2px solid rgba(99,102,241,0.2)',
+            }}>
+            {member.name?.charAt(0) ?? '?'}
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm font-bold truncate" style={{ color: 'var(--text-primary)' }}>{member.name ?? '—'}</p>
+            {member.relation && (
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{member.relation}</p>
+            )}
+          </div>
+        </div>
+
+        {/* Head of Family crown badge */}
+        {isHead && (
+          <span className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-bold flex-shrink-0"
+            style={{ background: 'rgba(245,131,17,0.15)', color: '#f58311', border: '1px solid rgba(245,131,17,0.3)' }}>
+            {/* Crown icon */}
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3"><path d="M2 20h20v2H2zM4 18l4-10 4 4 4-8 4 10H4z"/></svg>
+            Head of Family
+          </span>
+        )}
+      </div>
+
+      {/* Details */}
+      <div className="grid grid-cols-2 gap-2 text-xs" style={{ color: 'var(--text-muted)' }}>
+        {member.lrId  && <span className="font-mono col-span-2" style={{ color: '#f58311' }}>🪪 {member.lrId}</span>}
+        {member.phone && <span>📱 {member.phone}</span>}
+        {member.email && <span className="truncate">📧 {member.email}</span>}
+      </div>
+
+      {/* Support contact note (only on head card) */}
+      {isHead && (
+        <p className="text-xs px-3 py-2 rounded-xl"
+          style={{ background: 'rgba(245,131,17,0.07)', color: 'var(--text-muted)', border: '1px solid rgba(245,131,17,0.15)' }}>
+          All OxyLoans support queries from this family will be directed to this member.
+        </p>
+      )}
+
+      {/* Actions */}
+      <div className="flex gap-2 flex-wrap">
+        {/* Set as Head — hidden if already head */}
+        {!isHead && (
+          <button
+            onClick={handleSetHead}
+            disabled={settingHead || removing}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+            style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.28)' }}>
+            {settingHead
+              ? <span className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#f58311', borderTopColor: 'transparent' }} />
+              : <svg viewBox="0 0 24 24" fill="currentColor" className="w-3 h-3"><path d="M2 20h20v2H2zM4 18l4-10 4 4 4-8 4 10H4z"/></svg>
+            }
+            {settingHead ? 'Setting…' : 'Set as Head'}
+          </button>
+        )}
+
+        {/* Remove member — only non-head members can be removed by the head */}
+        {!isHead && (
+          confirmRemove ? (
+            <div className="flex gap-2 items-center">
+              <span className="text-xs" style={{ color: 'var(--text-muted)' }}>Remove?</span>
+              <button
+                onClick={handleRemove}
+                disabled={removing}
+                className="px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all hover:opacity-90 disabled:opacity-50"
+                style={{ background: '#e95330' }}>
+                {removing ? 'Removing…' : 'Yes, remove'}
+              </button>
+              <button
+                onClick={() => setConfirmRemove(false)}
+                className="px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-80"
+                style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                Cancel
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmRemove(true)}
+              disabled={removing}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:opacity-90 disabled:opacity-50"
+              style={{ background: 'rgba(233,83,48,0.08)', color: '#e95330', border: '1px solid rgba(233,83,48,0.2)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/><path d="M9 6V4h6v2"/></svg>
+              Remove
+            </button>
+          )
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─── OxyLoans Family Section ──────────────────────────────────────────────────
+// Shown only when oxyloansMembers has data (populated after Get OxyLoans Data).
+// Applies exclusively to OxyLoans — does not affect the general family list.
+function OxyLoansFamilySection({ members, headOfFamilyId, onSetHead, onRemove }) {
+  const head = members.find(m => m.id === headOfFamilyId || m.isHeadOfFamily);
+
+  return (
+    <div className="grid gap-4">
+      {/* Section header */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="w-9 h-9 rounded-2xl flex items-center justify-center flex-shrink-0"
+          style={{ background: 'rgba(245,131,17,0.12)', border: '1px solid rgba(245,131,17,0.3)', color: '#f58311' }}>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: '#f58311' }}>OxyLoans Only</p>
+          <h3 className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+            Family Members on OxyLoans
+            <span className="ml-2 text-sm font-semibold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
+              {members.length}
+            </span>
+          </h3>
+        </div>
+        {/* Head of family quick-ref chip */}
+        {head && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs"
+            style={{ background: 'rgba(245,131,17,0.08)', border: '1px solid rgba(245,131,17,0.25)', color: '#f58311' }}>
+            <svg viewBox="0 0 24 24" fill="currentColor" className="w-3.5 h-3.5 flex-shrink-0"><path d="M2 20h20v2H2zM4 18l4-10 4 4 4-8 4 10H4z"/></svg>
+            <span className="font-bold">{head.name}</span>
+            <span className="font-normal" style={{ color: 'var(--text-muted)' }}>is Head of Family</span>
+          </div>
+        )}
+      </div>
+
+      {/* Info note */}
+      <div className="px-4 py-3 rounded-xl text-xs"
+        style={{ background: 'rgba(38,115,187,0.06)', border: '1px solid rgba(38,115,187,0.15)', color: 'var(--text-muted)', lineHeight: 1.6 }}>
+        <strong style={{ color: '#2673bb' }}>How it works:</strong> When any member in this group raises an OxyLoans support query,
+        the <strong style={{ color: '#f58311' }}>Head of Family</strong> is contacted first to coordinate resolution.
+        Only the Head of Family can remove members from this group.
+      </div>
+
+      {/* Member cards */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {members.map(m => (
+          <OxyMemberCard
+            key={m.id}
+            member={m}
+            isHead={m.id === headOfFamilyId || m.isHeadOfFamily}
+            onSetHead={onSetHead}
+            onRemove={onRemove}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 export default function FamilyManagement() {
   const [members, setMembers]     = useState([]);
   const [loading, setLoading]     = useState(true);
   const [logTarget, setLogTarget] = useState(null);
   const [search, setSearch]       = useState('');
+
+  // OxyLoans-specific family state from context
+  const {
+    oxyloansMembers,
+    oxyMembersLoading,
+    headOfFamilyId,
+    setHeadOfFamily,
+    removeOxyFamilyMember,
+  } = useFamily();
 
   useEffect(() => {
     getFamilyMembers()
@@ -263,9 +487,9 @@ export default function FamilyManagement() {
       {/* Stats */}
       <div className="grid gap-4 sm:grid-cols-3">
         {[
-          { label: 'Approved Members',  value: approved.length,                                          color: '#10b981' },
-          { label: 'Pending Approval',  value: pending.length,                                           color: '#f59e0b' },
-          { label: 'Total Access Logs', value: members.reduce((s, m) => s + (m.accessLog?.length ?? 0), 0), color: '#6366f1' },
+          { label: 'Approved Members',       value: approved.length,                                              color: '#10b981' },
+          { label: 'Pending Approval',        value: pending.length,                                              color: '#f59e0b' },
+          { label: 'OxyLoans Family Members', value: oxyMembersLoading ? '…' : oxyloansMembers.length,            color: '#f58311' },
         ].map(s => (
           <div key={s.label} className="rounded-2xl p-5" style={{ background: 'var(--card-bg)', border: `1px solid ${s.color}30` }}>
             <p className="text-xs uppercase tracking-widest mb-2" style={{ color: s.color }}>{s.label}</p>
@@ -273,6 +497,28 @@ export default function FamilyManagement() {
           </div>
         ))}
       </div>
+
+      {/* ── OxyLoans Family section — only rendered when data exists ── */}
+      {oxyMembersLoading && (
+        <div className="flex items-center gap-3 py-4 px-1">
+          <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+            style={{ borderColor: '#f58311', borderTopColor: 'transparent' }} />
+          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading OxyLoans family members…</span>
+        </div>
+      )}
+      {!oxyMembersLoading && oxyloansMembers.length > 0 && (
+        <OxyLoansFamilySection
+          members={oxyloansMembers}
+          headOfFamilyId={headOfFamilyId}
+          onSetHead={setHeadOfFamily}
+          onRemove={removeOxyFamilyMember}
+        />
+      )}
+
+      {/* Divider between OxyLoans section and general family */}
+      {oxyloansMembers.length > 0 && (
+        <div style={{ height: 1, background: 'var(--border)' }} />
+      )}
 
       {/* Add member form */}
       <AddMemberForm onSubmitted={() => {
@@ -295,7 +541,7 @@ export default function FamilyManagement() {
         </div>
       )}
 
-      {/* Approved members grid */}
+      {/* Approved members grid (general — all platforms) */}
       <div>
         <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
           <div>

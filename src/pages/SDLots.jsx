@@ -60,7 +60,7 @@ function BankCard({ bank }) {
   );
 }
 
-function SDLotCard({ lot, index }) {
+function SDLotCard({ lot, index, participatePath }) {
   const navigate = useNavigate();
   const raisedPct = lot.totalSize > 0 ? Math.min(Math.round((lot.raised / lot.totalSize) * 100), 100) : 0;
   const isClosed  = lot.status === 'Closed' || lot.remaining === 0;
@@ -251,7 +251,7 @@ function SDLotCard({ lot, index }) {
 
             {/* CTA */}
             <button
-              onClick={() => !isClosed && navigate(`/sd-lot/participate/${lot.id}`)}
+              onClick={() => !isClosed && navigate(participatePath ?? `/sd-lot/participate/${lot.id}`)}
               disabled={isClosed}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all"
               style={{
@@ -501,33 +501,31 @@ function MyParticipations() {
   );
 }
 
+export { SDLotCard, mapDeal };
+
 export default function SDLots() {
   const { user } = useAuth();
-  const [lots, setLots]           = useState([]);
-  const [loading, setLoading]     = useState(true);
-  const [roiFilter,    setRoiFilter]    = useState('All');
-  const [payoutFilter, setPayoutFilter] = useState('All');
-  const [feeFilter,    setFeeFilter]    = useState('All');
+  const [allLots, setAllLots] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [roiFilter,      setRoiFilter]      = useState('All');
+  const [payoutFilter,   setPayoutFilter]   = useState('All');
 
   useEffect(() => {
+    setLoading(true);
     getSdLots("NORMAL")
-      .then(data => { if (Array.isArray(data)) setLots(data.map(mapDeal)); })
+      .then(data => { if (Array.isArray(data)) setAllLots(data.map(mapDeal)); })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, []);
 
+  // Only SDLOT deals
+  const lots = allLots.filter(l => !l.globalDealType || l.globalDealType === 'SDLOT');
+
   const roiOptions    = ['All', '< 1.5%', '1.5–2%', '> 2%'];
   const payoutOptions = ['All', ...new Set(lots.map(l => l.payoutType))];
-  const feeOptions    = ['All', 'Zero Fee', 'Has Fee'];
 
   const filtered = lots.filter(l => {
-    // Only show running (Open) deals
     if (l.status !== 'Open') return false;
-
-    // Skip non-SDLOT global deal types
-    if (l.globalDealType && l.globalDealType !== 'SDLOT') return false;
-
-    // If deal has a userIds restriction, only show to included users
     if (l.userIds && l.userIds.trim()) {
       const allowed = l.userIds.split(',').map(id => id.trim()).filter(Boolean);
       if (allowed.length > 0 && !allowed.includes(user?.userId ?? '')) return false;
@@ -536,8 +534,6 @@ export default function SDLots() {
     if (roiFilter === '1.5–2%'  && (l.roiMonthly < 1.5 || l.roiMonthly > 2)) return false;
     if (roiFilter === '> 2%'    && l.roiMonthly <= 2) return false;
     if (payoutFilter !== 'All'  && l.payoutType !== payoutFilter) return false;
-    if (feeFilter === 'Zero Fee' && l.feePercentage !== 0) return false;
-    if (feeFilter === 'Has Fee'  && l.feePercentage === 0) return false;
     return true;
   });
 
@@ -560,11 +556,10 @@ export default function SDLots() {
     </div>
   );
 
-  const hasActiveFilters = roiFilter !== 'All' || payoutFilter !== 'All' || feeFilter !== 'All';
+  const hasActiveFilters = roiFilter !== 'All' || payoutFilter !== 'All';
 
   return (
     <div className="grid gap-6">
-      {/* Page header */}
       <div className="flex items-center justify-between flex-wrap gap-3">
         <div>
           <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Running Deals</h1>
@@ -572,13 +567,12 @@ export default function SDLots() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="rounded-2xl p-4 flex flex-col gap-3"
         style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 2px 12px rgba(0,0,0,0.05)' }}>
         <div className="flex items-center justify-between">
           <span className="text-xs font-black uppercase tracking-widest" style={{ color: 'var(--text-primary)' }}>Filters</span>
           {hasActiveFilters && (
-            <button onClick={() => { setRoiFilter('All'); setPayoutFilter('All'); setFeeFilter('All'); }}
+            <button onClick={() => { setRoiFilter('All'); setPayoutFilter('All'); }}
               className="text-xs font-bold px-2.5 py-1 rounded-lg transition-all hover:opacity-80"
               style={{ background: 'rgba(239,68,68,0.08)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.2)' }}>
               Clear All
@@ -586,43 +580,27 @@ export default function SDLots() {
           )}
         </div>
         <div className="flex flex-col sm:flex-row flex-wrap gap-3">
-          <FilterGroup label="ROI"     options={roiOptions}               value={roiFilter}    onChange={setRoiFilter}    />
-          <FilterGroup label="Payout"  options={payoutOptions}            value={payoutFilter} onChange={setPayoutFilter} />
-          {/* <FilterGroup label="Fee"     options={feeOptions}               value={feeFilter}    onChange={setFeeFilter}    /> */}
+          <FilterGroup label="ROI"    options={roiOptions}    value={roiFilter}    onChange={setRoiFilter}    />
+          <FilterGroup label="Payout" options={payoutOptions} value={payoutFilter} onChange={setPayoutFilter} />
         </div>
       </div>
 
-      {/* Stats strip */}
-      {/* <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        {[
-          { label: 'Total Lots',      value: lots.length,                                                                                                    color: '#6366f1' },
-          { label: 'Open',            value: lots.filter(l => l.auctionType === 'Open').length,                                                              color: '#10b981' },
-          { label: 'Avg Monthly ROI', value: lots.length ? `${(lots.reduce((s,l) => s + (l.roiMonthly ?? 0), 0) / lots.length).toFixed(1)}%` : '—',         color: '#f59e0b' },
-          { label: 'Total Raised',    value: fmtINR(lots.reduce((s,l) => s + (l.raised ?? 0), 0)),                                                          color: '#818cf8' },
-        ].map(s => (
-          <div key={s.label} className="rounded-xl px-4 py-3"
-            style={{ background: 'var(--surface-card)', border: `1px solid ${s.color}18`, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-            <p className="text-xl font-extrabold" style={{ color: s.color }}>{s.value}</p>
-            <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
-          </div>
-        ))}
-      </div> */}
-
-      {/* Cards list — one per row */}
       <div className="grid gap-4">
         {loading ? (
           <div className="flex items-center justify-center gap-3 py-16 rounded-2xl" style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
             <div className="w-6 h-6 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#6366f1', borderTopColor: 'transparent' }} />
-            <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Loading lots…</span>
+            <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Loading deals…</span>
           </div>
         ) : filtered.length === 0
           ? <div className="py-16 text-center rounded-2xl" style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
-              <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>No lots match your filters.</p>
-              <button onClick={() => { setStatusFilter('All'); setRoiFilter('All'); setPayoutFilter('All'); setFeeFilter('All'); }}
-                className="mt-3 text-xs font-bold px-4 py-2 rounded-xl"
-                style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-                Clear Filters
-              </button>
+              <p className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>No SD Lot deals available.</p>
+              {hasActiveFilters && (
+                <button onClick={() => { setRoiFilter('All'); setPayoutFilter('All'); }}
+                  className="mt-3 text-xs font-bold px-4 py-2 rounded-xl"
+                  style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                  Clear Filters
+                </button>
+              )}
             </div>
           : [...filtered].reverse().map((lot, index) => <SDLotCard key={lot.id} lot={lot} index={index} />)
         }
