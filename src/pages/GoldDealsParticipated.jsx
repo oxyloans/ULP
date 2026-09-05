@@ -1,6 +1,17 @@
-import { useState, useEffect, useMemo } from 'react';
+import { Fragment, useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { downloadGoldMouForCurrentUser, getAllParticipationByUser, getGoldDealsEarnings, getGoldGrowthDetail, getRunningDeals } from '../api/afterlogin-user';
+import { Modal } from 'antd';
+import {
+  downloadGoldMouForCurrentUser,
+  getAllParticipationByUser,
+  getGoldDealsEarnings,
+  getGoldGrowthDetail,
+  getRunningDeals,
+  getWalletBalance,
+  getUserViewInterestStatement,
+  participateInDeal,
+  userWithdrawalReturned,
+} from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
@@ -727,6 +738,848 @@ function ProcessedDealCard({ deal, onDownloadMou, onRealizationPayout, onOpenDet
   );
 }
 
+// ─── Gold Withdrawal Modal ────────────────────────────────────────────────────
+const RED = '#ef4444';
+
+function GoldWithdrawalModal({ deal, totalInvested, onClose, onSuccess }) {
+  const [amount, setAmount]   = useState('');
+  const [step, setStep]       = useState('input'); // 'input' | 'confirm' | 'success'
+  const [loading, setLoading] = useState(false);
+  const [error, setError]     = useState('');
+
+  const parsed  = parseFloat(amount);
+  const isValid = !isNaN(parsed) && parsed > 0 && parsed <= totalInvested;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await userWithdrawalReturned({ dealId: deal.dealId, withdrawalAmount: parsed });
+      setStep('success');
+    } catch (e) {
+      setError(e?.message ?? 'Withdrawal request failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <Modal
+      open
+      onCancel={step === 'success' ? () => { onSuccess(); onClose(); } : onClose}
+      footer={null}
+      title={
+        <div style={{ paddingRight: 24 }}>
+          <p style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: RED, margin: 0 }}>
+            Withdrawal Request
+          </p>
+          <h2 style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-primary)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {deal.dealName}
+          </h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header:  { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body:    { padding: 20 },
+        close:   { color: 'var(--text-muted)' },
+      }}
+      width="min(480px, 96vw)"
+      centered
+    >
+      {step === 'success' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '24px 0', textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${GREEN}18`, border: `2px solid ${GREEN}40` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Withdrawal Requested!</p>
+            <p style={{ fontSize: 13, marginTop: 6, color: 'var(--text-muted)' }}>
+              Your withdrawal of{' '}
+              <span style={{ fontWeight: 700, color: GREEN }}>{fmtINR(parsed)}</span>
+              {' '}from <span style={{ fontWeight: 600 }}>{deal.dealName}</span> has been submitted successfully.
+            </p>
+          </div>
+          <button
+            onClick={() => { onSuccess(); onClose(); }}
+            style={{ padding: '10px 28px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', border: 'none', background: `linear-gradient(135deg,${GREEN},#059669)`, boxShadow: `0 4px 14px ${GREEN}40` }}
+          >
+            Done
+          </button>
+        </div>
+      ) : step === 'confirm' ? (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div style={{ borderRadius: 12, padding: 16, background: `${RED}08`, border: `1px solid ${RED}25` }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-primary)', margin: 0 }}>Confirm Withdrawal</p>
+            <p style={{ fontSize: 12, marginTop: 4, color: 'var(--text-muted)' }}>You are about to request a withdrawal of:</p>
+            <p style={{ fontSize: 26, fontWeight: 900, marginTop: 8, color: RED, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(parsed)}</p>
+            <p style={{ fontSize: 12, marginTop: 4, color: 'var(--text-muted)' }}>
+              from <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{deal.dealName}</span>
+            </p>
+          </div>
+          {error && <p style={{ fontSize: 12, fontWeight: 600, color: RED, margin: 0 }}>{error}</p>}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => { setStep('input'); setError(''); }}
+              disabled={loading}
+              style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            >
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', border: 'none', background: loading ? `${RED}60` : `linear-gradient(135deg,${RED},#dc2626)`, boxShadow: `0 4px 14px ${RED}35` }}
+            >
+              {loading ? 'Processing…' : 'Confirm Withdrawal'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 16 }}>
+          <div style={{ borderRadius: 12, padding: 12, background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Total Invested</p>
+            <p style={{ fontSize: 18, fontWeight: 900, color: BLUE, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{fmtINR(totalInvested)}</p>
+          </div>
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+              Withdrawal Amount
+            </label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => setAmount(e.target.value)}
+              placeholder="Enter amount"
+              min={1}
+              max={totalInvested}
+              style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 14px', borderRadius: 12, fontSize: 13, fontWeight: 600, outline: 'none', background: 'var(--input-bg)', border: `1px solid ${amount && !isValid ? RED : 'var(--border)'}`, color: 'var(--text-primary)', boxSizing: 'border-box' }}
+            />
+            {amount && !isValid && (
+              <p style={{ fontSize: 11, marginTop: 4, color: RED }}>Enter a valid amount between ₹1 and {fmtINR(totalInvested)}</p>
+            )}
+          </div>
+          <button
+            onClick={() => setStep('confirm')}
+            disabled={!isValid}
+            style={{ width: '100%', padding: '11px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: isValid ? 'pointer' : 'not-allowed', border: 'none', background: isValid ? `linear-gradient(135deg,${RED},#dc2626)` : `${RED}40`, boxShadow: isValid ? `0 4px 14px ${RED}35` : 'none' }}
+          >
+            Proceed to Confirm
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Gold Add More Modal ───────────────────────────────────────────────────────
+const PAYOUT_OPTIONS = [
+  { value: 'MONTHLY',      label: 'Monthly'      },
+  { value: 'QUARTELY',     label: 'Quarterly'    },
+  { value: 'HALFLY',       label: 'Half-Yearly'  },
+  { value: 'YEARLY',       label: 'Yearly'       },
+  { value: 'ENDOFTHEDEAL', label: 'End of Deal'  },
+];
+
+function GoldAddMoreModal({ deal, onClose, onSuccess }) {
+  // Payout type is locked to the existing participation's choice
+  const lockedPayout = deal.amountTye ?? 'MONTHLY';
+
+  const [amount, setAmount]         = useState('');
+  const [step, setStep]             = useState('input'); // 'input' | 'confirm' | 'success'
+  const [loading, setLoading]       = useState(false);
+  const [error, setError]           = useState('');
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [walletLoading, setWalletLoading] = useState(true);
+
+  // Load wallet balance on mount
+  useEffect(() => {
+    getWalletBalance()
+      .then(data => {
+        const bal = data?.currentWalletAmount ?? null;
+        setWalletBalance(typeof bal === 'number' ? bal : null);
+      })
+      .catch(() => setWalletBalance(null))
+      .finally(() => setWalletLoading(false));
+  }, []);
+
+  const parsed         = parseFloat(amount);
+  const totalInvested  = deal._totalInvested ?? 0;
+  const maxParticipation = deal._maxParticipation ?? 0;  // 0 means no cap
+  const balance        = walletBalance ?? 0;
+  const balanceAfter   = balance - (parsed || 0);
+
+  // Validation
+  const walletInsufficient = !isNaN(parsed) && parsed > 0 && parsed > balance;
+  const belowMin           = !isNaN(parsed) && parsed > 0 && parsed < 1;
+  const exceedsMax         = maxParticipation > 0 && !isNaN(parsed) && parsed > 0 && (totalInvested + parsed) > maxParticipation;
+  const hasError           = walletInsufficient || belowMin || exceedsMax;
+  const isValid            = !isNaN(parsed) && parsed > 0 && !hasError;
+  const remainingCapacity  = maxParticipation > 0 ? Math.max(0, maxParticipation - totalInvested) : null;
+
+  const getValidationMsg = () => {
+    if (walletInsufficient) return `Exceeds your wallet balance of ${fmtINR(balance)}`;
+    if (exceedsMax)         return `Exceeds per-user maximum. You can add at most ${fmtINR(remainingCapacity)} more (max ${fmtINR(maxParticipation)}, invested ${fmtINR(totalInvested)})`;
+    if (belowMin)           return 'Enter an amount greater than ₹0';
+    return '';
+  };
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await participateInDeal({
+        dealId:             deal.dealId,
+        lenderReturnsType:  lockedPayout,
+        participatedAmount: parsed,
+        rateofinterest:     deal.rateOfInterest ?? 0,
+      });
+      setStep('success');
+    } catch (e) {
+      setError(e?.message ?? 'Participation failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const payoutLabel = PAYOUT_OPTIONS.find(o => o.value === lockedPayout)?.label ?? lockedPayout;
+
+  return (
+    <Modal
+      open
+      onCancel={step === 'success' ? () => { onSuccess(); onClose(); } : onClose}
+      footer={null}
+      title={
+        <div style={{ paddingRight: 24 }}>
+          <p style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: GREEN, margin: 0 }}>
+            Add More Funds
+          </p>
+          <h2 style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-primary)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {deal.dealName}
+          </h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: `1px solid ${GREEN}28`, borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header:  { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body:    { padding: 20 },
+        close:   { color: 'var(--text-muted)' },
+      }}
+      width="min(480px, 96vw)"
+      centered
+    >
+      {step === 'success' ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, padding: '24px 0', textAlign: 'center' }}>
+          <div style={{ width: 64, height: 64, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: `${GREEN}18`, border: `2px solid ${GREEN}40` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 32, height: 32 }}>
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+          </div>
+          <div>
+            <p style={{ fontSize: 17, fontWeight: 900, color: 'var(--text-primary)', margin: 0 }}>Funds Added!</p>
+            <p style={{ fontSize: 13, marginTop: 6, color: 'var(--text-muted)' }}>
+              Your top-up of{' '}
+              <span style={{ fontWeight: 700, color: GREEN }}>{fmtINR(parsed)}</span>
+              {' '}to <span style={{ fontWeight: 600 }}>{deal.dealName}</span> has been submitted.
+            </p>
+          </div>
+          <button
+            onClick={() => { onSuccess(); onClose(); }}
+            style={{ padding: '10px 28px', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: 'pointer', border: 'none', background: `linear-gradient(135deg,${GREEN},#059669)`, boxShadow: `0 4px 14px ${GREEN}40` }}
+          >
+            Done
+          </button>
+        </div>
+
+      ) : step === 'confirm' ? (
+        <div style={{ display: 'grid', gap: 14 }}>
+          <div style={{ borderRadius: 12, padding: 16, background: `${GREEN}08`, border: `1px solid ${GREEN}25` }}>
+            <p style={{ fontSize: 12, color: 'var(--text-muted)', margin: 0 }}>You are about to add:</p>
+            <p style={{ fontSize: 26, fontWeight: 900, marginTop: 6, color: GREEN, fontFamily: "'JetBrains Mono',monospace" }}>{fmtINR(parsed)}</p>
+          </div>
+
+          {/* Summary rows */}
+          <div style={{ display: 'grid', gap: 6 }}>
+            {[
+              { label: 'Deal',            value: deal.dealName,              color: 'var(--text-primary)' },
+              { label: 'Payout Type',     value: payoutLabel,                color: GOLD                  },
+              { label: 'ROI',             value: `${deal.rateOfInterest ?? 0}%`, color: BLUE              },
+              { label: 'Existing Total',  value: fmtINR(totalInvested),      color: BLUE                  },
+              { label: 'New Total',       value: fmtINR(totalInvested + parsed), color: GREEN             },
+              { label: 'Wallet After',    value: fmtINR(balanceAfter),       color: balanceAfter >= 0 ? GREEN : RED },
+            ].map(r => (
+              <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 10, background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+                <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.label}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: r.color, fontFamily: "'JetBrains Mono',monospace" }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {error && <p style={{ fontSize: 12, fontWeight: 600, color: RED, margin: 0 }}>{error}</p>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={() => { setStep('input'); setError(''); }}
+              disabled={loading}
+              style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, cursor: 'pointer', background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
+            >
+              Back
+            </button>
+            <button
+              onClick={handleConfirm}
+              disabled={loading}
+              style={{ flex: 1, padding: '10px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: loading ? 'not-allowed' : 'pointer', border: 'none', background: loading ? `${GREEN}60` : `linear-gradient(135deg,${GREEN},#059669)`, boxShadow: `0 4px 14px ${GREEN}35` }}
+            >
+              {loading ? 'Processing…' : 'Confirm Top-Up'}
+            </button>
+          </div>
+        </div>
+
+      ) : (
+        <div style={{ display: 'grid', gap: 16 }}>
+          {/* Wallet + investment summary */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+            <div style={{ borderRadius: 12, padding: 12, background: `${BLUE}0d`, border: `1px solid ${BLUE}20` }}>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Wallet Balance</p>
+              {walletLoading
+                ? <p style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-muted)', margin: '4px 0 0' }}>Loading…</p>
+                : <p style={{ fontSize: 15, fontWeight: 900, color: BLUE, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{fmtINR(balance)}</p>
+              }
+            </div>
+            <div style={{ borderRadius: 12, padding: 12, background: `${GOLD}0d`, border: `1px solid ${GOLD}20` }}>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Already Invested</p>
+              <p style={{ fontSize: 15, fontWeight: 900, color: GOLD, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{fmtINR(totalInvested)}</p>
+            </div>
+          </div>
+
+          {/* Max capacity bar — only shown when maxParticipation is set */}
+          {maxParticipation > 0 && (
+            <div style={{ borderRadius: 12, padding: '10px 14px', background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap', gap: 4 }}>
+                <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>Capacity Used</span>
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{fmtINR(totalInvested)} / {fmtINR(maxParticipation)}</span>
+                  {remainingCapacity > 0
+                    ? <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${GREEN}12`, color: GREEN, border: `1px solid ${GREEN}25` }}>{fmtINR(remainingCapacity)} available</span>
+                    : <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: `${RED}12`, color: RED, border: `1px solid ${RED}25` }}>Max reached</span>
+                  }
+                </div>
+              </div>
+              <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'var(--border)' }}>
+                <div style={{
+                  height: '100%', borderRadius: 999,
+                  width: `${Math.min((totalInvested / maxParticipation) * 100, 100)}%`,
+                  background: remainingCapacity > 0 ? `linear-gradient(90deg,${BLUE},${GREEN})` : `linear-gradient(90deg,${RED},#dc2626)`,
+                  transition: 'width 0.6s ease',
+                }} />
+              </div>
+            </div>
+          )}
+
+          {/* Locked payout type — read-only to match existing participation */}
+          <div style={{ borderRadius: 12, padding: '10px 14px', background: `${BLUE}08`, border: `1px solid ${BLUE}20`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <p style={{ fontSize: 11, color: 'var(--text-muted)', margin: 0 }}>Payout Type</p>
+              <p style={{ fontSize: 13, fontWeight: 700, color: BLUE, margin: '2px 0 0' }}>{payoutLabel}</p>
+            </div>
+            <span style={{ fontSize: 10, padding: '3px 8px', borderRadius: 999, background: `${BLUE}15`, color: BLUE, border: `1px solid ${BLUE}25` }}>
+              Locked to existing choice
+            </span>
+          </div>
+
+          {/* Amount input */}
+          <div>
+            <label style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)' }}>
+              Amount to Add
+            </label>
+            <input
+              type="number"
+              value={amount}
+              onChange={e => { setAmount(e.target.value); setError(''); }}
+              placeholder="Enter amount"
+              min={1}
+              style={{ display: 'block', width: '100%', marginTop: 6, padding: '10px 14px', borderRadius: 12, fontSize: 13, fontWeight: 600, outline: 'none', background: 'var(--input-bg)', border: `1px solid ${amount && hasError ? RED : 'var(--border)'}`, color: 'var(--text-primary)', boxSizing: 'border-box' }}
+            />
+            {amount && hasError && (
+              <p style={{ fontSize: 11, marginTop: 4, color: RED }}>{getValidationMsg()}</p>
+            )}
+            {/* Wallet after preview */}
+            {isValid && (
+              <p style={{ fontSize: 11, marginTop: 4, color: balanceAfter >= 0 ? GREEN : RED }}>
+                Wallet after: {fmtINR(balanceAfter)}
+              </p>
+            )}
+          </div>
+
+          <button
+            onClick={() => setStep('confirm')}
+            disabled={!isValid || (maxParticipation > 0 && remainingCapacity <= 0)}
+            style={{ width: '100%', padding: '11px 0', borderRadius: 12, fontSize: 13, fontWeight: 700, color: '#fff', cursor: (isValid && !(maxParticipation > 0 && remainingCapacity <= 0)) ? 'pointer' : 'not-allowed', border: 'none', background: (isValid && !(maxParticipation > 0 && remainingCapacity <= 0)) ? `linear-gradient(135deg,${GREEN},#059669)` : `${GREEN}40`, boxShadow: (isValid && !(maxParticipation > 0 && remainingCapacity <= 0)) ? `0 4px 14px ${GREEN}35` : 'none' }}
+          >
+            {maxParticipation > 0 && remainingCapacity <= 0 ? 'Maximum Reached' : 'Preview Top-Up'}
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
+
+// ─── Gold Interest Statement Modal ───────────────────────────────────────────
+function interestStatusChipGold(status) {
+  const s = (status ?? '').toUpperCase();
+  if (s === 'PAID') return (
+    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 999, background: `${GREEN}14`, color: GREEN, border: `1px solid ${GREEN}30` }}>PAID</span>
+  );
+  if (s === 'NOTYETPAID' || s === 'NOT YET PAID') return (
+    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 999, background: `${GOLD}14`, color: GOLD, border: `1px solid ${GOLD}30` }}>NOT YET PAID</span>
+  );
+  return (
+    <span style={{ fontSize: 10, fontWeight: 800, padding: '3px 8px', borderRadius: 999, background: 'rgba(239,68,68,0.1)', color: RED, border: '1px solid rgba(239,68,68,0.2)' }}>
+      {s || 'PENDING'}
+    </span>
+  );
+}
+
+function GoldInterestStatementModal({ deal, onClose }) {
+  const [data, setData]           = useState(null);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState('');
+  const [expandedIdx, setExpandedIdx] = useState(null);
+
+  const load = () => {
+    if (!deal?.dealId) return;
+    setLoading(true);
+    setError('');
+    getUserViewInterestStatement(deal.dealId)
+      .then(res => setData(res))
+      .catch(e => setError(e?.message ?? 'Failed to load interest statement'))
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { load(); }, [deal?.dealId]);
+
+  const rows = data?.participationInterestStatement ?? [];
+  const totalInterest = useMemo(() => rows.reduce((sum, r) => sum + Number(r?.interestAmount ?? 0), 0), [rows]);
+  const firstRow = rows[0] ?? {};
+  const participationAmount = data?.totalParticipationAmount ?? firstRow?.participationAmount ?? null;
+  const participationDate   = firstRow?.participationDate ?? null;
+
+  return (
+    <Modal
+      open
+      onCancel={onClose}
+      footer={null}
+      title={
+        <div style={{ paddingRight: 24 }}>
+          <p style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: GOLD, margin: 0 }}>Interest Statement</p>
+          <h2 style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-primary)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {deal?.dealName ?? 'Gold Deal'}
+          </h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: `1px solid ${GOLD}28`, borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header:  { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body:    { padding: '16px 0 0 0' },
+        close:   { color: 'var(--text-muted)' },
+      }}
+      width="min(960px, 96vw)"
+      centered
+    >
+      <div style={{ overflowY: 'auto', padding: '12px 20px 20px', display: 'grid', gap: 16, maxHeight: '68vh' }}>
+
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '56px 0' }}>
+            <div style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${GOLD}40`, borderTopColor: GOLD, animation: 'spin 0.8s linear infinite' }} />
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>Loading interest statement…</span>
+          </div>
+        )}
+
+        {!loading && error && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '48px 0', textAlign: 'center' }}>
+            <p style={{ fontSize: 13, fontWeight: 700, color: RED, margin: 0 }}>{error}</p>
+            <button onClick={load} style={{ padding: '7px 18px', borderRadius: 10, fontSize: 12, fontWeight: 700, background: `${GOLD}12`, color: GOLD, border: `1px solid ${GOLD}28`, cursor: 'pointer' }}>Retry</button>
+          </div>
+        )}
+
+        {!loading && !error && (
+          <>
+            {/* KPI strip */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
+              {[
+                { label: 'Amount Invested',  value: participationAmount != null ? fmtINR(participationAmount) : '—', color: BLUE   },
+                { label: 'Participation Date', value: participationDate ?? '—',                                        color: GREEN  },
+                { label: 'Total Interest',   value: fmtINR(totalInterest),                                             color: GOLD   },
+                { label: 'ROI',              value: data?.roi != null ? `${data.roi}%` : '—',                          color: PURPLE },
+              ].map(k => (
+                <div key={k.label} style={{ borderRadius: 12, padding: '10px 14px', background: `${k.color}0e`, border: `1px solid ${k.color}28` }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', margin: 0 }}>{k.label}</p>
+                  <p style={{ fontSize: 15, fontWeight: 900, color: k.color, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{k.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Schedule table */}
+            {rows.length > 0 ? (
+              <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--border)', background: 'var(--surface-card)' }}>
+                {/* Table header bar */}
+                <div style={{ padding: '10px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.08em', color: GOLD }}>Monthly Interest Schedule</span>
+                  <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 999, background: `${GOLD}14`, color: GOLD, border: `1px solid ${GOLD}28` }}>
+                    {rows.length} months
+                  </span>
+                </div>
+
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: 12, minWidth: 600, borderCollapse: 'collapse' }}>
+                    <thead>
+                      <tr style={{ background: 'var(--table-header-bg, rgba(255,255,255,0.03))' }}>
+                        {['#', 'Interest Date', 'Days', 'Interest', 'Paid Date', 'Status'].map(h => (
+                          <th key={h} style={{ textAlign: 'left', padding: '10px 12px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((row, idx) => {
+                        const hasBreakup = Array.isArray(row?.updationParticiInterestStatement) && row.updationParticiInterestStatement.length > 0;
+                        const isExp = expandedIdx === idx;
+                        // handle both field name variants (SDLOT vs ASSET)
+                        const intDate  = row?.actualInterestDate ?? row?.interestDate ?? '—';
+                        const days     = row?.days ?? row?.noOfDays ?? '—';
+                        const paidDate = row?.paidDate ?? row?.disbursedDate ?? '—';
+                        return (
+                          <Fragment key={idx}>
+                            <tr style={{ borderTop: '1px solid var(--border)' }}
+                              onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover, rgba(255,255,255,0.03))'}
+                              onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                              <td style={{ padding: '10px 12px', fontWeight: 700, color: 'var(--text-muted)' }}>{idx + 1}</td>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap', color: 'var(--text-primary)' }}>{intDate}</td>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, color: 'var(--text-muted)' }}>{days}</td>
+                              <td style={{ padding: '10px 12px', fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", whiteSpace: 'nowrap', color: GOLD }}>
+                                {fmtINR(row?.interestAmount ?? 0)}
+                                {hasBreakup && (
+                                  <button
+                                    onClick={() => setExpandedIdx(isExp ? null : idx)}
+                                    style={{ marginLeft: 8, padding: '2px 8px', borderRadius: 999, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: `1px solid ${PURPLE}40`, background: `${PURPLE}14`, color: PURPLE }}>
+                                    {isExp ? 'Close' : 'Breakup'}
+                                  </button>
+                                )}
+                              </td>
+                              <td style={{ padding: '10px 12px', fontWeight: 600, whiteSpace: 'nowrap', color: 'var(--text-muted)' }}>{paidDate}</td>
+                              <td style={{ padding: '10px 12px' }}>{interestStatusChipGold(row?.status)}</td>
+                            </tr>
+
+                            {/* First-month top-up breakup */}
+                            {isExp && hasBreakup && (
+                              <tr style={{ borderTop: '1px solid var(--border)', background: 'var(--input-bg, rgba(255,255,255,0.02))' }}>
+                                <td colSpan={6} style={{ padding: 12 }}>
+                                  <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${PURPLE}28` }}>
+                                    <div style={{ padding: '7px 14px', background: `${PURPLE}10`, borderBottom: `1px solid ${PURPLE}20` }}>
+                                      <span style={{ fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: PURPLE }}>
+                                        First Month Breakup — {row.updationParticiInterestStatement.length + 1} entries
+                                      </span>
+                                    </div>
+                                    <div style={{ overflowX: 'auto', maxHeight: 220, overflowY: 'auto' }}>
+                                      <table style={{ width: '100%', fontSize: 11, minWidth: 520, borderCollapse: 'collapse' }}>
+                                        <thead>
+                                          <tr style={{ background: 'var(--table-header-bg, rgba(255,255,255,0.03))' }}>
+                                            {['#', 'Part. Date', 'Days', 'Invested', 'Interest', 'Status'].map(h => (
+                                              <th key={h} style={{ textAlign: 'left', padding: '7px 10px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.06em', color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{h}</th>
+                                            ))}
+                                          </tr>
+                                        </thead>
+                                        <tbody>
+                                          <tr style={{ borderTop: '1px solid var(--border)' }}>
+                                            <td style={{ padding: '7px 10px', fontWeight: 700, color: 'var(--text-muted)' }}>1</td>
+                                            <td style={{ padding: '7px 10px', color: 'var(--text-primary)' }}>{row?.participationDate ?? '—'}</td>
+                                            <td style={{ padding: '7px 10px', color: 'var(--text-muted)' }}>{days}</td>
+                                            <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: BLUE }}>{row?.participationAmount != null ? fmtINR(row.participationAmount) : '—'}</td>
+                                            <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: GOLD }}>{fmtINR(row?.interestAmount ?? 0)}</td>
+                                            <td style={{ padding: '7px 10px' }}>{interestStatusChipGold(row?.status)}</td>
+                                          </tr>
+                                          {row.updationParticiInterestStatement.map((upd, uIdx) => (
+                                            <tr key={uIdx} style={{ borderTop: '1px solid var(--border)' }}>
+                                              <td style={{ padding: '7px 10px', fontWeight: 700, color: 'var(--text-muted)' }}>{uIdx + 2}</td>
+                                              <td style={{ padding: '7px 10px', color: 'var(--text-primary)' }}>{upd?.participationDate ?? '—'}</td>
+                                              <td style={{ padding: '7px 10px', color: 'var(--text-muted)' }}>{upd?.days ?? '—'}</td>
+                                              <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: BLUE }}>{upd?.participationAmount != null ? fmtINR(upd.participationAmount) : '—'}</td>
+                                              <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: GOLD }}>{fmtINR(upd?.interestAmount ?? 0)}</td>
+                                              <td style={{ padding: '7px 10px' }}>{interestStatusChipGold(upd?.status)}</td>
+                                            </tr>
+                                          ))}
+                                        </tbody>
+                                        <tfoot>
+                                          <tr style={{ borderTop: `2px solid ${PURPLE}28`, background: `${PURPLE}08` }}>
+                                            <td colSpan={3} style={{ padding: '7px 10px', fontSize: 10, fontWeight: 800, textTransform: 'uppercase', color: PURPLE }}>Total</td>
+                                            <td style={{ padding: '7px 10px', fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: BLUE }}>
+                                              {fmtINR((row?.participationAmount ?? 0) + row.updationParticiInterestStatement.reduce((s, u) => s + Number(u?.participationAmount ?? 0), 0))}
+                                            </td>
+                                            <td style={{ padding: '7px 10px', fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: GOLD }}>
+                                              {fmtINR((row?.interestAmount ?? 0) + row.updationParticiInterestStatement.reduce((s, u) => s + Number(u?.interestAmount ?? 0), 0))}
+                                            </td>
+                                            <td />
+                                          </tr>
+                                        </tfoot>
+                                      </table>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        );
+                      })}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: `2px solid var(--border)`, background: `${GOLD}14` }}>
+                        <td colSpan={3} style={{ padding: '10px 12px', fontSize: 11, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.07em', color: GOLD }}>Total Interest</td>
+                        <td style={{ padding: '10px 12px', fontWeight: 900, fontFamily: "'JetBrains Mono',monospace", color: GOLD }}>{fmtINR(totalInterest)}</td>
+                        <td colSpan={2} />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              </div>
+            ) : (
+              <div style={{ padding: '32px 0', textAlign: 'center', fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>
+                No interest schedule available for this deal.
+              </div>
+            )}
+          </>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
+// ─── ULP Deal Card ────────────────────────────────────────────────────────────
+const PAYOUT_MAP_ULP = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
+
+function UlpDealCard({ p, onAddMore, onWithdraw, onViewInterest }) {
+  const [expanded, setExpanded] = useState(false);
+
+  const payLabel = PAYOUT_MAP_ULP[p.amountTye] ?? p.amountTye ?? '—';
+
+  const allEntries = [
+    {
+      type:   'initial',
+      label:  'Initial Participation',
+      date:   p.participatedDate ?? '—',
+      amount: p.participatedAmount ?? 0,
+      roi:    p.rateOfInterest ?? 0,
+      payout: p.amountTye,
+    },
+    ...(p.updatedParticipation ?? []).map((u, idx) => ({
+      type:   'topup',
+      label:  `Top-up #${idx + 1}`,
+      date:   u.updatedDate ?? '—',
+      amount: u.updationParticipation ?? 0,
+      roi:    u.rateOfInterest ?? p.rateOfInterest ?? 0,
+      payout: u.amountTye ?? p.amountTye,
+    })),
+  ];
+
+  const totalInvested = allEntries.reduce((s, e) => s + e.amount, 0);
+  const hasUpdates    = (p.updatedParticipation ?? []).length > 0;
+
+  return (
+    <div style={{
+      borderRadius: 18, overflow: 'hidden',
+      background: 'var(--surface-card, #1a1a2e)',
+      border: '1px solid #10b98128',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
+      transition: 'box-shadow 0.2s ease',
+    }}>
+      <div style={{ height: 3, background: 'linear-gradient(90deg,#10b981,#059669)' }} />
+      <div style={{ padding: '16px 20px', display: 'grid', gap: 10 }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+          <div>
+            <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary, #fff)', margin: 0 }}>{p.dealName}</p>
+            <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: 'var(--text-muted, #888)', marginTop: 4 }}>
+              {String(p.dealId ?? '').slice(0, 18)}…
+            </p>
+          </div>
+          <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#10b98118', color: '#10b981', border: '1px solid #10b98128' }}>
+            {payLabel}
+          </span>
+        </div>
+
+        {/* Stat pills */}
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {[
+            { label: 'Total Invested', value: formatINR(totalInvested),        color: '#6366f1' },
+            { label: 'ROI',            value: `${p.rateOfInterest ?? 0}%`,     color: '#f59e0b' },
+            { label: 'Since',          value: p.participatedDate ?? '—',       color: '#10b981' },
+            { label: 'Entries',        value: String(allEntries.length),        color: '#818cf8' },
+          ].map(s => (
+            <div key={s.label} style={{ padding: '8px 14px', borderRadius: 12, background: `${s.color}0d`, border: `1px solid ${s.color}20` }}>
+              <p style={{ fontSize: 10, color: 'var(--text-muted, #888)', margin: 0 }}>{s.label}</p>
+              <p style={{ fontSize: 14, fontWeight: 800, color: s.color, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Action buttons — single row, equal width */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, paddingTop: 4 }}>
+          {/* View Entries toggle */}
+          <button
+            onClick={() => setExpanded(v => !v)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              padding: '7px 0', borderRadius: 10,
+              fontSize: 12, fontWeight: 700,
+              border: `1px solid ${expanded ? '#818cf8' : 'var(--border, rgba(255,255,255,0.1))'}`,
+              background: expanded ? '#818cf812' : 'var(--input-bg, rgba(255,255,255,0.04))',
+              color: expanded ? '#818cf8' : 'var(--text-muted, #888)',
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13, flexShrink: 0 }}>
+              <polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/>
+            </svg>
+            Entries
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"
+              style={{ width: 11, height: 11, flexShrink: 0, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}>
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </button>
+
+          {/* View Interest Statement */}
+          <button
+            onClick={() => onViewInterest(p)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+              padding: '7px 0', borderRadius: 10,
+              fontSize: 12, fontWeight: 700,
+              border: `1px solid ${GOLD}35`,
+              background: `${GOLD}0d`,
+              color: GOLD,
+              cursor: 'pointer',
+              transition: 'all 0.15s ease',
+              whiteSpace: 'nowrap',
+            }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13, flexShrink: 0 }}>
+              <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>
+            </svg>
+            Interest
+          </button>
+
+          <button
+            onClick={() => onAddMore(p, totalInvested)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '7px 0', borderRadius: 10,
+              fontSize: 12, fontWeight: 700,
+              border: '1px solid #10b98135', background: '#10b98112', color: '#10b981',
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13, flexShrink: 0 }}>
+              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+            </svg>
+            Add More
+          </button>
+
+          <button
+            onClick={() => onWithdraw(p, totalInvested)}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '7px 0', borderRadius: 10,
+              fontSize: 12, fontWeight: 700,
+              border: `1px solid ${RED}35`, background: `${RED}0d`, color: RED,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13, flexShrink: 0 }}>
+              <path d="M12 2v20M17 7l-5-5-5 5M17 17l-5 5-5-5"/>
+            </svg>
+            Withdrawal
+          </button>
+        </div>
+      </div>
+
+      {/* ── Expanded: Investment History ── */}
+      {expanded && (
+        <div style={{ borderTop: '1px solid rgba(129,140,248,0.15)' }}>
+          {/* Section header */}
+          <div style={{
+            padding: '10px 20px', display: 'flex', alignItems: 'center', gap: 8,
+            background: 'rgba(129,140,248,0.05)',
+            borderBottom: '1px solid rgba(129,140,248,0.12)',
+          }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="#818cf8" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" style={{ width: 14, height: 14 }}>
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#818cf8' }}>
+              Investment Timeline · {allEntries.length} {allEntries.length === 1 ? 'entry' : 'entries'}
+            </span>
+          </div>
+
+          <div style={{ padding: '12px 16px', display: 'grid', gap: 8 }}>
+            {/* Initial participation */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 12,
+              padding: '10px 14px', borderRadius: 12,
+              background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.15)',
+            }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: BLUE, boxShadow: `0 0 6px ${BLUE}` }} />
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary, #fff)', margin: 0 }}>Initial Participation</p>
+                <p style={{ fontSize: 10, marginTop: 2, color: 'var(--text-muted, #888)' }}>{p.participatedDate ?? '—'}</p>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <p style={{ fontSize: 13, fontWeight: 800, color: BLUE, fontFamily: "'JetBrains Mono',monospace", margin: 0 }}>
+                  {formatINR(p.participatedAmount ?? 0)}
+                </p>
+                <p style={{ fontSize: 10, color: 'var(--text-muted, #888)', marginTop: 2 }}>{p.rateOfInterest ?? 0}% · {PAYOUT_MAP_ULP[p.amountTye] ?? p.amountTye}</p>
+              </div>
+            </div>
+
+            {/* Top-up entries */}
+            {(p.updatedParticipation ?? []).map((u, idx) => (
+              <div key={idx} style={{
+                display: 'flex', alignItems: 'center', gap: 12,
+                padding: '10px 14px', borderRadius: 12,
+                background: 'rgba(16,185,129,0.06)', border: '1px solid rgba(16,185,129,0.15)',
+              }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: GREEN, boxShadow: `0 0 6px ${GREEN}` }} />
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-primary, #fff)', margin: 0 }}>Top-up #{idx + 1}</p>
+                  <p style={{ fontSize: 10, marginTop: 2, color: 'var(--text-muted, #888)' }}>{u.updatedDate ?? '—'}</p>
+                </div>
+                <div style={{ textAlign: 'right' }}>
+                  <p style={{ fontSize: 13, fontWeight: 800, color: GREEN, fontFamily: "'JetBrains Mono',monospace", margin: 0 }}>
+                    {formatINR(u.updationParticipation ?? 0)}
+                  </p>
+                  <p style={{ fontSize: 10, color: 'var(--text-muted, #888)', marginTop: 2 }}>
+                    {u.rateOfInterest ?? p.rateOfInterest ?? 0}% · {PAYOUT_MAP_ULP[u.amountTye ?? p.amountTye] ?? u.amountTye ?? '—'}
+                  </p>
+                </div>
+              </div>
+            ))}
+
+            {/* Total row */}
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '8px 14px', borderRadius: 10,
+              background: 'rgba(129,140,248,0.08)', borderTop: '1px solid rgba(129,140,248,0.2)',
+            }}>
+              <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#818cf8' }}>Total</span>
+              <span style={{ fontSize: 14, fontWeight: 900, color: '#818cf8', fontFamily: "'JetBrains Mono',monospace" }}>
+                {formatINR(totalInvested)}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 export default function GoldDealsParticipated() {
   const navigate = useNavigate();
@@ -735,6 +1588,11 @@ export default function GoldDealsParticipated() {
   const [runningPayoutFilter, setRunningPayoutFilter] = useState('all');
   const [processedStatusFilter, setProcessedStatusFilter] = useState('all');
   const [processedAuctionFilter, setProcessedAuctionFilter] = useState('all');
+
+  // Modal state
+  const [withdrawDeal, setWithdrawDeal]   = useState(null); // { deal, totalInvested }
+  const [addMoreDeal, setAddMoreDeal]     = useState(null); // deal object
+  const [interestDeal, setInterestDeal]   = useState(null); // deal object for interest statement
 
   const [runningData, setRunningData]         = useState(null);
   const [runningLoading, setRunningLoading]   = useState(true);
@@ -1401,53 +2259,42 @@ export default function GoldDealsParticipated() {
             </div>
           )}
           {!ulpLoading && !ulpError && filteredUlpDeals.length > 0 && (
-            <div style={{ display: 'grid', gap: 14, gridTemplateColumns: '1fr' }}>
-              {filteredUlpDeals.map((p, i) => {
-                const PAYOUT_MAP = { MONTHLY: 'Monthly', QUARTELY: 'Quarterly', HALFLY: 'Half-Yearly', YEARLY: 'Yearly', ENDOFTHEDEAL: 'End of Deal' };
-                const payLabel = PAYOUT_MAP[p.amountTye] ?? p.amountTye ?? '—';
-                const allEntries = [
-                  { amount: p.participatedAmount ?? 0, roi: p.rateOfInterest ?? 0 },
-                  ...(p.updatedParticipation ?? []).map(u => ({ amount: u.updationParticipation ?? 0, roi: u.rateOfInterest ?? p.rateOfInterest ?? 0 })),
-                ];
-                const totalInvested = allEntries.reduce((s, e) => s + e.amount, 0);
-                return (
-                  <div key={p.dealId ?? i} style={{
-                    borderRadius: 18, overflow: 'hidden',
-                    background: 'var(--surface-card, #1a1a2e)',
-                    border: '1px solid #10b98128',
-                    boxShadow: '0 2px 12px rgba(0,0,0,0.08)',
-                  }}>
-                    <div style={{ height: 3, background: 'linear-gradient(90deg,#10b981,#059669)' }} />
-                    <div style={{ padding: '16px 20px', display: 'grid', gap: 10 }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                        <div>
-                          <p style={{ fontSize: 15, fontWeight: 800, color: 'var(--text-primary, #fff)', margin: 0 }}>{p.dealName}</p>
-                          <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono',monospace", color: 'var(--text-muted, #888)', marginTop: 4 }}>{String(p.dealId ?? '').slice(0, 18)}…</p>
-                        </div>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: '#10b98118', color: '#10b981', border: '1px solid #10b98128' }}>
-                          {payLabel}
-                        </span>
-                      </div>
-                      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                        {[
-                          { label: 'Total Invested', value: formatINR(totalInvested), color: '#6366f1' },
-                          { label: 'ROI',            value: `${p.rateOfInterest ?? 0}%`, color: '#f59e0b' },
-                          { label: 'Since',          value: p.participatedDate ?? '—', color: '#10b981' },
-                          { label: 'Entries',        value: String(allEntries.length), color: '#818cf8' },
-                        ].map(s => (
-                          <div key={s.label} style={{ padding: '8px 14px', borderRadius: 12, background: `${s.color}0d`, border: `1px solid ${s.color}20` }}>
-                            <p style={{ fontSize: 10, color: 'var(--text-muted, #888)', margin: 0 }}>{s.label}</p>
-                            <p style={{ fontSize: 14, fontWeight: 800, color: s.color, fontFamily: "'JetBrains Mono',monospace", margin: '4px 0 0' }}>{s.value}</p>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+            <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fill, minmax(420px, 1fr))' }}>
+              {filteredUlpDeals.map((p, i) => (
+                <UlpDealCard
+                  key={p.dealId ?? i}
+                  p={p}
+                  onAddMore={(deal, totalInvested) => setAddMoreDeal({ ...deal, _totalInvested: totalInvested, _maxParticipation: deal.maxParticipation ?? 0 })}
+                  onWithdraw={(deal, totalInvested) => setWithdrawDeal({ deal, totalInvested })}
+                  onViewInterest={(deal) => setInterestDeal(deal)}
+                />
+              ))}
             </div>
           )}
         </>
+      )}
+
+      {/* ── Modals ── */}
+      {withdrawDeal && (
+        <GoldWithdrawalModal
+          deal={withdrawDeal.deal}
+          totalInvested={withdrawDeal.totalInvested}
+          onClose={() => setWithdrawDeal(null)}
+          onSuccess={() => { setWithdrawDeal(null); loadUlp(); }}
+        />
+      )}
+      {addMoreDeal && (
+        <GoldAddMoreModal
+          deal={addMoreDeal}
+          onClose={() => setAddMoreDeal(null)}
+          onSuccess={() => { setAddMoreDeal(null); loadUlp(); }}
+        />
+      )}
+      {interestDeal && (
+        <GoldInterestStatementModal
+          deal={interestDeal}
+          onClose={() => setInterestDeal(null)}
+        />
       )}
     </div>
   );
