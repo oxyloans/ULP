@@ -759,6 +759,10 @@ export default function GoldDealsParticipated() {
       .then(res => setRunningData(res))
       .catch(e => setRunningError(e.message ?? 'Failed to load running gold deals'))
       .finally(() => setRunningLoading(false));
+    getRunningDeals()
+      .then(res => setUlpData(res))
+      .catch(e => setUlpError(e.message ?? 'Failed to load ULP deals'))
+      .finally(() => setUlpLoading(false));
   };
 
   const loadProcessed = () => {
