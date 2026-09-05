@@ -62,6 +62,7 @@ function BankCard({ bank }) {
 
 function SDLotCard({ lot, index, participatePath }) {
   const navigate = useNavigate();
+  console.log({lot})
   const raisedPct = lot.totalSize > 0 ? Math.min(Math.round((lot.raised / lot.totalSize) * 100), 100) : 0;
   const isClosed  = lot.status === 'Closed' || lot.remaining === 0;
 
@@ -198,6 +199,7 @@ function SDLotCard({ lot, index, participatePath }) {
                 { label: 'Tenure',         value: lot.tenure,                color: accentColor },
                 { label: 'Min Investment', value: fmtINR(lot.minInvestment), color: '#f59e0b'   },
                 { label: 'Max Investment', value: fmtINR(lot.maxInvestment), color: '#f59e0b'   },
+                { label: 'TDS',            value: lot.propertyTds === 'MANDATORY' ? `${lot.tdsPercentage}% TDS` : 'No TDS', color: '#ef4444'   }
               ].map(f => (
                 <div key={f.label} className="flex flex-col items-center px-3 py-2 rounded-xl"
                   style={{ background: `${f.color}08`, border: `1px solid ${f.color}18` }}>
@@ -321,6 +323,8 @@ function mapDeal(raw) {
       ifsc:          raw.ifscCode    ?? '—',
       branch:        raw.branchName  ?? '—',
     },
+    propertyTds:    raw.propertyTds    ?? 'NOT_MANDATORY',
+    tdsPercentage:  raw.tdsPercentage  ?? 0,
   };
 }
 
