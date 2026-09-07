@@ -62,7 +62,7 @@ function BankCard({ bank }) {
 
 function SDLotCard({ lot, index, participatePath }) {
   const navigate = useNavigate();
-  console.log({lot})
+  // console.log({lot})
   const raisedPct = lot.totalSize > 0 ? Math.min(Math.round((lot.raised / lot.totalSize) * 100), 100) : 0;
   const isClosed  = lot.status === 'Closed' || lot.remaining === 0;
 

@@ -643,6 +643,13 @@ function TicketHistory({ onRefresh }) {
             {isOpen && (
               <div className="px-5 pb-5 pt-1 grid gap-3"
                 style={{ borderTop: '1px solid var(--border)', background: `${activeTab?.color ?? '#2673bb'}04` }}>
+                  {/* Full query */}
+                <div className="rounded-xl p-4" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
+                    Full Query
+                  </p>
+                  <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{t.query}</p>
+                </div>
                 <div className="grid sm:grid-cols-3 gap-3 text-xs">
                   <div>
                     <p style={{ color: 'var(--text-muted)' }}>Email</p>

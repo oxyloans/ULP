@@ -5146,7 +5146,7 @@ function MemberDashboard({ memberId, mode, openFamilyModal = false, onFamilyModa
         )} */}
 
         {/* 5. lenderId found — deals failed to load → retry */}
-        {/* {migrationChecked && migrationLenderId && oxyloansApiError && !oxyloansApiLoading && (
+        {migrationChecked && migrationLenderId && oxyloansApiError && !oxyloansApiLoading && (
           <button
             onClick={() => loadOxyloansDeals(migrationLenderId)}
             className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:opacity-90"
@@ -5156,7 +5156,7 @@ function MemberDashboard({ memberId, mode, openFamilyModal = false, onFamilyModa
             </svg>
             Retry OxyLoans
           </button>
-        )} */}
+        )}
 
         {/* 6. OxyLoans family members available */}
         {oxyloansMembers.length > 0 && (
