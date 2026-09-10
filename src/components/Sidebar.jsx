@@ -18,6 +18,7 @@ const Building       = () => <svg viewBox="0 0 24 24" fill="none" stroke="curren
 const GoldIcon       = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><circle cx="12" cy="12" r="9"/><path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3"/><path d="M9 12h3"/></svg>
 const ParticipateIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 const OxyLoansIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><line x1="19" y1="1" x2="19" y2="7"/><line x1="16" y1="4" x2="22" y2="4"/></svg>
+const HistoryIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/><polyline points="12 7 12 12 15 15"/></svg>
 
 // ─── Nav structure ────────────────────────────────────────────────────────────
 // To add more sub-items under Deals, just push to the `children` array.
@@ -43,9 +44,10 @@ const NAV_ITEMS = [
       // { title: 'OxyLoans Deals',  path: '/oxyloans-deals',            Icon: OxyLoansIcon, comingSoon: false },
     ],
   },
-  { title: 'Wallet',     path: '/wallet',   Icon: WalletIcon,  comingSoon: false },
-  { title: 'Profile',    path: '/profile',  Icon: ProfileIcon, comingSoon: false },
-  { title: 'Contact Us', path: '/contact',  Icon: ContactIcon, comingSoon: false },
+  { title: 'Wallet',             path: '/wallet',              Icon: WalletIcon,   comingSoon: false },
+  { title: 'Withdrawal History', path: '/withdrawal-history',  Icon: HistoryIcon,  comingSoon: false },
+  { title: 'Profile',            path: '/profile',             Icon: ProfileIcon,  comingSoon: false },
+  { title: 'Contact Us',         path: '/contact',             Icon: ContactIcon,  comingSoon: false },
 ];
 
 const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset', '/gold-deals',];

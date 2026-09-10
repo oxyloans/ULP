@@ -34,6 +34,7 @@ import SDLots from './pages/SDLots.jsx';
 import WalletDashboard from './pages/WalletDashboard.jsx';
 import WalletHistory from './pages/WalletHistory.jsx';
 import WalletWithdrawalRequests from './pages/WalletWithdrawalRequests.jsx';
+import WithdrawalHistory from './pages/WithdrawalHistory.jsx';
 import SDLotParticipate from './pages/SDLotParticipate.jsx';
 import MyParticipations from './pages/MyParticipations.jsx';
 import Profile from './pages/Profile.jsx';
@@ -204,6 +205,7 @@ function UserLayout() {
             <Route path="/wallet" element={<WalletDashboard />} />
             <Route path="/wallet/history" element={<WalletHistory />} />
             <Route path="/wallet/withdrawal-requests" element={<WalletWithdrawalRequests />} />
+            <Route path="/withdrawal-history" element={<WithdrawalHistory />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/family" element={<FamilyManagement />} />
             <Route path="/oxyloans-family" element={<OxyLoansFamily />} />

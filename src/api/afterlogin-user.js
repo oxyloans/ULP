@@ -503,4 +503,13 @@ export async function userWithdrawalReturned({ dealId, withdrawalAmount }) {
   });
 }
 
+/**
+ * GET /oxybrick-service/getUserWithdrawalRequests/{userId}
+ * Returns { principalWithdrawalList: [...], withdrawalInterestList: [...] }
+ */
+export async function getUserWithdrawalRequests() {
+  const userId = getUserId();
+  return get(`/oxybrick-service/getUserWithdrawalRequests/${userId}`);
+}
+
 

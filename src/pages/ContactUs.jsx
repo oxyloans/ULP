@@ -22,7 +22,7 @@ const I = {
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
-const CATEGORIES = ['OxyLoans', 'Offline Payments', 'OxyBricks', 'Family', 'Account', 'Other'];
+const CATEGORIES = ['OFFLINE', 'OXYBRICKS','ULP','OXYLOANS'];
 const PRIORITIES  = ['Low', 'Medium', 'High'];
 
 const statusStyle = {
@@ -75,7 +75,7 @@ function ContactForm({ onSubmitted }) {
 
   // form fields
   const [query,    setQuery]    = useState('');
-  const [category, setCategory] = useState('OxyLoans');
+  const [category, setCategory] = useState('ULP');
   const [priority, setPriority] = useState('Medium');
 
   // file upload
@@ -160,7 +160,7 @@ function ContactForm({ onSubmitted }) {
       email,
       id: '',
       mobileNumber,
-      projectType: 'OXYBRICKS',
+      projectType: category,
       query,
       queryStatus: 'PENDING',
       resolvedBy: '',
@@ -225,7 +225,9 @@ function ContactForm({ onSubmitted }) {
         </div>
       </div>
 
-      {/* Email */}
+      {/* Category + Priority */}
+      <div className="grid sm:grid-cols-2 gap-3">
+         {/* Email */}
       <div>
         <label style={labelStyle}>Email <span style={{ color: '#e95330' }}>*</span></label>
         <input style={inputStyle} value={email}
@@ -233,16 +235,14 @@ function ContactForm({ onSubmitted }) {
           placeholder="your@email.com" type="email" />
         {emailError && <p style={errStyle}>{emailError}</p>}
       </div>
-
-      {/* Category + Priority */}
-      <div className="grid sm:grid-cols-2 gap-3">
+      {/* Category */}
         <div>
           <label style={labelStyle}>Category</label>
           <select style={inputStyle} value={category} onChange={e => setCategory(e.target.value)}>
             {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
         </div>
-        <div>
+        {/* <div>
           <label style={labelStyle}>Priority</label>
           <div className="flex gap-2">
             {PRIORITIES.map(p => {
@@ -262,7 +262,7 @@ function ContactForm({ onSubmitted }) {
               );
             })}
           </div>
-        </div>
+        </div> */}
       </div>
 
       {/* Query / Message */}
@@ -419,8 +419,18 @@ function CancelModal({ ticket, onConfirm, onClose, loading }) {
   );
 }
 
+// ─── Category tab config ──────────────────────────────────────────────────────
+const CATEGORY_TABS = [
+  { value: 'ULP',       label: 'ULP',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)',  border: 'rgba(139,92,246,0.25)'  },
+  { value: 'OXYLOANS',  label: 'OxyLoans',  color: '#2673bb', bg: 'rgba(38,115,187,0.1)',  border: 'rgba(38,115,187,0.25)'  },
+  { value: 'OXYBRICKS', label: 'OxyBricks', color: '#f58311', bg: 'rgba(245,131,17,0.1)',  border: 'rgba(245,131,17,0.25)'  },
+  { value: 'OFFLINE',   label: 'Offline',   color: '#35a13e', bg: 'rgba(53,161,62,0.1)',   border: 'rgba(53,161,62,0.25)'   },
+  // { value: 'FAMILY',    label: 'Family',    color: '#e95330', bg: 'rgba(233,83,48,0.1)',   border: 'rgba(233,83,48,0.25)'   },
+];
+
 // ─── Ticket History ───────────────────────────────────────────────────────────
 function TicketHistory({ onRefresh }) {
+  const [categoryValue, setCategoryValue] = useState('ULP');
   const [statusValue, setStatusValue] = useState('PENDING');
   const [data,        setData]        = useState([]);
   const [loading,     setLoading]     = useState(false);
@@ -455,13 +465,13 @@ function TicketHistory({ onRefresh }) {
     }).catch(() => {});
   }, []);
 
-  // fetch queries by status
-  const fetchQueries = (status = statusValue) => {
+  // fetch queries by status + category
+  const fetchQueries = (status = statusValue, category = categoryValue) => {
     setLoading(true);
     setExpanded(null);
     axios.post(
       `https://meta.oxyloans.com/api/write-to-us/student/getQueries`,
-      { queryStatus: status, userId, projectType: 'OXYBRICKS' },
+      { queryStatus: status, userId, projectType: category },
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then(res => { setData(Array.isArray(res.data) ? res.data : []); })
@@ -469,7 +479,7 @@ function TicketHistory({ onRefresh }) {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchQueries(statusValue); }, [statusValue]);
+  useEffect(() => { fetchQueries(statusValue, categoryValue); }, [statusValue, categoryValue]);
 
   // cancel a query
   const handleCancel = (id, query, reason) => {
@@ -478,7 +488,7 @@ function TicketHistory({ onRefresh }) {
       email,
       id,
       mobileNumber,
-      projectType: 'OXYBRICKS',
+      projectType: categoryValue,
       query,
       queryStatus: 'CANCELLED',
       resolvedBy: 'user',
@@ -497,7 +507,7 @@ function TicketHistory({ onRefresh }) {
         toast.success('Query cancelled successfully!');
         setShowModal(false);
         setCancelTicket(null);
-        fetchQueries(statusValue);
+        fetchQueries(statusValue, categoryValue);
         if (onRefresh) onRefresh();
       })
       .catch(err => {
@@ -508,6 +518,7 @@ function TicketHistory({ onRefresh }) {
   };
 
   const activeTab = STATUS_TABS.find(t => t.value === statusValue);
+  const activeCatTab = CATEGORY_TABS.find(c => c.value === categoryValue);
 
   return (
     <div className="grid gap-4">
@@ -522,6 +533,25 @@ function TicketHistory({ onRefresh }) {
           loading={yesLoader}
         />
       )}
+
+      {/* Category tabs */}
+      <div className="flex gap-2 flex-wrap">
+        {CATEGORY_TABS.map(cat => {
+          const isActive = categoryValue === cat.value;
+          return (
+            <button key={cat.value} onClick={() => { setCategoryValue(cat.value); setExpanded(null); }}
+              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{
+                background: isActive ? cat.bg : 'var(--input-bg)',
+                color:      isActive ? cat.color : 'var(--text-muted)',
+                border:     `1px solid ${isActive ? cat.border : 'var(--border)'}`,
+                boxShadow:  isActive ? `0 0 10px ${cat.color}20` : 'none',
+              }}>
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Status tabs */}
       <div className="flex gap-2 flex-wrap">
@@ -546,7 +576,7 @@ function TicketHistory({ onRefresh }) {
             </button>
           );
         })}
-        <button onClick={() => fetchQueries(statusValue)}
+        <button onClick={() => fetchQueries(statusValue, categoryValue)}
           className="ml-auto px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
           style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
           ↻ Refresh
@@ -561,7 +591,7 @@ function TicketHistory({ onRefresh }) {
             <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
             <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
           </svg>
-          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading {activeTab?.label.toLowerCase()} queries…</span>
+          <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading {activeTab?.label.toLowerCase()} queries for {activeCatTab?.label}…</span>
         </div>
       )}
 
@@ -745,16 +775,22 @@ export default function ContactUs() {
   const token  = getToken();
   const userId = getUserId();
 
-  // fetch pending count for badge
+  // fetch pending count for badge (across all visible categories)
   const fetchPendingCount = () => {
     if (!userId || !token) return;
-    axios.post(
-      `https://meta.oxyloans.com/api/write-to-us/student/getQueries`,
-      { queryStatus: 'PENDING', userId, projectType: 'OXYBRICKS' },
-      { headers: { Authorization: `Bearer ${token}` } }
-    )
-      .then(res => setPendingCount(Array.isArray(res.data) ? res.data.length : 0))
-      .catch(() => {});
+    // Sum pending across all categories
+    let total = 0;
+    let done = 0;
+    CATEGORY_TABS.forEach(cat => {
+      axios.post(
+        `https://meta.oxyloans.com/api/write-to-us/student/getQueries`,
+        { queryStatus: 'PENDING', userId, projectType: cat.value },
+        { headers: { Authorization: `Bearer ${token}` } }
+      )
+        .then(res => { total += Array.isArray(res.data) ? res.data.length : 0; })
+        .catch(() => {})
+        .finally(() => { done++; if (done === CATEGORY_TABS.length) setPendingCount(total); });
+    });
   };
 
   useEffect(() => { fetchPendingCount(); }, []);
@@ -834,13 +870,13 @@ export default function ContactUs() {
                 <InfoCard Icon={I.MapPin} label="Address" value="Hyderabad, Telangana"  color="#f58311" />
               </div>
             </div>
-            <div className="rounded-2xl p-5"
+            {/* <div className="rounded-2xl p-5"
               style={{ background: 'linear-gradient(135deg,rgba(38,115,187,0.08) 0%,var(--card-bg) 100%)', border: '1px solid rgba(38,115,187,0.18)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)' }}>
               <h3 className="text-sm font-bold mb-3" style={{ color: 'var(--text-primary)' }}>Response Times</h3>
               <div className="grid gap-2">
                 {[
-                  { label: 'High Priority',   time: '2–4 hours',   color: '#e95330' },
-                  { label: 'Medium Priority', time: '12–24 hours', color: '#f58311' },
+                  { label: 'High Priority',   time: '24 hours',   color: '#e95330' },
+                  { label: 'Medium Priority', time: '24-48 hours', color: '#f58311' },
                   { label: 'Low Priority',    time: '2–3 days',    color: '#35a13e' },
                 ].map(r => (
                   <div key={r.label} className="flex items-center justify-between">
@@ -852,7 +888,7 @@ export default function ContactUs() {
                   </div>
                 ))}
               </div>
-            </div>
+            </div> */}
           </div>
         </div>
       ) : (
