@@ -534,23 +534,30 @@ function TicketHistory({ onRefresh }) {
         />
       )}
 
-      {/* Category tabs */}
-      <div className="flex gap-2 flex-wrap">
-        {CATEGORY_TABS.map(cat => {
-          const isActive = categoryValue === cat.value;
-          return (
-            <button key={cat.value} onClick={() => { setCategoryValue(cat.value); setExpanded(null); }}
-              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
-              style={{
-                background: isActive ? cat.bg : 'var(--input-bg)',
-                color:      isActive ? cat.color : 'var(--text-muted)',
-                border:     `1px solid ${isActive ? cat.border : 'var(--border)'}`,
-                boxShadow:  isActive ? `0 0 10px ${cat.color}20` : 'none',
-              }}>
-              {cat.label}
-            </button>
-          );
-        })}
+      <div className="flex items-center justify-between gap-4" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
+        {/* Title — left side */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <I.History />
+          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Your Support Tickets</h2>
+        </div>
+        {/* Category tabs — right side */}
+        <div className="flex gap-2 flex-wrap justify-end">
+          {CATEGORY_TABS.map(cat => {
+            const isActive = categoryValue === cat.value;
+            return (
+              <button key={cat.value} onClick={() => { setCategoryValue(cat.value); setExpanded(null); }}
+                className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+                style={{
+                  background: isActive ? cat.bg : 'var(--input-bg)',
+                  color:      isActive ? cat.color : 'var(--text-muted)',
+                  border:     `1px solid ${isActive ? cat.border : 'var(--border)'}`,
+                  boxShadow:  isActive ? `0 0 10px ${cat.color}20` : 'none',
+                }}>
+                {cat.label}
+              </button>
+            );
+          })}
+        </div>
       </div>
 
       {/* Status tabs */}
@@ -634,14 +641,24 @@ function TicketHistory({ onRefresh }) {
               {/* Query text — clickable to expand */}
               <button className="flex-1 min-w-0 text-left"
                 onClick={() => setExpanded(isOpen ? null : idx)}>
-                <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
-                  {t.query ?? '—'}
-                </p>
-                <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t.projectType ?? 'OXYBRICKS'}</span>
+                <div className="flex items-center gap-2 min-w-0">
+                  <p className="text-sm font-semibold truncate min-w-0" style={{ color: 'var(--text-primary)' }}>
+                    {t.query ?? '—'}
+                  </p>
+                  {t.projectType && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0 whitespace-nowrap"
+                      style={{
+                        background: activeCatTab?.bg ?? 'rgba(38,115,187,0.1)',
+                        color: activeCatTab?.color ?? '#2673bb',
+                        border: `1px solid ${activeCatTab?.border ?? 'rgba(38,115,187,0.25)'}`,
+                      }}>
+                      {t.projectType}
+                    </span>
+                  )}
                   {t.mobileNumber && (
-                    <><span style={{ color: 'var(--border)' }}>·</span>
-                    <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t.mobileNumber}</span></>
+                    <span className="text-xs flex-shrink-0 whitespace-nowrap hidden sm:inline" style={{ color: 'var(--text-muted)' }}>
+                      {t.mobileNumber}
+                    </span>
                   )}
                 </div>
               </button>
@@ -866,7 +883,7 @@ export default function ContactUs() {
               <h3 className="text-sm font-bold mb-4" style={{ color: 'var(--text-primary)' }}>Get in Touch</h3>
               <div className="grid gap-3">
                 <InfoCard Icon={I.Mail}   label="Email"   value="support@oxyloans.com" color="#2673bb" />
-                <InfoCard Icon={I.Phone}  label="Phone"   value="+91 98765 43210"       color="#35a13e" />
+                <InfoCard Icon={I.Phone}  label="Phone"   value="+91 91825 80511"       color="#35a13e" />
                 <InfoCard Icon={I.MapPin} label="Address" value="Hyderabad, Telangana"  color="#f58311" />
               </div>
             </div>
@@ -894,10 +911,7 @@ export default function ContactUs() {
       ) : (
         <div className="rounded-2xl p-6"
           style={{ background: 'var(--table-bg)', border: '1px solid var(--border)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-          <div className="flex items-center gap-2 mb-5" style={{ borderBottom: '1px solid var(--border)', paddingBottom: 16 }}>
-            <I.History />
-            <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Your Support Tickets</h2>
-          </div>
+          
           <TicketHistory onRefresh={fetchPendingCount} />
         </div>
       )}
