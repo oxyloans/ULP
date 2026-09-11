@@ -1,4 +1,4 @@
-﻿import { useState, useEffect } from 'react';
+﻿import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -82,6 +82,9 @@ function ContactForm({ onSubmitted }) {
   const [fileName,    setFileName]    = useState('');
   const [documentId,  setDocumentId]  = useState('');
   const [uploadStatus, setUploadStatus] = useState('idle'); // idle | loading | uploaded | Failed
+  const [pastedPreview, setPastedPreview] = useState(''); // base64 preview of pasted image
+  const [isDragging,  setIsDragging]  = useState(false);
+  const fileInputRef = useRef(null);
 
   // submission
   const [loading,  setLoading]  = useState(false);
@@ -114,11 +117,10 @@ function ContactForm({ onSubmitted }) {
   useEffect(() => { fetchProfile(); }, []);
 
   // ── File upload ─────────────────────────────────────────────────────────────
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
+  const uploadFile = (file) => {
     if (!file) return;
     setUploadStatus('loading');
-    setFileName(file.name);
+    setFileName(file.name || 'pasted-image.png');
     const formData = new FormData();
     formData.append('multiPart', file);
     formData.append('fileType', 'kyc');
@@ -136,7 +138,50 @@ function ContactForm({ onSubmitted }) {
         console.error('Error uploading file:', err);
         toast.error(err.response?.data?.error ?? 'Upload failed');
         setUploadStatus('Failed');
+        setPastedPreview('');
       });
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setPastedPreview('');
+    uploadFile(file);
+  };
+
+  // ── Paste handler ───────────────────────────────────────────────────────────
+  const handlePaste = (e) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (!file) continue;
+        // generate preview
+        const reader = new FileReader();
+        reader.onload = (ev) => setPastedPreview(ev.target.result);
+        reader.readAsDataURL(file);
+        uploadFile(file);
+        e.preventDefault();
+        break;
+      }
+    }
+  };
+
+  // ── Drag-and-drop handlers ──────────────────────────────────────────────────
+  const handleDragOver = (e) => { e.preventDefault(); setIsDragging(true); };
+  const handleDragLeave = ()  => setIsDragging(false);
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files[0];
+    if (!file) return;
+    setPastedPreview('');
+    uploadFile(file);
+  };
+
+  const clearUpload = () => {
+    setFileName(''); setDocumentId(''); setUploadStatus('idle'); setPastedPreview('');
   };
 
   // ── Submit query ────────────────────────────────────────────────────────────
@@ -181,6 +226,8 @@ function ContactForm({ onSubmitted }) {
         setQuery('');
         setDocumentId('');
         setFileName('');
+        setUploadStatus('idle');
+        setPastedPreview('');
         fetchProfile();
         onSubmitted();
       })
@@ -276,43 +323,124 @@ function ContactForm({ onSubmitted }) {
 
       {/* File upload */}
       <div>
-        <label style={labelStyle}>Attach Document (optional)</label>
-        <label className="flex items-center gap-3 px-4 py-3 rounded-xl cursor-pointer transition-all"
+        <label style={labelStyle}>Attach Document / Screenshot (optional)</label>
+
+        {/* Outer zone: handles paste + drag-drop. NOT a <label> so it never opens the browser. */}
+        <div
+          onPaste={handlePaste}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          tabIndex={0}
+          className="rounded-xl outline-none focus:ring-2"
           style={{
-            background: 'var(--input-bg)', border: '1px dashed var(--input-border)',
-            color: 'var(--text-muted)',
+            border: `1.5px dashed ${isDragging ? '#2673bb' : uploadStatus === 'uploaded' ? '#35a13e' : uploadStatus === 'Failed' ? '#e95330' : 'var(--input-border)'}`,
+            background: isDragging ? 'rgba(38,115,187,0.06)' : 'var(--input-bg)',
+            transition: 'border-color 0.2s, background 0.2s',
           }}>
-          <input type="file" className="hidden" onChange={handleFileChange}
-            accept="image/*,.pdf,.doc,.docx" />
-          {uploadStatus === 'loading' ? (
-            <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
-            </svg>
-          ) : uploadStatus === 'uploaded' ? (
-            <I.CheckCircle />
-          ) : (
-            <I.Paperclip />
+
+          {/* Hidden file input — triggered only by Browse button */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileChange}
+            accept="image/*,.pdf,.doc,.docx"
+          />
+
+          {/* Pasted / dropped image preview */}
+          {pastedPreview && (
+            <div className="relative p-3 pb-0">
+              <img src={pastedPreview} alt="pasted preview"
+                className="w-full max-h-40 object-contain rounded-lg"
+                style={{ border: '1px solid var(--border)' }} />
+              {uploadStatus === 'loading' && (
+                <div className="absolute inset-0 m-3 flex items-center justify-center rounded-lg"
+                  style={{ background: 'rgba(0,0,0,0.4)' }}>
+                  <svg className="w-6 h-6 animate-spin" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                    <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                  </svg>
+                </div>
+              )}
+            </div>
           )}
-          <span className="text-sm flex-1 truncate">
-            {uploadStatus === 'loading' ? 'Uploading…'
-              : uploadStatus === 'uploaded' ? fileName
-              : uploadStatus === 'Failed' ? 'Upload failed — try again'
-              : 'Click to attach a file'}
-          </span>
-          {uploadStatus === 'uploaded' && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.2)' }}>
-              Uploaded
+
+          {/* Status / info row */}
+          <div className="flex items-center gap-3 px-4 py-3">
+            {uploadStatus === 'loading' && !pastedPreview ? (
+              <svg className="w-4 h-4 animate-spin flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+              </svg>
+            ) : uploadStatus === 'uploaded' ? (
+              <span style={{ color: '#35a13e' }}><I.CheckCircle /></span>
+            ) : uploadStatus === 'Failed' ? (
+              <span style={{ color: '#e95330' }}><I.AlertCircle /></span>
+            ) : (
+              <span style={{ color: 'var(--text-muted)' }}><I.Paperclip /></span>
+            )}
+
+            <span className="text-sm flex-1 truncate" style={{ color: 'var(--text-muted)' }}>
+              {uploadStatus === 'loading' ? 'Uploading…'
+                : uploadStatus === 'uploaded' ? fileName
+                : uploadStatus === 'Failed' ? 'Upload failed — try again'
+                : 'Drag & drop or paste a screenshot here (Ctrl+V)'}
             </span>
+
+            {/* Status badge */}
+            {uploadStatus === 'uploaded' && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{ background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.2)' }}>
+                Uploaded
+              </span>
+            )}
+            {uploadStatus === 'Failed' && (
+              <span className="text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0"
+                style={{ background: 'rgba(233,83,48,0.1)', color: '#e95330', border: '1px solid rgba(233,83,48,0.2)' }}>
+                Failed
+              </span>
+            )}
+
+            {/* Browse button — only button that opens file picker */}
+            {(uploadStatus === 'idle' || uploadStatus === 'Failed') && (
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105"
+                style={{ background: 'rgba(38,115,187,0.1)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.25)' }}>
+                <I.Upload /> Browse
+              </button>
+            )}
+
+            {/* Clear button */}
+            {(uploadStatus === 'uploaded' || uploadStatus === 'Failed') && (
+              <button
+                type="button"
+                onClick={clearUpload}
+                className="flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center transition-all hover:scale-110"
+                style={{ background: 'var(--border)', color: 'var(--text-muted)' }}>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+            )}
+          </div>
+
+          {/* Paste hint */}
+          {uploadStatus === 'idle' && (
+            <div className="flex items-center justify-center gap-1.5 pb-2.5 text-xs" style={{ color: 'var(--text-muted)' }}>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5">
+                <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/>
+                <rect x="8" y="2" width="8" height="4" rx="1" ry="1"/>
+              </svg>
+              Click this box then press&nbsp;
+              <kbd className="px-1.5 py-0.5 rounded font-mono"
+                style={{ background: 'var(--border)', color: 'var(--text-primary)', fontSize: 11 }}>Ctrl+V</kbd>
+              &nbsp;to paste a screenshot
+            </div>
           )}
-          {uploadStatus === 'Failed' && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
-              style={{ background: 'rgba(233,83,48,0.1)', color: '#e95330', border: '1px solid rgba(233,83,48,0.2)' }}>
-              Failed
-            </span>
-          )}
-        </label>
+        </div>
       </div>
 
       {/* Global error */}
@@ -421,6 +549,7 @@ function CancelModal({ ticket, onConfirm, onClose, loading }) {
 
 // ─── Category tab config ──────────────────────────────────────────────────────
 const CATEGORY_TABS = [
+  { value: 'ALL',       label: 'All',       color: '#4e88d8', bg: 'rgba(100, 116, 139, 0.1)',  border: 'rgba(1, 30, 70, 0.25)'  },
   { value: 'ULP',       label: 'ULP',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)',  border: 'rgba(139,92,246,0.25)'  },
   { value: 'OXYLOANS',  label: 'OxyLoans',  color: '#2673bb', bg: 'rgba(38,115,187,0.1)',  border: 'rgba(38,115,187,0.25)'  },
   { value: 'OXYBRICKS', label: 'OxyBricks', color: '#f58311', bg: 'rgba(245,131,17,0.1)',  border: 'rgba(245,131,17,0.25)'  },
@@ -430,7 +559,7 @@ const CATEGORY_TABS = [
 
 // ─── Ticket History ───────────────────────────────────────────────────────────
 function TicketHistory({ onRefresh }) {
-  const [categoryValue, setCategoryValue] = useState('ULP');
+  const [categoryValue, setCategoryValue] = useState('ALL');
   const [statusValue, setStatusValue] = useState('PENDING');
   const [data,        setData]        = useState([]);
   const [loading,     setLoading]     = useState(false);
@@ -746,7 +875,7 @@ function TicketHistory({ onRefresh }) {
                       </div>
                     </div>
                     <button
-                      onClick={() => openPreview(`https://meta.oxyloans.com/api/common-upload-service/view/${t.userDocumentId}`, 'Your Attached Document')}
+                      onClick={() => openPreview(t.userQueryDocumentStatus.filePath, 'Your Attached Document')}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105"
                       style={{ background: 'rgba(38,115,187,0.12)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.25)' }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -767,7 +896,7 @@ function TicketHistory({ onRefresh }) {
                       </div>
                     </div>
                     <button
-                      onClick={() => openPreview(`https://meta.oxyloans.com/api/common-upload-service/view/${t.adminDocumentId}`, 'Admin Attached Document')}
+                      onClick={() => openPreview(t.userQueryDocumentStatus.adminUploadedFilePath, 'Admin Attached Document')}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105"
                       style={{ background: 'rgba(53,161,62,0.12)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.25)' }}>
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
@@ -884,6 +1013,10 @@ export default function ContactUs() {
               <div className="grid gap-3">
                 <InfoCard Icon={I.Mail}   label="Email"   value="support@oxyloans.com" color="#2673bb" />
                 <InfoCard Icon={I.Phone}  label="Phone"   value="+91 91825 80511"       color="#35a13e" />
+                <p className="text-xs px-3 py-2 rounded-lg"
+                  style={{ background: 'rgba(233,83,48,0.08)', color: '#e95330', border: '1px solid rgba(233,83,48,0.2)', marginTop: -6 }}>
+                  ⚡ For anything urgent or an emergency, feel free to call us directly on this number.
+                </p>
                 <InfoCard Icon={I.MapPin} label="Address" value="Hyderabad, Telangana"  color="#f58311" />
               </div>
             </div>

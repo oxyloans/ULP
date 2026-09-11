@@ -27,6 +27,13 @@ const STATUS_TABS = [
   { value: 'CANCELLED', label: 'Cancelled', color: '#e95330', bg: 'rgba(233,83,48,0.1)',   border: 'rgba(233,83,48,0.25)'   },
 ];
 
+const CATEGORY_TABS = [
+  { value: 'ULP',       label: 'ULP',       color: '#8b5cf6', bg: 'rgba(139,92,246,0.1)',  border: 'rgba(139,92,246,0.25)'  },
+  { value: 'OXYLOANS',  label: 'OxyLoans',  color: '#2673bb', bg: 'rgba(38,115,187,0.1)',  border: 'rgba(38,115,187,0.25)'  },
+  { value: 'OXYBRICKS', label: 'OxyBricks', color: '#f58311', bg: 'rgba(245,131,17,0.1)',  border: 'rgba(245,131,17,0.25)'  },
+  { value: 'OFFLINE',   label: 'Offline',   color: '#35a13e', bg: 'rgba(53,161,62,0.1)',   border: 'rgba(53,161,62,0.25)'   },
+];
+
 const statusStyle = {
   PENDING:   { bg: 'rgba(245,131,17,0.1)',  color: '#f58311', border: 'rgba(245,131,17,0.22)', Icon: I.Clock       },
   COMPLETED: { bg: 'rgba(53,161,62,0.1)',   color: '#35a13e', border: 'rgba(53,161,62,0.22)',  Icon: I.CheckCircle },
@@ -273,6 +280,7 @@ export default function AdminSupport() {
   const [modalTicket, setModalTicket] = useState(null);
   const [totalCount,  setTotalCount]  = useState(0);
   const { previewUrl, previewName, open: openPreview, close: closePreview } = useFilePreview();
+  const [categoryType, setCategoryType] = useState('OXYBRICKS');
 
   const token = getToken();
 
@@ -281,7 +289,7 @@ export default function AdminSupport() {
     setExpanded(null);
     axios.post(
       `https://meta.oxyloans.com/api/write-to-us/student/getQueries`,
-      { queryStatus: status, projectType: 'OXYBRICKS' },
+      { queryStatus: status, projectType: categoryType },
       { headers: { Authorization: `Bearer ${token}` } }
     )
       .then(res => {
@@ -294,7 +302,7 @@ export default function AdminSupport() {
       .finally(() => setLoader(false));
   };
 
-  useEffect(() => { fetchQueries(statusValue); }, [statusValue]);
+  useEffect(() => { fetchQueries(statusValue); }, [statusValue, categoryType]);
 
   const activeTab = STATUS_TABS.find(t => t.value === statusValue);
 
@@ -339,9 +347,28 @@ export default function AdminSupport() {
           <I.Refresh />Refresh
         </button>
       </div>
+    <div className='flex items-center justify-between gap-4'>
+      {/* Category tabs */}
+      <div className="flex gap-2 flex-wrap items-center gap-2 flex-shrink-0">
+        {CATEGORY_TABS.map(cat => {
+          const isActive = categoryType === cat.value;
+          return (
+            <button key={cat.value} onClick={() => { setCategoryType(cat.value); setExpanded(null); }}
+              className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+              style={{
+                background: isActive ? cat.bg : 'var(--input-bg)',
+                color:      isActive ? cat.color : 'var(--text-muted)',
+                border:     `1px solid ${isActive ? cat.border : 'var(--border)'}`,
+                boxShadow:  isActive ? `0 0 10px ${cat.color}20` : 'none',
+              }}>
+              {cat.label}
+            </button>
+          );
+        })}
+      </div>
 
       {/* Status tabs */}
-      <div className="flex gap-2 flex-wrap">
+      <div className="flex gap-2 flex-wrap justify-end">
         {STATUS_TABS.map(tab => {
           const isActive = statusValue === tab.value;
           return (
@@ -364,6 +391,7 @@ export default function AdminSupport() {
           );
         })}
       </div>
+    </div>
 
       {/* Loading */}
       {loader && (
