@@ -18,6 +18,8 @@ const I = {
   Eye:         () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
   Refresh:     () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>,
   Calendar:    () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+  Shield:      () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>,
+  RefreshCw:   () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -35,9 +37,10 @@ const CATEGORY_TABS = [
 ];
 
 const statusStyle = {
-  PENDING:   { bg: 'rgba(245,131,17,0.1)',  color: '#f58311', border: 'rgba(245,131,17,0.22)', Icon: I.Clock       },
-  COMPLETED: { bg: 'rgba(53,161,62,0.1)',   color: '#35a13e', border: 'rgba(53,161,62,0.22)',  Icon: I.CheckCircle },
-  CANCELLED: { bg: 'rgba(233,83,48,0.1)',   color: '#e95330', border: 'rgba(233,83,48,0.22)',  Icon: I.XCircle     },
+  PENDING:   { bg: 'rgba(245,131,17,0.1)',  color: '#f58311', border: 'rgba(245,131,17,0.22)', Icon: I.Clock,       label: 'Pending'   },
+  COMPLETED: { bg: 'rgba(53,161,62,0.1)',   color: '#35a13e', border: 'rgba(53,161,62,0.22)',  Icon: I.CheckCircle, label: 'Completed' },
+  CANCELLED: { bg: 'rgba(233,83,48,0.1)',   color: '#e95330', border: 'rgba(233,83,48,0.22)',  Icon: I.XCircle,     label: 'Cancelled' },
+  REOPEN:    { bg: 'rgba(139,92,246,0.1)',  color: '#8b5cf6', border: 'rgba(139,92,246,0.22)', Icon: I.RefreshCw,   label: 'Reopened'  },
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -46,7 +49,7 @@ function StatusChip({ status }) {
   return (
     <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold"
       style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}` }}>
-      <s.Icon />{status}
+      <s.Icon />{s.label ?? status}
     </span>
   );
 }
@@ -60,9 +63,189 @@ function useFilePreview() {
   return { previewUrl, previewName, open, close };
 }
 
+/** "2026-09-11 12:14:14.082" → "11 Sep 2026, 12:14 PM" */
 function fmtDate(str) {
   if (!str) return '—';
-  return str.slice(0, 10);
+  try {
+    const d = new Date(str.replace(' ', 'T'));
+    if (isNaN(d)) return str.slice(0, 10);
+    return d.toLocaleString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit', hour12: true,
+    });
+  } catch { return str.slice(0, 10); }
+}
+
+/** parse date string → numeric timestamp for sorting */
+function toTs(raw) {
+  if (!raw) return 0;
+  try { return new Date(raw.replace(' ', 'T')).getTime() || 0; }
+  catch { return 0; }
+}
+
+// ─── Conversation Timeline ────────────────────────────────────────────────────
+/**
+ * Same logic as ContactUs.jsx — builds one unified sorted event array.
+ *
+ * ticket.updatedAt  = true first-submission time (backend never overwrites it)
+ * ticket.createdAt  = gets overwritten on reopen → unreliable for original query
+ * ticket.comments   = admin's FIRST close comment
+ * ticket.resolvedOn = timestamp of first close
+ * userPendingQueries = every action after first close, sorted by resolvedOn asc
+ */
+function ConversationTimeline({ ticket }) {
+  const ES = {
+    PENDING:   { color: '#f58311', bg: 'rgba(245,131,17,0.08)',  border: 'rgba(245,131,17,0.2)',  label: 'Pending'   },
+    COMPLETED: { color: '#35a13e', bg: 'rgba(53,161,62,0.08)',   border: 'rgba(53,161,62,0.2)',   label: 'Resolved'  },
+    CANCELLED: { color: '#e95330', bg: 'rgba(233,83,48,0.08)',   border: 'rgba(233,83,48,0.2)',   label: 'Cancelled' },
+    REOPEN:    { color: '#8b5cf6', bg: 'rgba(139,92,246,0.08)',  border: 'rgba(139,92,246,0.2)',  label: 'Reopened'  },
+    QUERY:     { color: '#a855f7', bg: 'rgba(168,85,247,0.08)',  border: 'rgba(168,85,247,0.2)',  label: 'Query'     },
+  };
+
+  // ── build unified sorted event list ────────────────────────────────────────
+  const events = [];
+
+  // 1️⃣  Original query
+  //  updatedAt = actual creation time (never overwritten)
+  //  createdAt = gets set to reopen timestamp — don't use for original
+  const allTs = [
+    toTs(ticket.createdAt),
+    toTs(ticket.resolvedOn),
+    ...(ticket.userPendingQueries ?? []).map(e => toTs(e.resolvedOn || e.createdAt)),
+  ].filter(t => t > 0);
+  const earliestTs   = allTs.length ? Math.min(...allTs) : toTs(ticket.createdAt);
+  const originalTs   = toTs(ticket.updatedAt) > 0 ? toTs(ticket.updatedAt) : earliestTs;
+  const originalDate = toTs(ticket.updatedAt) > 0 ? ticket.updatedAt : ticket.createdAt;
+
+  events.push({
+    _type: 'query', by: 'user', status: 'QUERY',
+    text: ticket.query, dateRaw: originalDate, ts: originalTs,
+  });
+
+  // 2️⃣  Top-level admin first close (ticket.comments)
+  if (ticket.comments && ticket.resolvedOn) {
+    events.push({
+      _type: 'toplevel', by: 'admin', status: 'COMPLETED',
+      text: ticket.comments, dateRaw: ticket.resolvedOn, ts: toTs(ticket.resolvedOn),
+    });
+  }
+
+  // 3️⃣  All userPendingQueries entries
+  (ticket.userPendingQueries ?? []).forEach(entry => {
+    const dateRaw = entry.resolvedOn || entry.createdAt;
+    events.push({
+      _type: 'pending', by: entry.resolvedBy ?? 'user',
+      status: entry.queryStatus ?? 'PENDING',
+      text: entry.pendingComments ?? '', dateRaw, ts: toTs(dateRaw),
+    });
+  });
+
+  // 4️⃣  Sort by timestamp ascending
+  events.sort((a, b) => a.ts - b.ts);
+
+  if (events.length === 0) return null;
+
+  const renderBubble = (ev, idx) => {
+    const byAdmin     = ev.by === 'admin';
+    const es          = ES[ev.status] ?? ES['PENDING'];
+    const isOriginal  = ev._type === 'query';
+    const isReopen    = ev.status === 'REOPEN';
+
+    // admin → purple (to match admin theme); user → blue
+    const avatarColor  = byAdmin ? '#a855f7'               : '#2673bb';
+    const avatarBg     = byAdmin ? 'rgba(168,85,247,0.12)' : 'rgba(38,115,187,0.12)';
+    const avatarBorder = byAdmin ? 'rgba(168,85,247,0.3)'  : 'rgba(38,115,187,0.3)';
+    const bubbleBg     = byAdmin ? 'rgba(168,85,247,0.06)' : 'rgba(38,115,187,0.06)';
+    const bubbleBorder = byAdmin ? 'rgba(168,85,247,0.15)' : 'rgba(38,115,187,0.15)';
+
+    return (
+      <div key={idx}>
+        {/* REOPEN divider */}
+        {isReopen && (
+          <div className="flex items-center gap-2 my-1">
+            <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.25)' }} />
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full"
+              style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.3)' }}>
+              ↩ Ticket Reopened
+            </span>
+            <div className="flex-1 h-px" style={{ background: 'rgba(139,92,246,0.25)' }} />
+          </div>
+        )}
+
+        <div className="flex gap-3 items-start relative">
+          {/* Avatar */}
+          <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 z-10 mt-0.5"
+            style={{ background: avatarBg, border: `1px solid ${avatarBorder}`, color: avatarColor }}>
+            {byAdmin ? <I.Shield /> : <I.User />}
+          </div>
+
+          {/* Bubble */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+              <span className="text-xs font-bold" style={{ color: avatarColor }}>
+                {byAdmin ? 'Support Team (Admin)' : (ticket.name ?? 'User')}
+              </span>
+              <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                style={{ background: avatarBg, color: avatarColor, border: `1px solid ${avatarBorder}` }}>
+                {byAdmin ? 'Admin' : 'User'}
+              </span>
+              {!isOriginal && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                  style={{ background: es.bg, color: es.color, border: `1px solid ${es.border}` }}>
+                  {es.label}
+                </span>
+              )}
+              {isOriginal && (
+                <span className="text-xs px-1.5 py-0.5 rounded-full font-semibold"
+                  style={{ background: 'rgba(168,85,247,0.08)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.2)' }}>
+                  New Ticket
+                </span>
+              )}
+              <span className="text-xs ml-auto" style={{ color: 'var(--text-muted)' }}>
+                {fmtDate(ev.dateRaw)}
+              </span>
+            </div>
+            <div className="rounded-xl px-4 py-3 text-sm"
+              style={{ background: bubbleBg, border: `1px solid ${bubbleBorder}`, color: 'var(--text-primary)' }}>
+              {ev.text || <em style={{ color: 'var(--text-muted)' }}>No message</em>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const onlyOriginalQuery = events.length === 1;
+
+  return (
+    <div className="grid gap-1">
+      {/* Section header */}
+      <div className="flex items-center gap-2 mb-2">
+        <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+        <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+          style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+          Conversation · {events.length} event{events.length !== 1 ? 's' : ''}
+        </span>
+        <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+      </div>
+
+      <div className="relative grid gap-3 pl-2">
+        {/* Vertical connector */}
+        <div className="absolute left-5 top-4 bottom-4 w-px" style={{ background: 'var(--border)' }} />
+
+        {events.map((ev, i) => renderBubble(ev, i))}
+
+        {/* Awaiting — only when just the original query exists */}
+        {onlyOriginalQuery && (
+          <div className="flex items-center gap-2 px-4 py-3 rounded-xl ml-11"
+            style={{ background: 'rgba(245,131,17,0.06)', border: '1px solid rgba(245,131,17,0.15)' }}>
+            <I.Clock />
+            <p className="text-xs font-semibold" style={{ color: '#f58311' }}>No response yet — awaiting admin action</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 // ─── Respond Modal ────────────────────────────────────────────────────────────
@@ -173,7 +356,7 @@ function RespondModal({ ticket, onClose, onDone, onPreview }) {
               { label: 'Name',    value: ticket.name          },
               { label: 'Email',   value: ticket.email         },
               { label: 'Mobile',  value: ticket.mobileNumber  },
-              { label: 'Date',    value: fmtDate(ticket.createdAt) },
+              { label: 'Date',    value: fmtDate(toTs(ticket.updatedAt) > 0 ? ticket.updatedAt : ticket.createdAt) },
             ].map(m => (
               <div key={m.label} className="px-3 py-2 rounded-xl"
                 style={{ background: 'rgba(168,85,247,0.05)', border: '1px solid rgba(168,85,247,0.12)' }}>
@@ -458,7 +641,7 @@ export default function AdminSupport() {
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t.mobileNumber}</span>
                   <span style={{ color: 'var(--border)' }}>·</span>
                   <I.Calendar />
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtDate(t.createdAt)}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtDate(toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt)}</span>
                 </div>
               </button>
 
@@ -496,116 +679,87 @@ export default function AdminSupport() {
 
             {/* ── Expanded detail ── */}
             {isOpen && (
-              <div className="px-5 pb-5 pt-2 grid gap-3"
+              <div className="px-5 pb-5 pt-3 grid gap-4"
                 style={{ borderTop: '1px solid var(--border)', background: 'rgba(168,85,247,0.02)' }}>
-
-                {/* Full query */}
-                <div className="rounded-xl p-4" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
-                  <p className="text-xs font-semibold uppercase tracking-wider mb-2" style={{ color: 'var(--text-muted)' }}>
-                    Full Query
-                  </p>
-                  <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{t.query}</p>
-                </div>
 
                 {/* Meta grid */}
                 <div className="grid sm:grid-cols-3 gap-3 text-xs">
                   {[
-                    { label: 'Name',        value: t.name           },
-                    { label: 'Email',       value: t.email          },
-                    { label: 'Mobile',      value: t.mobileNumber   },
-                    { label: 'User ID',     value: t.userId         },
-                    { label: 'Submitted',   value: fmtDate(t.createdAt) },
-                    { label: 'Resolved On', value: fmtDate(t.resolvedOn) },
+                    { label: 'Ticket ID',   value: t.randomTicketId       },
+                    { label: 'Submitted',   value: fmtDate(toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt) },
+                    { label: 'Resolved On', value: fmtDate(t.resolvedOn)  },
+                    { label: 'Name',        value: t.name                 },
+                    { label: 'Email',       value: t.email                },
+                    { label: 'Mobile',      value: t.mobileNumber         },
                   ].map(m => (
-                    <div key={m.label}>
-                      <p style={{ color: 'var(--text-muted)' }}>{m.label}</p>
-                      <p className="font-semibold mt-0.5 break-all" style={{ color: 'var(--text-primary)' }}>
+                    <div key={m.label} className="rounded-xl p-3"
+                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{m.label}</p>
+                      <p className="font-semibold mt-0.5 break-all text-xs" style={{ color: 'var(--text-primary)' }}>
                         {m.value || '—'}
                       </p>
                     </div>
                   ))}
                 </div>
 
-                {/* User document — use filePath directly from userQueryDocumentStatus */}
-                {userFile && (
-                  <div className="rounded-xl p-3 flex items-center justify-between gap-3"
-                    style={{ background: 'rgba(38,115,187,0.06)', border: '1px solid rgba(38,115,187,0.18)' }}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <I.Paperclip />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold" style={{ color: '#2673bb' }}>User Attached Document</p>
-                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                          {userDoc.fileName ?? userFile}
-                        </p>
-                      </div>
-                    </div>
-                    <button onClick={() => openPreview(userFile, userDoc.fileName ?? userFile)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 flex-shrink-0"
-                      style={{ background: 'rgba(38,115,187,0.12)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.25)' }}>
-                      <I.Eye />View
-                    </button>
-                  </div>
-                )}
+                {/* ── Conversation timeline ── */}
+                <ConversationTimeline ticket={t} />
 
-                {/* Admin document — adminUploadedFilePath */}
-                {adminFile && (
-                  <div className="rounded-xl p-3 flex items-center justify-between gap-3"
-                    style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)' }}>
-                    <div className="flex items-center gap-2 min-w-0">
-                      <I.Paperclip />
-                      <div className="min-w-0">
-                        <p className="text-xs font-semibold" style={{ color: '#a855f7' }}>Admin Attached Document</p>
-                        <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                          {userDoc.adminUploadedFileName ?? adminFile}
-                        </p>
-                      </div>
+                {/* ── Attachments ── */}
+                {(userFile || adminFile) && (
+                  <div className="grid gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
+                      <span className="text-xs font-semibold px-2 py-0.5 rounded-full"
+                        style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+                        Attachments
+                      </span>
+                      <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
                     </div>
-                    <button onClick={() => openPreview(adminFile, userDoc.adminUploadedFileName ?? adminFile)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 flex-shrink-0"
-                      style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.25)' }}>
-                      <I.Eye />View
-                    </button>
-                  </div>
-                )}
 
-                {/* Admin response */}
-                {t.comments ? (
-                  <div className="rounded-xl p-3"
-                    style={{ background: 'rgba(53,161,62,0.06)', border: '1px solid rgba(53,161,62,0.15)' }}>
-                    <p className="text-xs font-semibold mb-1" style={{ color: '#35a13e' }}>Admin Response</p>
-                    <p className="text-sm whitespace-pre-wrap" style={{ color: 'var(--text-primary)' }}>{t.comments}</p>
-                    {t.resolvedBy && (
-                      <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                        by {t.resolvedBy} · {fmtDate(t.resolvedOn)}
-                      </p>
+                    {userFile && (
+                      <div className="rounded-xl p-3 flex items-center justify-between gap-3"
+                        style={{ background: 'rgba(38,115,187,0.06)', border: '1px solid rgba(38,115,187,0.18)' }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <I.Paperclip />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold" style={{ color: '#2673bb' }}>User Attached Document</p>
+                            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                              {userDoc.fileName ?? userFile}
+                            </p>
+                          </div>
+                        </div>
+                        <button onClick={() => openPreview(userFile, userDoc.fileName ?? userFile)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 flex-shrink-0"
+                          style={{ background: 'rgba(38,115,187,0.12)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.25)' }}>
+                          <I.Eye />View
+                        </button>
+                      </div>
+                    )}
+
+                    {adminFile && (
+                      <div className="rounded-xl p-3 flex items-center justify-between gap-3"
+                        style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)' }}>
+                        <div className="flex items-center gap-2 min-w-0">
+                          <I.Paperclip />
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold" style={{ color: '#a855f7' }}>Admin Attached Document</p>
+                            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
+                              {userDoc.adminUploadedFileName ?? adminFile}
+                            </p>
+                          </div>
+                        </div>
+                        <button onClick={() => openPreview(adminFile, userDoc.adminUploadedFileName ?? adminFile)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all hover:scale-105 flex-shrink-0"
+                          style={{ background: 'rgba(168,85,247,0.12)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.25)' }}>
+                          <I.Eye />View
+                        </button>
+                      </div>
                     )}
                   </div>
-                ) : (
-                  <div className="rounded-xl p-3"
-                    style={{ background: 'rgba(245,131,17,0.06)', border: '1px solid rgba(245,131,17,0.15)' }}>
-                    <p className="text-xs font-semibold" style={{ color: '#f58311' }}>No response yet</p>
-                  </div>
                 )}
 
-                {/* User follow-up replies (userPendingQueries) */}
-                {hasPendingReplies && (
-                  <div className="grid gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: '#f58311' }}>
-                      User Follow-ups ({t.userPendingQueries.length})
-                    </p>
-                    {t.userPendingQueries.map((pq, pi) => (
-                      <div key={pi} className="rounded-xl p-3"
-                        style={{ background: 'rgba(245,131,17,0.05)', border: '1px solid rgba(245,131,17,0.15)' }}>
-                        <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{pq.pendingComments}</p>
-                        <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>
-                          {pq.resolvedBy} · {fmtDate(pq.resolvedOn)}
-                        </p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-
-                {/* Respond button in expanded view for PENDING */}
+                {/* Respond button */}
                 {status === 'PENDING' && (
                   <button onClick={() => setModalTicket(t)}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"

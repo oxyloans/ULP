@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getSdLots } from '../api/afterlogin-user';
 import { useAuth } from '../context/AuthContext';
 import { formatINR } from '../utils/currency';
+import InterestGuideModal, { InterestGuideButton } from '../components/InterestGuideModal';
 
 const USE_DUMMY = false;
 
@@ -171,6 +172,7 @@ function SDLotCard({ lot, index, participatePath }) {
 
           {/* ── Section B: ROI + metrics ── */}
           <div className="px-5 py-4 lg:flex-1">
+              <div className='flex justify-end'> <InterestGuideButton  accentColor="#6366f1"/></div>
             <p className="text-xs font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)', fontSize: 10 }}>Details</p>
 
             {/* Interest pills + Tenure/Min/Max all in one row */}
@@ -201,11 +203,22 @@ function SDLotCard({ lot, index, participatePath }) {
                 { label: 'Max Investment', value: fmtINR(lot.maxInvestment), color: '#f59e0b'   },
                 { label: 'TDS',            value: lot.propertyTds === 'MANDATORY' ? `${lot.tdsPercentage}% TDS` : 'No TDS', color: '#ef4444'   }
               ].map(f => (
+                <>
+                {f.label === 'TDS' && lot.globalDealType !== 'SDLOT' ?( 
                 <div key={f.label} className="flex flex-col items-center px-3 py-2 rounded-xl"
                   style={{ background: `${f.color}08`, border: `1px solid ${f.color}18` }}>
                   <span className="text-sm font-extrabold leading-none" style={{ color: f.color, fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</span>
                   <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
                 </div>
+                ) : (
+                  <div key={f.label} className="flex flex-col items-center px-3 py-2 rounded-xl"
+                  style={{ background: `${f.color}08`, border: `1px solid ${f.color}18` }}>
+                  <span className="text-sm font-extrabold leading-none" style={{ color: f.color, fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</span>
+                  <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{f.label}</span>
+                </div>
+                )
+              }
+               </>
               ))}
 
             </div>
@@ -569,6 +582,7 @@ export default function SDLots() {
           <h1 className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>Running Deals</h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>Browse and participate in active Deals</p>
         </div>
+        <InterestGuideButton accentColor="#6366f1" defaultRate={filtered[0]?.roiMonthly ?? filtered[0]?.interestOptions?.[0]?.rate} />
       </div>
 
       <div className="rounded-2xl p-4 flex flex-col gap-3"

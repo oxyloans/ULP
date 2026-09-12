@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getSdLotDetail, getWalletBalance, participateInDeal, getRunningDeals } from '../api/afterlogin-user';
 import { useProfile } from '../context/ProfileContext';
 import { formatINR } from '../utils/currency';
+import { InterestGuideButton } from '../components/InterestGuideModal';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const GOLD   = '#f59e0b';
@@ -391,7 +392,7 @@ export default function GoldLotParticipate() {
       )}
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => navigate('/gold-deals')}
           className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity"
           style={{ color: 'var(--text-muted)' }}>
@@ -399,6 +400,8 @@ export default function GoldLotParticipate() {
         </button>
         <span style={{ color: 'var(--border)' }}>/</span>
         <span className="text-sm font-semibold truncate max-w-xs" style={{ color: 'var(--text-primary)' }}>{lot.title}</span>
+        <span style={{ flex: 1 }} />
+        <InterestGuideButton accentColor="#f59e0b" defaultRate={lot?.interestOptions?.[0]?.rate ?? lot?.roiMonthly} />
       </div>
 
       {/* ── Gold Hero Banner ── */}
@@ -625,6 +628,7 @@ export default function GoldLotParticipate() {
                       </button>
                     );
                   })}
+                  <InterestGuideButton />
                 </div>
               </div>
             )}

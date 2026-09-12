@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { getSdLotDetail, getWalletBalance, participateInDeal, getRunningDeals } from '../api/afterlogin-user';
 import { useProfile } from '../context/ProfileContext';
 import { formatINR } from '../utils/currency';
+import { InterestGuideButton } from '../components/InterestGuideModal';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -405,7 +406,7 @@ export default function AssetParticipate() {
       )}
 
       {/* Breadcrumb */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 flex-wrap">
         <button onClick={() => navigate('/asset')}
           className="flex items-center gap-1.5 text-base font-semibold hover:opacity-70 transition-opacity"
           style={{ color: 'var(--text-muted)' }}>
@@ -413,6 +414,8 @@ export default function AssetParticipate() {
         </button>
         <span style={{ color: 'var(--border)' }}>/</span>
         <span className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{lot.title}</span>
+        <span style={{ flex: 1 }} />
+        <InterestGuideButton accentColor="#06b6d4" defaultRate={lot?.roiMonthly ?? lot?.interestOptions?.[0]?.rate} />
       </div>
 
       {/* Main content grid */}

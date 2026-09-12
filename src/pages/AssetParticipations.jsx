@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Modal } from 'antd';
 import { getRunningDeals, getUserViewInterestStatement, getSdLots, getUserOfflineParticipationDealsInfo, userWithdrawalReturned } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 // ─── SD Lot helpers (mirrors SDLots.jsx mapDeal) ─────────────────────────────
 function mapSdDeal(raw) {
@@ -417,15 +419,101 @@ function InterestStatementModal({ deal, onClose }) {
   const participationAmount = data?.totalParticipationAmount ?? firstRow?.participationAmount ?? null;
   const participationDate   = firstRow?.participationDate ?? null;
 
+  // const handleDownloadPdf = () => {
+  //   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  //   const dealName = deal?.dealName ?? 'Asset Opportunity';
+
+  //   // Header bar
+  //   doc.setFillColor(6, 182, 212);
+  //   doc.rect(0, 0, 210, 14, 'F');
+  //   doc.setTextColor(255, 255, 255);
+  //   doc.setFontSize(10);
+  //   doc.setFont('helvetica', 'bold');
+  //   doc.text('OxyBricks — Interest Yield Statement', 10, 9);
+
+  //   // Deal name
+  //   doc.setTextColor(30, 30, 30);
+  //   doc.setFontSize(14);
+  //   doc.text(dealName, 10, 24);
+
+  //   // KPI row
+  //   doc.setFontSize(8);
+  //   doc.setFont('helvetica', 'normal');
+  //   const kpis = [
+  //     { label: 'Amount Invested',  value: participationAmount != null ? fmtINR(participationAmount) : '-' },
+  //     { label: 'Yield Starts',     value: participationDate ?? '-' },
+  //     { label: 'Total Yield',      value: fmtINR(totalInterest) },
+  //     { label: 'Monthly ROI',      value: data?.roi != null ? `${data.roi}%` : '-' },
+  //   ];
+  //   const kpiBoxW = 45, kpiBoxH = 12, kpiStartX = 10, kpiY = 29;
+  //   kpis.forEach((k, i) => {
+  //     const x = kpiStartX + i * (kpiBoxW + 3);
+  //     doc.setFillColor(240, 253, 255);
+  //     doc.roundedRect(x, kpiY, kpiBoxW, kpiBoxH, 2, 2, 'F');
+  //     doc.setFont('helvetica', 'bold');
+  //     doc.setTextColor(6, 182, 212);
+  //     doc.text(k.value, x + 3, kpiY + 5);
+  //     doc.setFont('helvetica', 'normal');
+  //     doc.setTextColor(120, 120, 130);
+  //     doc.text(k.label, x + 3, kpiY + 10);
+  //   });
+
+  //   // Table
+  //   autoTable(doc, {
+  //     startY: 46,
+  //     head: [['#', 'Yield Due Date', 'Days', 'Interest Amount', 'Paid Date', 'Status']],
+  //     body: rows.map((r, idx) => [
+  //       idx + 1,
+  //       r?.actualInterestDate ?? '-',
+  //       r?.days ?? '-',
+  //       fmtINR(r?.interestAmount ?? 0),
+  //       r?.paidDate ?? '-',
+  //       (r?.status ?? '').toUpperCase() || 'NA',
+  //     ]),
+  //     foot: [['', '', 'Total', fmtINR(totalInterest), '', '']],
+  //     styles: { fontSize: 8, cellPadding: 3 },
+  //     headStyles: { fillColor: [6, 182, 212], textColor: 255, fontStyle: 'bold' },
+  //     footStyles: { fillColor: [240, 253, 255], textColor: [0, 130, 150], fontStyle: 'bold' },
+  //     alternateRowStyles: { fillColor: [245, 253, 255] },
+  //     columnStyles: { 3: { fontStyle: 'bold' } },
+  //   });
+
+  //   // Footer
+  //   const pageCount = doc.getNumberOfPages();
+  //   for (let i = 1; i <= pageCount; i++) {
+  //     doc.setPage(i);
+  //     doc.setFontSize(7);
+  //     doc.setTextColor(160, 160, 170);
+  //     doc.text(`Generated on ${new Date().toLocaleDateString('en-IN')}  •  Page ${i} of ${pageCount}`, 10, 290);
+  //   }
+
+  //   doc.save(`Interest_Statement_${dealName.replace(/\s+/g, '_')}.pdf`);
+  // };
+
   return (
     <Modal
       open={true}
       onCancel={onClose}
       footer={null}
       title={
-        <div className="pr-6 text-left">
-          <p className="text-[10px] font-black uppercase tracking-widest text-cyan-600">Interest Yield Statement</p>
-          <h2 className="text-lg font-black truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{deal?.dealName ?? "Asset Opportunity"}</h2>
+        <div className="pr-6 text-left flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-widest text-cyan-600">Interest Yield Statement</p>
+            <h2 className="text-lg font-black truncate mt-0.5" style={{ color: "var(--text-primary)" }}>{deal?.dealName ?? "Asset Opportunity"}</h2>
+          </div>
+          {/* {!loading && !error && rows.length > 0 && (
+            <button
+              type="button"
+              onClick={handleDownloadPdf}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 flex-shrink-0 mt-0.5"
+              style={{ background: 'rgba(6,182,212,0.1)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.3)', cursor: 'pointer' }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13 }}>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
+              </svg>
+              Download PDF
+            </button>
+          )} */}
         </div>
       }
       styles={{
