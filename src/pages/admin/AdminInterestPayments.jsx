@@ -199,13 +199,23 @@ function normalizeDateToYmd(value) {
   return raw;
 }
 
-function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener noreferrer';
-  a.download = fileName;
-  a.click();
+async function downloadFromRemoteUrl(url, fileName = 'interest-breakup.xlsx') {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Server returned ${res.status}`);
+    const blob = await res.blob();
+    const objectUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = objectUrl;
+    a.download = fileName;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(objectUrl);
+  } catch {
+    // fallback: open in new tab so the browser handles it
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 }
 
 function LenderBreakupModal({
@@ -787,7 +797,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
       const responseUrl = normalizeDownloadUrl(
         typeof approvalRes === 'string'
           ? approvalRes
-          : approvalRes?.url ?? approvalRes?.fileUrl ?? approvalRes?.downloadUrl ?? ''
+          : approvalRes?.downloadUrl ?? approvalRes?.url ?? approvalRes?.fileUrl ?? ''
       );
 
       if (responseUrl) {

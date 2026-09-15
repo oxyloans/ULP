@@ -4,6 +4,7 @@ import { getSdLotDetail, getWalletBalance, participateInDeal, getRunningDeals } 
 import { useProfile } from '../context/ProfileContext';
 import { formatINR } from '../utils/currency';
 import { InterestGuideButton } from '../components/InterestGuideModal';
+import InterestGuideModal from '../components/InterestGuideModal';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const ArrowLeft   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>;
@@ -67,6 +68,9 @@ export default function AssetParticipate() {
   const [submitError, setSubmitError]           = useState('');
   const [showConfirm, setShowConfirm]           = useState(false);
   const [existingParticipation, setExistingParticipation] = useState(null);
+  const [interestGuideChecked, setInterestGuideChecked] = useState(false);
+  const [showInterestGuide, setShowInterestGuide]       = useState(false);
+  const [checkboxError, setCheckboxError]               = useState(false);
 
   useEffect(() => {
     getSdLotDetail(id)
@@ -198,6 +202,7 @@ export default function AssetParticipate() {
   };
 
   const handleConfirmClick = () => {
+    if (!interestGuideChecked) { setCheckboxError(true); document.getElementById('interestGuideCheckAsset')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
     const err = validate();
     if (err) { setError(err); return; }
     setShowConfirm(true);
@@ -354,6 +359,13 @@ export default function AssetParticipate() {
 
   return (
     <div className="grid gap-5 max-w-6xl mx-auto">
+      {/* Interest Guide Modal */}
+      <InterestGuideModal
+        open={showInterestGuide}
+        onClose={() => setShowInterestGuide(false)}
+        onConfirm={() => { setInterestGuideChecked(true); setCheckboxError(false); }}
+      />
+
       {/* Confirmation Modal */}
       {showConfirm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -415,7 +427,7 @@ export default function AssetParticipate() {
         <span style={{ color: 'var(--border)' }}>/</span>
         <span className="text-base font-semibold" style={{ color: 'var(--text-primary)' }}>{lot.title}</span>
         <span style={{ flex: 1 }} />
-        <InterestGuideButton accentColor="#06b6d4" defaultRate={lot?.roiMonthly ?? lot?.interestOptions?.[0]?.rate} />
+        {/* <InterestGuideButton accentColor="#06b6d4" defaultRate={lot?.roiMonthly ?? lot?.interestOptions?.[0]?.rate} /> */}
       </div>
 
       {/* Main content grid */}
@@ -839,6 +851,42 @@ export default function AssetParticipate() {
               {error && !hasAmountError && (
                 <p className="text-base font-semibold mt-2" style={{ color: '#ef4444' }}>{error}</p>
               )}
+
+              {/* Interest guide checkbox — mandatory before investing */}
+              <div className="flex flex-col gap-1 mt-4">
+                <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl transition-all"
+                  style={{
+                    border: checkboxError ? '1.5px solid #ef4444' : '1.5px solid transparent',
+                    background: checkboxError ? 'rgba(239,68,68,0.05)' : 'transparent',
+                  }}>
+                  <input
+                    type="checkbox"
+                    id="interestGuideCheckAsset"
+                    checked={interestGuideChecked}
+                    onChange={e => { setInterestGuideChecked(e.target.checked); if (e.target.checked) setCheckboxError(false); }}
+                    className="w-4 h-4 rounded cursor-pointer"
+                    style={{ accentColor: '#06b6d4', flexShrink: 0 }}
+                  />
+                  <label htmlFor="interestGuideCheckAsset" className="text-sm select-none" style={{ color: checkboxError ? '#ef4444' : 'var(--text-muted)', cursor: 'pointer' }}>
+                    Please review the{' '}
+                    <button
+                      type="button"
+                      onClick={() => setShowInterestGuide(true)}
+                      className="font-bold underline underline-offset-2 transition-opacity hover:opacity-70"
+                      style={{ color: checkboxError ? '#ef4444' : '#06b6d4', background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}
+                    >
+                      first interest calculation
+                    </button>
+                    , How it works
+                  </label>
+                </div>
+                {checkboxError && (
+                  <p className="text-xs font-semibold flex items-center gap-1.5 px-1" style={{ color: '#ef4444' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 12, height: 12, flexShrink: 0 }}><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    Please tick this checkbox before investing.
+                  </p>
+                )}
+              </div>
             </div>
           </div>
 

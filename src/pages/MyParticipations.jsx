@@ -5,6 +5,7 @@ import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInter
 import { formatINR } from "../utils/currency";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import InterestGuideModal, { InterestGuideButton } from "../components/InterestGuideModal";
 
 const INDIGO = '#6366f1';
 const PURPLE = '#818cf8';
@@ -410,19 +411,7 @@ function InterestStatementModal({ deal, onClose }) {
             <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: AMBER, margin: 0 }}>Interest Statement</p>
             <h2 className="text-base sm:text-xl font-black truncate mt-0.5" style={{ color: "var(--text-primary)", margin: 0 }}>{deal?.dealName ?? "SD Deal"}</h2>
           </div>
-          {/* {!loading && !error && rows.length > 0 && (
-            <button
-              type="button"
-              onClick={handleDownloadPdf}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 flex-shrink-0 mt-0.5"
-              style={{ background: `${INDIGO}12`, color: INDIGO, border: `1px solid ${INDIGO}30`, cursor: "pointer" }}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 13, height: 13 }}>
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 18 15 15"/>
-              </svg>
-              Download PDF
-            </button>
-          )} */}
+          <InterestGuideButton />
         </div>
       }
       styles={{

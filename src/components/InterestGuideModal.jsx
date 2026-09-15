@@ -152,7 +152,7 @@ function FAQ({ q, children }) {
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
-export default function InterestGuideModal({ open, onClose }) {
+export default function InterestGuideModal({ open, onClose, onConfirm }) {
   return (
     <Modal
       open={open}
@@ -161,7 +161,7 @@ export default function InterestGuideModal({ open, onClose }) {
       title={
         <div style={{ paddingRight: 24 }}>
           <p style={{ margin: 0, fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: AMBER }}>
-            OxyLoans · Lender Guide
+            ULP · Lender Guide
           </p>
           <h2 style={{ margin: '3px 0 0', fontSize: 16, fontWeight: 900, color: 'var(--text-primary, #fff)' }}>
             How Your First Interest Payment is Calculated
@@ -231,7 +231,7 @@ export default function InterestGuideModal({ open, onClose }) {
               <div style={{ display: 'flex', gap: 10 }}>
                 <span style={{ width: 20, height: 20, borderRadius: '50%', background: AMBER, color: '#fff', fontSize: 10, fontWeight: 900, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>1</span>
                 <p style={{ margin: 0, fontSize: 12, color: 'var(--text-primary, #ccc)', lineHeight: 1.6 }}>
-                  <strong style={{ color: AMBER }}>Your participation date</strong> — OxyLoans cannot deploy your funds on the same day
+                  <strong style={{ color: AMBER }}>Your participation date</strong> — ULP cannot deploy your funds on the same day
                   you participate (bank hours, late-night processing, etc.). So it is not counted as an interest-earning day.
                 </p>
               </div>
@@ -253,7 +253,7 @@ export default function InterestGuideModal({ open, onClose }) {
         <Section icon="🗓" title="Every Month = 30 Days" color={GREEN}>
           <Callout color={GREEN}>
             <p style={{ margin: 0, fontSize: 13, color: 'var(--text-primary, #ccc)', lineHeight: 1.65 }}>
-              OxyLoans counts every month as exactly <strong style={{ color: GREEN }}>30 days</strong> for interest
+              ULP counts every month as exactly <strong style={{ color: GREEN }}>30 days</strong> for interest
               calculation — whether it is January (31 days), February (28/29 days), or any other month.
             </p>
           </Callout>
@@ -366,7 +366,7 @@ export default function InterestGuideModal({ open, onClose }) {
               { label: 'Monthly Rate',    value: '1.75%' },
             ]}
             note={[
-              'OxyLoans 30/360 rule: every month = 30 days — so Feb is also 30 days',
+              'ULP 30/360 rule: every month = 30 days — so Feb is also 30 days',
               'Subtract 2 → 28 days counted',
               'Monthly interest = ₹35,000  ·  Daily interest = ₹1,166.67',
               "First payment = 28 × ₹1,166.67  ·  February's shorter calendar does NOT reduce your interest",
@@ -383,17 +383,17 @@ export default function InterestGuideModal({ open, onClose }) {
             date — not a full month. From the second month onwards you receive the full amount every month.
           </FAQ>
           <FAQ q="What is the monthly interest payment date?">
-            It is the fixed date on which OxyLoans credits interest to all lenders in that deal. This date is the same every
+            It is the fixed date on which ULP credits interest to all lenders in that deal. This date is the same every
             month throughout the deal. For example, if the payment date is the 30th, you receive interest on the 30th of
             every month.
           </FAQ>
           <FAQ q="Why does February also use 30 days?">
-            OxyLoans uses the 30/360 convention — every month is treated as 30 days so that interest is consistent and
+            ULP uses the 30/360 convention — every month is treated as 30 days so that interest is consistent and
             fair for every lender regardless of which month they invest in. February's shorter calendar does not reduce
             your interest.
           </FAQ>
           <FAQ q="Is my money earning interest from the day I invest?">
-            In most cases OxyLoans is unable to deploy funds on the very same day you participate — due to bank working
+            In most cases ULP is unable to deploy funds on the very same day you participate — due to bank working
             hours, late evening participation, or other processing reasons. Your funds are deployed as soon as possible
             thereafter, and the 2-day exclusion fairly accounts for both the participation day and the payment day.
           </FAQ>
@@ -404,9 +404,37 @@ export default function InterestGuideModal({ open, onClose }) {
         </Section>
 
         {/* ── Footer ── */}
-        <p style={{ margin: 0, fontSize: 11, color: MUTED, textAlign: 'center' }}>
-          OxyLoans · RBI Registered NBFC-P2P · For queries: support@oxyloans.com
-        </p>
+        {/* <p style={{ margin: 0, fontSize: 11, color: MUTED, textAlign: 'center' }}>
+          ULP · RBI Registered NBFC-P2P · For queries: support@ULP.com
+        </p> */}
+
+        {/* ── Got it button (only when opened from the invest form) ── */}
+        {onConfirm && (
+          <div style={{ display: 'flex', justifyContent: 'center', paddingTop: 4, paddingBottom: 4 }}>
+            <button
+              type="button"
+              onClick={() => { onConfirm(); onClose(); }}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 8,
+                padding: '11px 28px', borderRadius: 12,
+                fontSize: 14, fontWeight: 900, letterSpacing: '0.01em',
+                background: `linear-gradient(135deg,${INDIGO},#4338ca)`,
+                color: '#fff',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: `0 4px 18px ${INDIGO}50`,
+                transition: 'all 0.18s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = 'scale(1.04)'; e.currentTarget.style.boxShadow = `0 6px 24px ${INDIGO}60`; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = 'scale(1)';    e.currentTarget.style.boxShadow = `0 4px 18px ${INDIGO}50`; }}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ width: 16, height: 16 }}>
+                <polyline points="20 6 9 17 4 12"/>
+              </svg>
+              I've read this, Got it!
+            </button>
+          </div>
+        )}
 
       </div>
     </Modal>

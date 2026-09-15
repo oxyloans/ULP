@@ -612,14 +612,47 @@ export default function AdminSupport() {
         const adminFile = userDoc?.adminUploadedFilePath;
         const hasPendingReplies = t.userPendingQueries?.length > 0;
 
+        // A ticket is "reopened" when userPendingQueries contains at least one REOPEN entry.
+        // The top-level queryStatus stays PENDING after a reopen — never becomes 'REOPEN'.
+        const reopenEntry = [...(t.userPendingQueries ?? [])]
+          .filter(e => e.queryStatus === 'REOPEN')
+          .sort((a, b) => toTs(b.resolvedOn || b.createdAt) - toTs(a.resolvedOn || a.createdAt))[0] ?? null;
+        const wasReopened = !!reopenEntry;
+
+        // True original submission date
+        const raisedDate = toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt;
+        // Reopen timestamp — backend writes it into ticket.createdAt on reopen
+        const reopenDate = wasReopened ? (reopenEntry.resolvedOn || reopenEntry.createdAt) : null;
+
         return (
           <div key={t.id ?? idx} className="rounded-2xl overflow-hidden transition-all"
             style={{
               background: 'var(--table-bg)',
-              border: `1px solid ${isOpen ? 'rgba(168,85,247,0.3)' : 'var(--border)'}`,
+              border: `1px solid ${
+                isOpen
+                  ? wasReopened ? 'rgba(139,92,246,0.4)' : 'rgba(168,85,247,0.3)'
+                  : wasReopened ? 'rgba(139,92,246,0.3)' : 'var(--border)'
+              }`,
               backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
               boxShadow: isOpen ? '0 4px 24px rgba(168,85,247,0.1)' : '0 2px 8px rgba(0,0,0,0.05)',
             }}>
+
+            {/* ── Reopened banner strip — always visible at top of card ── */}
+            {wasReopened && (
+              <div className="flex items-center gap-2 px-5 py-2 flex-wrap"
+                style={{ background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(139,92,246,0.2)' }}>
+                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.35)' }}>
+                  <I.RefreshCw /> Reopened
+                </span>
+                <span className="text-xs font-semibold flex-1 truncate" style={{ color: '#8b5cf6' }}>
+                  {reopenEntry.pendingComments || '—'}
+                </span>
+                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  {fmtDate(reopenDate)}
+                </span>
+              </div>
+            )}
 
             {/* ── Row ── */}
             <div className="flex items-center gap-3 px-5 py-4 flex-wrap">
@@ -641,7 +674,7 @@ export default function AdminSupport() {
                   <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{t.mobileNumber}</span>
                   <span style={{ color: 'var(--border)' }}>·</span>
                   <I.Calendar />
-                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtDate(toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt)}</span>
+                  <span className="text-xs" style={{ color: 'var(--text-muted)' }}>{fmtDate(raisedDate)}</span>
                 </div>
               </button>
 
@@ -662,12 +695,20 @@ export default function AdminSupport() {
                 <StatusChip status={status} />
               </div>
 
-              {/* Respond — PENDING only */}
+              {/* Respond — PENDING (includes reopened tickets) */}
               {status === 'PENDING' && (
                 <button onClick={() => setModalTicket(t)}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 flex-shrink-0"
-                  style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 2px 10px rgba(168,85,247,0.3)' }}>
-                  <I.Send />Respond
+                  style={{
+                    background: wasReopened
+                      ? 'linear-gradient(135deg,#8b5cf6,#6d28d9)'
+                      : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+                    color: '#fff',
+                    boxShadow: wasReopened
+                      ? '0 2px 10px rgba(139,92,246,0.35)'
+                      : '0 2px 10px rgba(168,85,247,0.3)',
+                  }}>
+                  <I.Send />{wasReopened ? 'Respond to Reopen' : 'Respond'}
                 </button>
               )}
 
@@ -680,22 +721,56 @@ export default function AdminSupport() {
             {/* ── Expanded detail ── */}
             {isOpen && (
               <div className="px-5 pb-5 pt-3 grid gap-4"
-                style={{ borderTop: '1px solid var(--border)', background: 'rgba(168,85,247,0.02)' }}>
+                style={{ borderTop: `1px solid ${wasReopened ? 'rgba(139,92,246,0.2)' : 'var(--border)'}`, background: wasReopened ? 'rgba(139,92,246,0.02)' : 'rgba(168,85,247,0.02)' }}>
+
+                {/* Reopen reason banner — detailed block in expanded section */}
+                {wasReopened && reopenEntry && (
+                  <div className="rounded-xl p-4 flex items-start gap-3"
+                    style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6' }}>
+                      <I.RefreshCw />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8b5cf6' }}>
+                          Query Reopened by User
+                        </p>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.25)' }}>
+                          {fmtDate(reopenDate)}
+                        </span>
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {reopenEntry.pendingComments || '—'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Meta grid */}
                 <div className="grid sm:grid-cols-3 gap-3 text-xs">
                   {[
-                    { label: 'Ticket ID',   value: t.randomTicketId       },
-                    { label: 'Submitted',   value: fmtDate(toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt) },
-                    { label: 'Resolved On', value: fmtDate(t.resolvedOn)  },
-                    { label: 'Name',        value: t.name                 },
-                    { label: 'Email',       value: t.email                },
-                    { label: 'Mobile',      value: t.mobileNumber         },
+                    { label: 'Ticket ID', value: t.randomTicketId },
+                    { label: 'Raised On', value: fmtDate(raisedDate) },
+                    {
+                      label: wasReopened ? 'Reopened On' : 'Resolved On',
+                      value: wasReopened ? fmtDate(reopenDate) : fmtDate(t.resolvedOn),
+                      highlight: wasReopened,
+                    },
+                    { label: 'Name',   value: t.name         },
+                    { label: 'Email',  value: t.email        },
+                    { label: 'Mobile', value: t.mobileNumber },
                   ].map(m => (
                     <div key={m.label} className="rounded-xl p-3"
-                      style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{m.label}</p>
-                      <p className="font-semibold mt-0.5 break-all text-xs" style={{ color: 'var(--text-primary)' }}>
+                      style={{
+                        background: m.highlight ? 'rgba(139,92,246,0.06)' : 'var(--input-bg)',
+                        border: `1px solid ${m.highlight ? 'rgba(139,92,246,0.2)' : 'var(--border)'}`,
+                      }}>
+                      <p className="text-xs mb-0.5" style={{ color: m.highlight ? '#8b5cf6' : 'var(--text-muted)' }}>
+                        {m.label}
+                      </p>
+                      <p className="font-semibold break-all text-xs" style={{ color: m.highlight ? '#8b5cf6' : 'var(--text-primary)' }}>
                         {m.value || '—'}
                       </p>
                     </div>
@@ -716,7 +791,6 @@ export default function AdminSupport() {
                       </span>
                       <div className="flex-1 h-px" style={{ background: 'var(--border)' }} />
                     </div>
-
                     {userFile && (
                       <div className="rounded-xl p-3 flex items-center justify-between gap-3"
                         style={{ background: 'rgba(38,115,187,0.06)', border: '1px solid rgba(38,115,187,0.18)' }}>
@@ -724,9 +798,7 @@ export default function AdminSupport() {
                           <I.Paperclip />
                           <div className="min-w-0">
                             <p className="text-xs font-semibold" style={{ color: '#2673bb' }}>User Attached Document</p>
-                            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                              {userDoc.fileName ?? userFile}
-                            </p>
+                            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{userDoc.fileName ?? userFile}</p>
                           </div>
                         </div>
                         <button onClick={() => openPreview(userFile, userDoc.fileName ?? userFile)}
@@ -736,7 +808,6 @@ export default function AdminSupport() {
                         </button>
                       </div>
                     )}
-
                     {adminFile && (
                       <div className="rounded-xl p-3 flex items-center justify-between gap-3"
                         style={{ background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.18)' }}>
@@ -744,9 +815,7 @@ export default function AdminSupport() {
                           <I.Paperclip />
                           <div className="min-w-0">
                             <p className="text-xs font-semibold" style={{ color: '#a855f7' }}>Admin Attached Document</p>
-                            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>
-                              {userDoc.adminUploadedFileName ?? adminFile}
-                            </p>
+                            <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-muted)' }}>{userDoc.adminUploadedFileName ?? adminFile}</p>
                           </div>
                         </div>
                         <button onClick={() => openPreview(adminFile, userDoc.adminUploadedFileName ?? adminFile)}
@@ -763,8 +832,16 @@ export default function AdminSupport() {
                 {status === 'PENDING' && (
                   <button onClick={() => setModalTicket(t)}
                     className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105"
-                    style={{ background: 'linear-gradient(135deg,#a855f7,#7c3aed)', color: '#fff', boxShadow: '0 4px 14px rgba(168,85,247,0.3)' }}>
-                    <I.Send />Respond to this Query
+                    style={{
+                      background: wasReopened
+                        ? 'linear-gradient(135deg,#8b5cf6,#6d28d9)'
+                        : 'linear-gradient(135deg,#a855f7,#7c3aed)',
+                      color: '#fff',
+                      boxShadow: wasReopened
+                        ? '0 4px 14px rgba(139,92,246,0.35)'
+                        : '0 4px 14px rgba(168,85,247,0.3)',
+                    }}>
+                    <I.Send />{wasReopened ? 'Respond to Reopened Query' : 'Respond to this Query'}
                   </button>
                 )}
               </div>
@@ -773,14 +850,9 @@ export default function AdminSupport() {
         );
       })}
 
-      {/* Respond modal */}
-      {modalTicket && (
-        <RespondModal
-          ticket={modalTicket}
-          onClose={() => setModalTicket(null)}
-          onDone={() => fetchQueries(statusValue)}
-        />
-      )}
+        );
+      })}
+
     </div>
   );
 }

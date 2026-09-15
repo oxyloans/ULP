@@ -13,6 +13,7 @@ import {
   userWithdrawalReturned,
 } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
+import { InterestGuideButton } from '../components/InterestGuideModal';
 
 // ─── Colors ───────────────────────────────────────────────────────────────────
 const GOLD   = '#f59e0b';
@@ -1171,12 +1172,13 @@ function GoldInterestStatementModal({ deal, onClose }) {
       onCancel={onClose}
       footer={null}
       title={
-        <div style={{ paddingRight: 24 }}>
-          <p style={{ fontSize: 10, fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', color: GOLD, margin: 0 }}>Interest Statement</p>
-          <h2 style={{ fontSize: 15, fontWeight: 900, color: 'var(--text-primary)', margin: '2px 0 0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {deal?.dealName ?? 'Gold Deal'}
-          </h2>
-        </div>
+         <div className="pr-6 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: GOLD, margin: 0 }}>Interest Statement</p>
+                    <h2 className="text-base sm:text-xl font-black truncate mt-0.5" style={{ color: "var(--text-primary)", margin: 0 }}>{deal?.dealName ?? "GOLD Deal"}</h2>
+                  </div>
+                  <InterestGuideButton />
+                </div>
       }
       styles={{
         content: { background: 'var(--surface-card)', border: `1px solid ${GOLD}28`, borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
@@ -1301,11 +1303,11 @@ function GoldInterestStatementModal({ deal, onClose }) {
                                           {row.updationParticiInterestStatement.map((upd, uIdx) => (
                                             <tr key={uIdx} style={{ borderTop: '1px solid var(--border)' }}>
                                               <td style={{ padding: '7px 10px', fontWeight: 700, color: 'var(--text-muted)' }}>{uIdx + 2}</td>
-                                              <td style={{ padding: '7px 10px', color: 'var(--text-primary)' }}>{upd?.participationDate ?? '—'}</td>
+                                              <td style={{ padding: '7px 10px', color: 'var(--text-primary)' }}>{upd?.updationParticipationDate ?? '—'}</td>
                                               <td style={{ padding: '7px 10px', color: 'var(--text-muted)' }}>{upd?.days ?? '—'}</td>
-                                              <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: BLUE }}>{upd?.participationAmount != null ? fmtINR(upd.participationAmount) : '—'}</td>
+                                              <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: BLUE }}>{upd?.updationParticipationAmount != null ? fmtINR(upd.updationParticipationAmount) : '—'}</td>
                                               <td style={{ padding: '7px 10px', fontWeight: 700, fontFamily: "'JetBrains Mono',monospace", color: GOLD }}>{fmtINR(upd?.interestAmount ?? 0)}</td>
-                                              <td style={{ padding: '7px 10px' }}>{interestStatusChipGold(upd?.status)}</td>
+                                              {/* <td style={{ padding: '7px 10px' }}>{interestStatusChipGold(upd?.status)}</td> */}
                                             </tr>
                                           ))}
                                         </tbody>

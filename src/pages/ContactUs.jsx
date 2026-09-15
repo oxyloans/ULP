@@ -68,6 +68,13 @@ function formatDate(raw) {
   } catch { return raw; }
 }
 
+/** Parse a date string → numeric timestamp for sorting/comparison */
+function toTs(raw) {
+  if (!raw) return 0;
+  try { return new Date(raw.replace(' ', 'T')).getTime() || 0; }
+  catch { return 0; }
+}
+
 function InfoCard({ Icon, label, value, color }) {
   return (
     <div className="flex items-start gap-3 p-4 rounded-xl"
@@ -1040,13 +1047,6 @@ function ConversationTimeline({ ticket }) {
     QUERY:     { color: '#2673bb', bg: 'rgba(38,115,187,0.08)',  border: 'rgba(38,115,187,0.2)',  label: 'Query'     },
   };
 
-  // ── parse a date string to a numeric timestamp (for sorting) ─────────────
-  const toTs = (raw) => {
-    if (!raw) return 0;
-    try { return new Date(raw.replace(' ', 'T')).getTime() || 0; }
-    catch { return 0; }
-  };
-
   // ── build unified event list ──────────────────────────────────────────────
   // Each event: { ts, by, status, text, dateRaw, _type }
   const events = [];
@@ -1469,14 +1469,43 @@ function TicketHistory({ onRefresh }) {
         const canReply     = isPending || isReopen;  // active ticket — user can add follow-up
         const hasConvo     = (t.userPendingQueries ?? []).length > 0;
 
+        // Detect if ticket was ever reopened (REOPEN entry in userPendingQueries)
+        // This is true even when queryStatus is now PENDING/COMPLETED
+        const reopenEntry = [...(t.userPendingQueries ?? [])]
+          .filter(e => e.queryStatus === 'REOPEN')
+          .sort((a, b) => toTs(b.resolvedOn || b.createdAt) - toTs(a.resolvedOn || a.createdAt))[0] ?? null;
+        const wasReopened = !!reopenEntry;
+        const reopenDate  = wasReopened ? (reopenEntry.resolvedOn || reopenEntry.createdAt) : null;
+
         return (
           <div key={t.id ?? idx} className="rounded-2xl overflow-hidden transition-all"
             style={{
               background: 'var(--table-bg)',
-              border: `1px solid ${isOpen ? (activeTab?.color ?? '#2673bb') + '30' : 'var(--border)'}`,
+              border: `1px solid ${
+                isOpen
+                  ? wasReopened ? 'rgba(139,92,246,0.35)' : (activeTab?.color ?? '#2673bb') + '30'
+                  : wasReopened ? 'rgba(139,92,246,0.25)' : 'var(--border)'
+              }`,
               backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)',
               boxShadow: isOpen ? '0 4px 20px rgba(0,0,0,0.1)' : '0 2px 8px rgba(0,0,0,0.05)',
             }}>
+
+            {/* ── Reopened banner strip — always visible at top of card when ticket was reopened ── */}
+            {wasReopened && (
+              <div className="flex items-center gap-2 px-5 py-2 flex-wrap"
+                style={{ background: 'rgba(139,92,246,0.1)', borderBottom: '1px solid rgba(139,92,246,0.2)' }}>
+                <span className="flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full flex-shrink-0"
+                  style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.35)' }}>
+                  <I.RefreshCw /> Reopened
+                </span>
+                <span className="text-xs font-semibold flex-1 truncate" style={{ color: '#8b5cf6' }}>
+                  {reopenEntry.pendingComments || '—'}
+                </span>
+                <span className="text-xs flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
+                  {formatDate(reopenDate)}
+                </span>
+              </div>
+            )}
 
             {/* Row header */}
             <div className="flex items-center gap-3 px-5 py-4">
@@ -1518,9 +1547,16 @@ function TicketHistory({ onRefresh }) {
                     </span>
                   )}
                 </div>
-                {/* Created date */}
-                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  {formatDate(t.createdAt)}
+                {/* Created date — use updatedAt (true original; createdAt gets overwritten on reopen) */}
+                <p className="text-xs mt-0.5 flex items-center gap-2 flex-wrap" style={{ color: 'var(--text-muted)' }}>
+                  <span>Raised: {formatDate(toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt)}</span>
+                  {/* If ticket was reopened, createdAt holds the reopen timestamp */}
+                  {isReopen && toTs(t.createdAt) > 0 && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full font-semibold"
+                      style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.2)', fontSize: 10 }}>
+                      <I.RefreshCw /> Reopened: {formatDate(t.createdAt)}
+                    </span>
+                  )}
                 </p>
               </button>
 
@@ -1572,7 +1608,32 @@ function TicketHistory({ onRefresh }) {
             {/* Expanded detail */}
             {isOpen && (
               <div className="px-5 pb-5 pt-3 grid gap-4"
-                style={{ borderTop: '1px solid var(--border)', background: `${activeTab?.color ?? '#2673bb'}04` }}>
+                style={{ borderTop: '1px solid var(--border)', background: `${wasReopened ? 'rgba(139,92,246,0.02)' : (activeTab?.color ?? '#2673bb') + '04'}` }}>
+
+                {/* Reopened banner — detailed block shown when expanded */}
+                {wasReopened && reopenEntry && (
+                  <div className="rounded-xl p-4 flex items-start gap-3"
+                    style={{ background: 'rgba(139,92,246,0.08)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                    <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5"
+                      style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.3)', color: '#8b5cf6' }}>
+                      <I.RefreshCw />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="text-xs font-bold uppercase tracking-wider" style={{ color: '#8b5cf6' }}>
+                          You Reopened this Query
+                        </p>
+                        <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
+                          style={{ background: 'rgba(139,92,246,0.1)', color: '#8b5cf6', border: '1px solid rgba(139,92,246,0.25)' }}>
+                          {formatDate(reopenDate)}
+                        </span>
+                      </div>
+                      <p className="text-sm" style={{ color: 'var(--text-primary)' }}>
+                        {reopenEntry.pendingComments || '—'}
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Meta info row */}
                 <div className="grid sm:grid-cols-3 gap-3 text-xs">
@@ -1581,15 +1642,29 @@ function TicketHistory({ onRefresh }) {
                     <p className="font-mono font-bold" style={{ color: 'var(--text-primary)' }}>{t.randomTicketId ?? '—'}</p>
                   </div>
                   <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
-                    <p style={{ color: 'var(--text-muted)' }} className="mb-0.5">Created</p>
-                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{formatDate(t.createdAt)}</p>
-                  </div>
-                  <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
-                    <p style={{ color: 'var(--text-muted)' }} className="mb-0.5">Resolved On</p>
-                    <p className="font-semibold" style={{ color: t.resolvedOn ? '#35a13e' : 'var(--text-muted)' }}>
-                      {formatDate(t.resolvedOn)}
+                    <p style={{ color: 'var(--text-muted)' }} className="mb-0.5">Raised On</p>
+                    <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>
+                      {formatDate(toTs(t.updatedAt) > 0 ? t.updatedAt : t.createdAt)}
                     </p>
                   </div>
+                  {/* Show Reopened On only when ticket has been reopened */}
+                  {isReopen ? (
+                    <div className="rounded-xl p-3" style={{ background: 'rgba(139,92,246,0.06)', border: '1px solid rgba(139,92,246,0.2)' }}>
+                      <p style={{ color: '#8b5cf6' }} className="mb-0.5 flex items-center gap-1">
+                        <I.RefreshCw /> Reopened On
+                      </p>
+                      <p className="font-semibold" style={{ color: '#8b5cf6' }}>
+                        {formatDate(t.createdAt)}
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl p-3" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+                      <p style={{ color: 'var(--text-muted)' }} className="mb-0.5">Resolved On</p>
+                      <p className="font-semibold" style={{ color: t.resolvedOn ? '#35a13e' : 'var(--text-muted)' }}>
+                        {formatDate(t.resolvedOn)}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Conversation timeline */}
