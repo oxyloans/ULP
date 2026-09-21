@@ -285,7 +285,7 @@ export default function WithdrawalHistory() {
   useEffect(() => {
     getUserWithdrawalRequests()
       .then(res => {
-        setPrincipal(res?.principalWithdrawalList ?? []);
+        setPrincipal(res?.withdrawalList ?? []);
         setInterest(res?.withdrawalInterestList   ?? []);
       })
       .catch(() => {

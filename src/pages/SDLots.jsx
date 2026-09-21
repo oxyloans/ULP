@@ -204,7 +204,7 @@ function SDLotCard({ lot, index, participatePath }) {
                 { label: 'TDS',            value: lot.propertyTds === 'MANDATORY' ? `${lot.tdsPercentage}% TDS` : 'No TDS', color: '#ef4444'   }
               ].map(f => (
                 <>
-                {f.label === 'TDS' && lot.globalDealType !== 'SDLOT' ?( 
+                {lot.propertyTds === 'MANDATORY' ?( 
                 <div key={f.label} className="flex flex-col items-center px-3 py-2 rounded-xl"
                   style={{ background: `${f.color}08`, border: `1px solid ${f.color}18` }}>
                   <span className="text-sm font-extrabold leading-none" style={{ color: f.color, fontFamily: "'JetBrains Mono', monospace" }}>{f.value}</span>

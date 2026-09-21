@@ -561,6 +561,21 @@ export default function SDLotParticipate() {
             </div>
           </div>
         )}
+        {/* TDS */}
+        {lot.propertyTds === 'MANDATORY' && ( 
+          <div className="mb-5 rounded-xl p-4 w-18" style={{ border: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+            <p className="text-sm font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>TDS</p>
+            <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>{lot.tdsPercentage}% TDS</p>
+          </div>
+        )}
+
+        {/* Deal description */}
+        {lot.description && (
+          <div className="mb-5 rounded-xl p-4" style={{ border: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+            <p className="text-sm font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--text-muted)' }}>Deal Description</p>
+            <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>{lot.description}</p>
+          </div>
+        )}
 
         {/* Investment Amount Input */}
         <div className="mb-5">

@@ -850,9 +850,6 @@ export default function AdminSupport() {
         );
       })}
 
-        );
-      })}
-
     </div>
   );
 }

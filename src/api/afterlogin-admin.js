@@ -51,6 +51,26 @@ export async function getAdminWalletWithdrawalRequests() {
   return get('/oxybrick-service/getAllShowingToAdminWalletWithdrawal');
 }
 
+export async function getAdminInitiatedWithdrawalRequests() {
+  return get('/oxybrick-service/getAdminInitiatedWithdrawalRequests');
+}
+
+export async function approveOrRejectDealWithdrawal({ action, remarks, withdrawalId }) {
+  return patch('/oxybrick-service/adminApproveOrRejectDealWithdrawal', {
+    action,
+    remarks,
+    withdrawalId,
+  });
+}
+
+export async function generateWithdrawalFile({ fileType, withdrawalId }) {
+  return post('/oxybrick-service/fileGenerationWithdrawal', { fileType, withdrawalId });
+}
+
+export async function getApprovedWithdrawalUsersForFile({ fileType, withdrawalId }) {
+  return get(`/oxybrick-service/getApprovedWithdrawalUsersForFile?fileType=${encodeURIComponent(fileType)}&withdrawalId=${encodeURIComponent(withdrawalId)}`);
+}
+
 export async function updateAdminWalletWithdrawalStatus({ id, walletStatus }) {
   const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
   return patch('/oxybrick-service/adminAprroveWithdrawal', {

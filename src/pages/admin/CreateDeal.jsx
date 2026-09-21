@@ -2027,9 +2027,14 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                 </Field>
               ))}
             </div>
-
-            <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Property TDS" error={errors.propertyTds}>
+          </div>
+        )}
+        {/* TDS */}
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>TDS</p>
+        <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="TDS Type" error={errors.propertyTds}>
                 <select
                   value={form.propertyTds} onChange={e => set("propertyTds", e.target.value)}
                   style={{ ...inp(errors.propertyTds), appearance: "none", cursor: "pointer" }}>
@@ -2047,6 +2052,12 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                 </div>
               </Field>
             </div>
+        </div>
+
+        {/* Description */}
+        <div className="rounded-2xl p-5 grid gap-4"
+          style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
+          {/* <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>Description</p> */}
 
             <Field label="Description" error={errors.description}>
               <textarea rows={3} placeholder="Enter deal description…"
@@ -2054,8 +2065,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                 className="w-full resize-none"
                 style={{ ...inp(errors.description), padding: "10px 14px" }} />
             </Field>
-          </div>
-        )}
+        </div>
 
         {/* Dates */}
         <div className="rounded-2xl p-5 grid gap-4"

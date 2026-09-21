@@ -18,6 +18,7 @@ const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 const AssetIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>;
 const ChevronDown  = ({ open }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 transition-transform duration-200" style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}><polyline points="6 9 12 15 18 9"/></svg>;
 const BarChartIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>;
+const HoldIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>;
 
 const assetSubItems = [
   { title: 'Load Asset',        path: '/admin/assets/load',      perm: PERM.ASSETS    },
@@ -39,6 +40,10 @@ const migratedSubItems = [
 const walletSubItems = [
   { title: 'Wallet Approvals',   path: '/admin/wallet-approvals',   perm: PERM.WALLET },
   { title: 'Wallet Withdrawals', path: '/admin/wallet-withdrawals', perm: PERM.WALLET },
+];
+const holdSubItems = [
+  { title: 'Hold Amount',         path: '/admin/hold-amount/create', perm: PERM.HOLD_AMOUNT },
+  { title: 'List of Hold Amounts',path: '/admin/hold-amount/list',   perm: PERM.HOLD_AMOUNT },
 ];
 const statsSubItems = [
   { title: 'Funds Raised', path: '/admin/stats/funds-raised', perm: PERM.STATS },
@@ -63,6 +68,7 @@ const navItemsBefore = [
 ];
 
 const navItemsAfter = [
+  { title: 'Withdrawal Requests', path: '/admin/user-withdrawal-requests',Icon: WalletIcon,       perm: PERM.WITHDRAWAL },
   { title: 'OxyLoans',         path: '/admin/oxyloans',      Icon: BankIcon,     perm: PERM.OXYLOANS      },
   { title: 'Family Approvals', path: '/admin/approvals',     Icon: CheckIcon,    perm: PERM.APPROVALS     },
   { title: 'Properties',       path: '/admin/properties',    Icon: BuildingIcon, perm: PERM.PROPERTIES    },
@@ -97,28 +103,32 @@ function AdminSidebarContent({ onClose }) {
   const isMigratedActive = location.pathname.startsWith('/admin/migrated-');
   const isWalletActive   = location.pathname.startsWith('/admin/wallet-');
   const isStatsActive    = location.pathname.startsWith('/admin/stats');
+  const isHoldActive     = location.pathname.startsWith('/admin/hold-amount');
   const [openSection, setOpenSection] = useState(
     isAssetActive ? 'assets'
       : isInterestActive ? 'interest'
       : isMigratedActive ? 'migrated'
       : isWalletActive ? 'wallet'
       : isStatsActive ? 'stats'
+      : isHoldActive ? 'hold'
       : null
   );
-  const assetOpen = openSection === 'assets';
+  const assetOpen    = openSection === 'assets';
   const interestOpen = openSection === 'interest';
   const migratedOpen = openSection === 'migrated';
-  const walletOpen = openSection === 'wallet';
-  const statsOpen = openSection === 'stats';
+  const walletOpen   = openSection === 'wallet';
+  const statsOpen    = openSection === 'stats';
+  const holdOpen     = openSection === 'hold';
 
   useEffect(() => {
-    if (isAssetActive) return setOpenSection('assets');
+    if (isAssetActive)    return setOpenSection('assets');
     if (isInterestActive) return setOpenSection('interest');
     if (isMigratedActive) return setOpenSection('migrated');
-    if (isWalletActive) return setOpenSection('wallet');
-    if (isStatsActive) return setOpenSection('stats');
+    if (isWalletActive)   return setOpenSection('wallet');
+    if (isStatsActive)    return setOpenSection('stats');
+    if (isHoldActive)     return setOpenSection('hold');
     setOpenSection(null);
-  }, [isAssetActive, isInterestActive, isMigratedActive, isWalletActive, isStatsActive]);
+  }, [isAssetActive, isInterestActive, isMigratedActive, isWalletActive, isStatsActive, isHoldActive]);
 
   const toggleSection = (section) => {
     setOpenSection(current => current === section ? null : section);
@@ -497,6 +507,57 @@ function AdminSidebarContent({ onClose }) {
                           fontWeight: isActive ? 600 : 400,
                           color: isActive ? activeColor : 'inherit',
                         }}>{sub.title}</span>
+                      </>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ── Hold Amount accordion ── */}
+        {can(PERM.HOLD_AMOUNT) && (
+          <>
+            <button
+              onClick={() => toggleSection('hold')}
+              className="admin-sidebar-item w-full text-left"
+              style={{
+                ...(isHoldActive
+                  ? { background: activeBg, borderLeft: `3px solid ${activeIndicator}`, color: activeColor, fontWeight: 700 }
+                  : { background: 'transparent', borderLeft: '3px solid transparent', color: sidebarText }),
+                borderRadius: '8px',
+                transition: 'all 0.2s ease',
+              }}
+            >
+              <span className="admin-sidebar-icon" style={{ color: isHoldActive ? activeIndicator : sidebarText }}>
+                <HoldIcon />
+              </span>
+              <span className="admin-sidebar-label" style={{ fontWeight: isHoldActive ? 700 : 500, color: isHoldActive ? activeColor : 'inherit' }}>
+                Hold Amount
+              </span>
+              <span className="ml-auto"><ChevronDown open={holdOpen} /></span>
+            </button>
+            {holdOpen && (
+              <div className="flex flex-col gap-0.5 pl-3 mt-0.5">
+                {holdSubItems.map(sub => (
+                  <NavLink key={sub.path} to={sub.path} onClick={() => onClose?.()}
+                    className="admin-sidebar-item text-xs"
+                    style={({ isActive }) => ({
+                      background: isActive ? activeBg : 'transparent',
+                      borderRadius: '6px',
+                      color: isActive ? activeColor : sidebarText,
+                      fontWeight: isActive ? 600 : 400,
+                      transition: 'all 0.2s ease',
+                    })}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 ml-1 mr-1"
+                          style={{ background: isActive ? activeIndicator : sidebarBorder }} />
+                        <span className="admin-sidebar-label" style={{ fontWeight: isActive ? 600 : 400, color: isActive ? activeColor : 'inherit' }}>
+                          {sub.title}
+                        </span>
                       </>
                     )}
                   </NavLink>

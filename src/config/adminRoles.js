@@ -32,6 +32,8 @@ export const PERM = {
   OXYLOANS:           'oxyloans',
   BANK_ACCOUNTS:      'bank-accounts',
   SUPPORT:            'support',
+  HOLD_AMOUNT:        'hold-amount',       // hold-amount/create + hold-amount/list + hold-amount/deals
+  WITHDRAWAL:         'withdrawal'
 };
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
@@ -126,6 +128,8 @@ export function getDefaultAdminRoute(roles) {
     { perm: PERM.OXYLOANS,        path: '/admin/oxyloans' },
     { perm: PERM.BANK_ACCOUNTS,   path: '/admin/bank-accounts' },
     { perm: PERM.SUPPORT,         path: '/admin/support' },
+    { perm: PERM.HOLD_AMOUNT,     path: '/admin/hold-amount/list' },
+    { perm: PERM.WITHDRAWAL,      path: '/admin/user-withdrawal-requests' },
   ];
 
   for (const { perm, path } of routePriority) {
@@ -150,6 +154,7 @@ export const ROUTE_PERM_MAP = {
   'migrated-deals':      PERM.MIGRATED,
   'wallet-approvals':    PERM.WALLET,
   'wallet-withdrawals':  PERM.WALLET,
+  'user-withdrawal-requests': PERM.WALLET,
   'interest/sd-lot':     PERM.INTEREST,
   'interest/gold':       PERM.INTEREST,
   'interest/asset':      PERM.INTEREST,
@@ -163,4 +168,6 @@ export const ROUTE_PERM_MAP = {
   'oxyloans':            PERM.OXYLOANS,
   'bank-accounts':       PERM.BANK_ACCOUNTS,
   'support':             PERM.SUPPORT,
+  'hold-amount':         PERM.HOLD_AMOUNT,
+  'withdrawal':          PERM.WITHDRAWAL
 };

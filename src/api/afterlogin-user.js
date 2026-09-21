@@ -484,9 +484,9 @@ export async function GoldRate(){
  * Returns the full interest statement for a participation, including first-month
  * breakup via `updationParticiInterestStatement` on the first row.
  */
-export async function getUserViewInterestStatement(dealId) {
+export async function getUserViewInterestStatement(dealId, requestedUserId) {
   // amazonq-ignore-next-line
-  const userId = getUserId();
+  const userId = requestedUserId ?? getUserId();
   return get(`/oxybrick-service/userViewInterestStatement/${userId}/${dealId}`);
 }
 
@@ -511,5 +511,4 @@ export async function getUserWithdrawalRequests() {
   const userId = getUserId();
   return get(`/oxybrick-service/getUserWithdrawalRequests/${userId}`);
 }
-
 

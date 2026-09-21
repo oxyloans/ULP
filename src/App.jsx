@@ -72,6 +72,7 @@ import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
 import AdminMigratedDeals from './pages/admin/AdminMigratedDeals.jsx';
 import AdminRegisterUser from './pages/admin/AdminRegisterUser.jsx';
 import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
+import AdminDealWithdrawalRequests from './pages/admin/AdminDealWithdrawalRequests.jsx';
 import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
 import AdminStats from './pages/admin/AdminStats.jsx';
 import AdminBorrowers from './pages/admin/AdminBorrowers.jsx';
@@ -81,6 +82,9 @@ import TotalAssets from './pages/admin/stats/TotalAssets.jsx';
 import InterestPrincipal from './pages/admin/stats/InterestPrincipal.jsx';
 import OxyLoansRunningDeals from './pages/admin/stats/OxyLoansRunningDeals.jsx';
 import OfflineRunningDeals from './pages/admin/stats/OfflineRunningDeals.jsx';
+import AdminHoldAmount from './pages/admin/AdminHoldAmount.jsx';
+import AdminListHoldAmounts from './pages/admin/AdminListHoldAmounts.jsx';
+import AdminHoldAmountDeals from './pages/admin/AdminHoldAmountDeals.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 import GoldDealTest from './pages/GoldDealTest.jsx';
@@ -236,6 +240,7 @@ function AdminLayout() {
               <Route path="approvals"             element={<RequireAdminPerm routeKey="approvals"><AdminApprovals /></RequireAdminPerm>} />
               <Route path="wallet-approvals"      element={<RequireAdminPerm routeKey="wallet-approvals"><AdminWalletApprovals /></RequireAdminPerm>} />
               <Route path="wallet-withdrawals"    element={<RequireAdminPerm routeKey="wallet-withdrawals"><AdminWalletWithdrawals /></RequireAdminPerm>} />
+              <Route path="user-withdrawal-requests" element={<RequireAdminPerm routeKey="user-withdrawal-requests"><AdminDealWithdrawalRequests /></RequireAdminPerm>} />
               <Route path="create-deal"           element={<RequireAdminPerm routeKey="create-deal"><CreateDeal /></RequireAdminPerm>} />
               <Route path="create-deal/:id"       element={<RequireAdminPerm routeKey="create-deal"><CreateDeal /></RequireAdminPerm>} />
               <Route path="properties"            element={<RequireAdminPerm routeKey="properties"><AdminProperties /></RequireAdminPerm>} />
@@ -263,6 +268,9 @@ function AdminLayout() {
               <Route path="stats/total-assets"   element={<RequireAdminPerm routeKey="stats"><TotalAssets /></RequireAdminPerm>} />
               <Route path="stats/interest-principal" element={<RequireAdminPerm routeKey="stats"><InterestPrincipal /></RequireAdminPerm>} />
               <Route path="borrowers"             element={<RequireAdminPerm routeKey="borrowers"><AdminBorrowers /></RequireAdminPerm>} />
+              <Route path="hold-amount/create"    element={<RequireAdminPerm routeKey="hold-amount"><AdminHoldAmount /></RequireAdminPerm>} />
+              <Route path="hold-amount/list"      element={<RequireAdminPerm routeKey="hold-amount"><AdminListHoldAmounts /></RequireAdminPerm>} />
+              <Route path="hold-amount/deals/:userId" element={<RequireAdminPerm routeKey="hold-amount"><AdminHoldAmountDeals /></RequireAdminPerm>} />
               <Route path="*"                     element={<NotFound />} />
             </Routes>
           </main>

@@ -109,6 +109,14 @@ function ParticipantsPanel({ dealId }) {
   // Confirmation state
   const [confirmModalOpen, setConfirmModalOpen] = useState(false);
   const [amountsMap, setAmountsMap] = useState({});
+  const [copiedUserId, setCopiedUserId] = useState(null);
+
+  const handleCopyUserId = (uid) => {
+    navigator.clipboard.writeText(uid).then(() => {
+      setCopiedUserId(uid);
+      setTimeout(() => setCopiedUserId(null), 2000);
+    });
+  };
 
   useEffect(() => {
     setLoading(true); setError('');
@@ -296,7 +304,27 @@ function ParticipantsPanel({ dealId }) {
                   <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
                   <td className="py-2.5 px-3">
                     <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{p.userName ?? '—'}</p>
-                    <p className="font-mono mt-0.5" style={{ color: 'var(--text-muted)', fontSize: 9 }}>{String(p.userId ?? '').slice(0, 8)}…</p>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <p className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>{String(p.userId ?? '').slice(0, 8)}…</p>
+                      {p.userId && (
+                        <button
+                          onClick={() => handleCopyUserId(p.userId)}
+                          title={copiedUserId === p.userId ? 'Copied!' : 'Copy User ID'}
+                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: copiedUserId === p.userId ? '#10b981' : 'var(--text-muted)', lineHeight: 1 }}
+                        >
+                          {copiedUserId === p.userId ? (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          ) : (
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                              <rect x="9" y="9" width="13" height="13" rx="2" />
+                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                            </svg>
+                          )}
+                        </button>
+                      )}
+                    </div>
                   </td>
                   <td className="py-2.5 px-3 font-black tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
                     {fmtINR(p.participationAmount)}
@@ -429,6 +457,15 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
   const isAchieved = deal.dealStatus === 'ACHIEVED';
 
   const fillColor  = fillPct >= 100 ? '#ef4444' : fillPct >= 80 ? '#f59e0b' : '#10b981';
+  
+  const [copied,setCopied] = useState(false)
+  
+   const handleCopy = (id) => {
+      navigator.clipboard.writeText(id).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      });
+    };
 
   return (
     <>
@@ -474,9 +511,28 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
           <p className="font-bold text-sm" style={{ color: expanded ? tabColor : 'var(--text-primary)', transition: 'color 0.2s' }}>
             {deal.dealName}
           </p>
+          <div className='flex flex-wrap row'>
           <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {String(deal.dealId ?? deal.id ?? '').slice(0, 8)}…
           </p>
+          <button
+            className='text-xs font-mono mt-0.5 flex items-center'
+            style={{ color: copied ? '#10b981' : 'var(--text-muted)', marginLeft: "10px", background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}
+            onClick={(e) => { e.stopPropagation(); handleCopy(deal.dealId ?? deal.id ?? ''); }}
+            title={copied ? 'Copied!' : 'Copy Deal ID'}
+          >
+            {copied ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3">
+                <rect x="9" y="9" width="13" height="13" rx="2" />
+                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+              </svg>
+            )}
+          </button>
+          </div>
         </td>
 
         {/* Deal Value */}
