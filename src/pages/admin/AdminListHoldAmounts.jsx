@@ -1,270 +1,684 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
-import { toast } from 'react-toastify';
-import { BASE_URL, getToken } from '../../api/client';
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { toast } from "react-toastify";
+import { BASE_URL, getToken } from "../../api/client";
+import { getUserViewInterestStatement } from "../../api/afterlogin-user";
 
-// ─── Icons ────────────────────────────────────────────────────────────────────
-const LockIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>;
-const PlusIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>;
-const RefreshIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
-const UserIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
-const ArrowRight  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>;
-const SearchIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
-const EmptyIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="w-10 h-10"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>;
+const PAGE_SIZE = 8;
+const money = (n) =>
+  Number(n ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 2 });
+const date = (v) => {
+  if (!v) return "—";
+  const d = new Date(v);
+  return Number.isNaN(d.getTime())
+    ? String(v).slice(0, 10)
+    : d.toISOString().slice(0, 10);
+};
+const principal = (d) =>
+  d?.principalAmount ??
+  d?.investmentAmount ??
+  d?.participationAmount ??
+  d?.participatedAmount ??
+  d?.paticipatedAmount ??
+  d?.amount ??
+  0;
+const interest = (d) => {
+  const direct =
+    d?.interestAmount ??
+    d?.lenderInterestAmount ??
+    d?.totalInterest ??
+    d?.interest;
+  if (direct != null) return direct;
+  const rows =
+    d?.interestInfoList ??
+    d?.lenderInterestInfoList ??
+    d?.interestDetails ??
+    [];
+  return Array.isArray(rows)
+    ? rows.reduce(
+        (sum, row) => sum + Number(row?.interestAmount ?? row?.amount ?? 0),
+        0,
+      )
+    : 0;
+};
 
-function fmtINR(n) {
-  if (n == null || n === '') return '—';
-  return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
-}
-
-function fmtDate(raw) {
-  if (!raw) return '—';
-  try {
-    const d = new Date(raw);
-    if (isNaN(d)) return raw;
-    return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true });
-  } catch { return raw; }
+function InterestDetails({ deal, userId }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    setLoading(true);
+    getUserViewInterestStatement(deal.dealId, userId)
+      .then((r) => alive && setRows(r?.participationInterestStatement ?? []))
+      .catch(() => alive && setRows([]))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
+  }, [deal.dealId, userId]);
+  if (loading)
+    return (
+      <span style={{ color: "var(--text-muted)" }}>
+        Loading interest details…
+      </span>
+    );
+  const pending = rows
+    .filter(
+      (r) =>
+        !["PAID", "EXECUTED"].includes(String(r?.status ?? "").toUpperCase()) &&
+        !r?.paidDate,
+    )
+    .slice(0, 1);
+  if (!pending.length)
+    return (
+      <span style={{ color: "var(--text-muted)" }}>
+        No unpaid or upcoming payment
+      </span>
+    );
+  return (
+    <div className="overflow-x-auto">
+      <table
+        className="w-full text-xs"
+        style={{ minWidth: 600, borderCollapse: "collapse" }}
+      >
+        <thead>
+          <tr style={{ background: "#edf6f8" }}>
+            {[
+              "Interest Date",
+              "Days",
+              "Interest Amount",
+              "Paid Date",
+              "Status",
+            ].map((h) => (
+              <th
+                key={h}
+                className="px-2 py-1.5 text-left"
+                style={{ border: "1px solid #9aa6ad" }}
+              >
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {pending.map((r, i) => (
+            <tr key={r.id ?? i}>
+              <td
+                className="px-2 py-1.5"
+                style={{ border: "1px solid #c4cdd2" }}
+              >
+                {r.actualInterestDate ?? r.interestDate ?? "—"}
+              </td>
+              <td
+                className="px-2 py-1.5"
+                style={{ border: "1px solid #c4cdd2" }}
+              >
+                {r.days ?? "—"}
+              </td>
+              <td
+                className="px-2 py-1.5 font-bold"
+                style={{ border: "1px solid #c4cdd2" }}
+              >
+                ₹{money(r.interestAmount ?? r.amount)}
+              </td>
+              <td
+                className="px-2 py-1.5"
+                style={{ border: "1px solid #c4cdd2" }}
+              >
+                {r.paidDate ?? "Not paid"}
+              </td>
+              <td
+                className="px-2 py-1.5 font-semibold"
+                style={{ border: "1px solid #c4cdd2" }}
+              >
+                {r.status ?? "UPCOMING"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function AdminListHoldAmounts() {
   const navigate = useNavigate();
   const token = getToken();
+  const [holds, setHolds] = useState([]),
+    [expandedId, setExpandedId] = useState(null),
+    [deals, setDeals] = useState([]),
+    [nextPayments, setNextPayments] = useState({});
+  const [holdInformation, setHoldInformation] = useState(null);
+  const [principalIds, setPrincipalIds] = useState(new Set()),
+    [interestIds, setInterestIds] = useState(new Set());
+  const [loading, setLoading] = useState(false),
+    [dealsLoading, setDealsLoading] = useState(false),
+    [search, setSearch] = useState(""),
+    [page, setPage] = useState(1);
 
-  const [data,    setData]    = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [search,  setSearch]  = useState('');
-
-  const fetchList = async () => {
+  const fetchHolds = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(
+      const r = await axios.get(
         `${BASE_URL}/oxybrick-service/listOfHoldAmounts`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
-      setData(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      toast.error(err?.response?.data?.message ?? 'Failed to load hold amounts');
-      setData([]);
+      setHolds(Array.isArray(r.data) ? r.data : []);
+    } catch (e) {
+      toast.error(e?.response?.data?.message ?? "Failed to load hold amounts");
     } finally {
       setLoading(false);
     }
   };
+  useEffect(() => {
+    fetchHolds();
+  }, []);
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase().trim();
+    return q
+      ? holds.filter((r) =>
+          [r.userId, r.userName, r.dealId, r.comments, r.reason].some((v) =>
+            String(v ?? "")
+              .toLowerCase()
+              .includes(q),
+          ),
+        )
+      : holds;
+  }, [holds, search]);
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const visible = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+  useEffect(() => {
+    if (page > pages) setPage(pages);
+  }, [page, pages]);
+  const selectedHold = holds.find((r) => r.id === expandedId);
 
-  useEffect(() => { fetchList(); }, []);
-
-  // Filter by userId, dealId, or comments
-  const filtered = data.filter(row => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      String(row.userId   ?? '').toLowerCase().includes(q) ||
-      String(row.dealId   ?? '').toLowerCase().includes(q) ||
-      String(row.comments ?? '').toLowerCase().includes(q) ||
-      String(row.userName ?? '').toLowerCase().includes(q)
-    );
-  });
-
-  // Summary stats
-  const totalHeld    = data.reduce((s, r) => s + (Number(r.holdAmount) || 0), 0);
-  const uniqueUsers  = new Set(data.map(r => r.userId).filter(Boolean)).size;
-  const uniqueDeals  = new Set(data.map(r => r.dealId).filter(Boolean)).size;
+  const choose = async (row) => {
+    if (expandedId === row.id) {
+      setExpandedId(null);
+      return;
+    }
+    setExpandedId(row.id);
+    setDeals([]);
+    setNextPayments({});
+    setHoldInformation(null);
+    setPrincipalIds(new Set());
+    setInterestIds(new Set());
+    setDealsLoading(true);
+    try {
+      const holdInfoRequest = axios.get(
+        `${BASE_URL}/oxybrick-service/holdInformation/${row.userId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      const r = await axios.get(
+        `${BASE_URL}/oxybrick-service/getRunningDeals/${row.userId}`,
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      holdInfoRequest
+        .then(response => setHoldInformation(response.data?.data ?? response.data))
+        .catch(() => setHoldInformation(null));
+      const d = r.data;
+      const list = Array.isArray(d) ? d : (d?.participationInfo ?? []);
+      setDeals(list);
+      const paymentEntries = await Promise.all(list.map(async deal => {
+        const dealId = deal.dealId ?? deal.id;
+        try {
+          const statement = await getUserViewInterestStatement(dealId, row.userId);
+          const next = (statement?.participationInterestStatement ?? [])
+            .find(item => !['PAID', 'EXECUTED'].includes(String(item?.status ?? '').toUpperCase()) && !item?.paidDate);
+          return [dealId, next ?? null];
+        } catch {
+          return [dealId, null];
+        }
+      }));
+      setNextPayments(Object.fromEntries(paymentEntries));
+    } catch (e) {
+      toast.error(e?.response?.data?.message ?? "Failed to load user deals");
+    } finally {
+      setDealsLoading(false);
+    }
+  };
+  const toggle = (id, type) => {
+    const setter = type === "principal" ? setPrincipalIds : setInterestIds;
+    setter((old) => {
+      const n = new Set(old);
+      n.has(id) ? n.delete(id) : n.add(id);
+      return n;
+    });
+  };
+  const process = () => {
+    if (!selectedHold) return toast.info("Choose a hold amount first");
+    navigate(`/admin/hold-amount/deals/${selectedHold.userId}`, {
+      state: {
+        holdAmount: selectedHold.holdAmount,
+        holdId: selectedHold.id,
+        userName: selectedHold.userName,
+        selectedPrincipalIds: [...principalIds],
+        selectedInterestIds: [...interestIds],
+      },
+    });
+  };
+  const deleteHold = async (row) => {
+    if (!row?.id) return toast.error("Hold ID is missing");
+    if (!window.confirm("Delete this hold amount?")) return;
+    try {
+      await axios.patch(
+        `${BASE_URL}/oxybrick-service/deleteHoldAmount/${row.id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } },
+      );
+      if (expandedId === row.id) setExpandedId(null);
+      toast.success("Hold amount deleted successfully");
+      await fetchHolds();
+    } catch (e) {
+      toast.error(e?.response?.data?.message ?? "Failed to delete hold amount");
+    }
+  };
 
   return (
-    <div className="grid gap-6">
-
-      {/* Page header */}
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div className="flex items-center gap-3">
-          <div className="w-11 h-11 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(245,131,17,0.12)', border: '1px solid rgba(245,131,17,0.25)', color: '#f58311', boxShadow: '0 0 18px rgba(245,131,17,0.15)' }}>
-            <LockIcon />
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-widest font-semibold" style={{ color: '#f58311' }}>Hold Amount</p>
-            <h1 className="text-xl font-extrabold tracking-tight" style={{ color: 'var(--text-primary)' }}>
-              List of Hold Amounts
-              {data.length > 0 && (
-                <span className="ml-2 text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>
-                  ({data.length})
-                </span>
-              )}
-            </h1>
-          </div>
+    <div className="grid gap-5">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p
+            className="text-xs uppercase tracking-widest font-bold"
+            style={{ color: "#2673bb" }}
+          >
+            Hold Amount
+          </p>
+          <h1
+            className="text-2xl font-extrabold"
+            style={{ color: "var(--text-primary)" }}
+          >
+            List of Hold Amounts
+          </h1>
         </div>
-        <div className="flex items-center gap-2">
-          <button onClick={fetchList}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-            style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-            <RefreshIcon /> Refresh
+        <div className="flex gap-2">
+          <button
+            onClick={fetchHolds}
+            className="px-3 py-2 rounded-lg text-xs font-bold"
+            style={{
+              background: "var(--input-bg)",
+              color: "var(--text-muted)",
+              border: "1px solid var(--border)",
+            }}
+          >
+            Refresh
           </button>
-          <button onClick={() => navigate('/admin/hold-amount/create')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
-            style={{ background: 'linear-gradient(135deg,#f58311,#d4690a)', color: '#fff', boxShadow: '0 4px 14px rgba(245,131,17,0.35)' }}>
-            <PlusIcon /> New Hold
+          <button
+            onClick={() => navigate("/admin/hold-amount/create")}
+            className="px-3 py-2 rounded-lg text-xs font-bold"
+            style={{ background: "#0aaed6", color: "#fff" }}
+          >
+            + New Hold
           </button>
         </div>
       </div>
-
-      {/* Summary cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        {[
-          { label: 'Total Held',    value: fmtINR(totalHeld),        color: '#f58311', bg: 'rgba(245,131,17,0.08)',  border: 'rgba(245,131,17,0.2)'  },
-          { label: 'Unique Users',  value: uniqueUsers,               color: '#2673bb', bg: 'rgba(38,115,187,0.08)', border: 'rgba(38,115,187,0.2)'  },
-          { label: 'Unique Deals',  value: uniqueDeals,               color: '#35a13e', bg: 'rgba(53,161,62,0.08)',  border: 'rgba(53,161,62,0.2)'   },
-        ].map(c => (
-          <div key={c.label} className="rounded-2xl p-5 flex items-center gap-4"
-            style={{ background: c.bg, border: `1px solid ${c.border}` }}>
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider" style={{ color: c.color }}>{c.label}</p>
-              <p className="text-2xl font-extrabold mt-0.5" style={{ color: 'var(--text-primary)' }}>{loading ? '—' : c.value}</p>
-            </div>
-          </div>
-        ))}
-      </div>
-
-      {/* List card */}
-      <div className="rounded-2xl overflow-hidden"
-        style={{ background: 'var(--table-bg)', border: '1px solid var(--border)', backdropFilter: 'blur(20px)', WebkitBackdropFilter: 'blur(20px)', boxShadow: '0 4px 24px rgba(0,0,0,0.08)' }}>
-
-        {/* Toolbar */}
-        <div className="px-5 py-4 flex items-center justify-between gap-3 flex-wrap"
-          style={{ borderBottom: '1px solid var(--border)' }}>
-          <h2 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Hold Amount Records</h2>
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-            style={{ background: 'var(--input-bg)', border: '1px solid var(--input-border)', minWidth: 220 }}>
-            <SearchIcon />
-            <input
-              className="flex-1 bg-transparent outline-none text-sm"
-              style={{ color: 'var(--text-primary)' }}
-              placeholder="Search by user, deal, comments…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
-          </div>
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <button
+          onClick={process}
+          className="px-4 py-2 rounded-md text-sm font-bold"
+          style={{ background: "#0aaed6", color: "#fff" }}
+        >
+          Process
+        </button>
+        <div className="flex gap-2">
+          <input
+            value={search}
+            onChange={(e) => {
+              setSearch(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search lender, deal or reason"
+            className="px-3 py-2 rounded-md text-xs outline-none"
+            style={{
+              background: "var(--input-bg)",
+              border: "1px solid var(--border)",
+              color: "var(--text-primary)",
+              minWidth: 220,
+            }}
+          />
+          <button
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-2 rounded disabled:opacity-40"
+            style={{ border: "1px solid var(--border)" }}
+          >
+            ←
+          </button>
+          <span
+            className="px-3 py-2 text-xs font-bold"
+            style={{ background: "#2673bb", color: "#fff" }}
+          >
+            {page}
+          </span>
+          <button
+            onClick={() => setPage((p) => Math.min(pages, p + 1))}
+            disabled={page === pages}
+            className="px-3 py-2 rounded disabled:opacity-40"
+            style={{ border: "1px solid var(--border)" }}
+          >
+            →
+          </button>
         </div>
-
-        {/* Loading */}
-        {loading && (
-          <div className="flex items-center justify-center gap-3 py-16">
-            <svg className="w-5 h-5 animate-spin" viewBox="0 0 24 24" fill="none" stroke="#f58311" strokeWidth="2">
-              <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
-              <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
-            </svg>
-            <span className="text-sm" style={{ color: 'var(--text-muted)' }}>Loading hold amounts…</span>
-          </div>
-        )}
-
-        {/* Empty */}
-        {!loading && filtered.length === 0 && (
-          <div className="flex flex-col items-center justify-center gap-3 py-16" style={{ color: 'var(--text-muted)' }}>
-            <EmptyIcon />
-            <p className="text-sm font-semibold" style={{ color: 'var(--text-primary)' }}>
-              {search ? 'No matching records' : 'No hold amounts yet'}
-            </p>
-            {!search && (
-              <button onClick={() => navigate('/admin/hold-amount/create')}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 mt-1"
-                style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.25)' }}>
-                <PlusIcon /> Create first hold amount
-              </button>
+      </div>
+      <div
+        className="overflow-x-auto rounded-md"
+        style={{ border: "1px solid #111" }}
+      >
+        <table
+          className="w-full text-xs"
+          style={{ minWidth: 900, borderCollapse: "collapse" }}
+        >
+          <thead>
+            <tr style={{ background: "#b3c9e2", color: "#142238" }}>
+              {[
+                "Lender Id",
+                "Request Date",
+                "Current Hold Amount",
+                "Hold Amount",
+                "Reason",
+                "Status",
+                "Choose Deal",
+              ].map((h) => (
+                <th
+                  key={h}
+                  className="px-2 py-2 text-left font-extrabold"
+                  style={{ border: "1px solid #111" }}
+                >
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {loading && (
+              <tr>
+                <td colSpan={7} className="p-8 text-center">
+                  Loading hold amounts…
+                </td>
+              </tr>
             )}
+            {!loading && !visible.length && (
+              <tr>
+                <td colSpan={7} className="p-8 text-center">
+                  No hold amounts found
+                </td>
+              </tr>
+            )}
+            {!loading &&
+              visible.map((r, i) => (
+                <tr
+                  key={r.id ?? i}
+                  style={{
+                    background:
+                      expandedId === r.id ? "#e7f5fb" : "var(--surface-card)",
+                  }}
+                >
+                  <td
+                    className="px-2 py-2"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    {r.userId ?? "—"}
+                  </td>
+                  <td
+                    className="px-2 py-2"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    {date(r.createdAt ?? r.createdDate ?? r.createdOn)}
+                  </td>
+                  <td
+                    className="px-2 py-2"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    {money(r.currentHoldAmount ?? r.currentAmount)}
+                  </td>
+                  <td
+                    className="px-2 py-2 font-bold"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    {money(r.holdAmount)}
+                  </td>
+                  <td
+                    className="px-2 py-2 min-w-[340px]"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    {r.comments ?? r.reason ?? "—"}
+                  </td>
+                  <td
+                    className="px-2 py-2 font-semibold"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    {String(r.status ?? r.holdStatus ?? "OPEN").toUpperCase()}
+                  </td>
+                  <td
+                    className="px-2 py-2"
+                    style={{ border: "1px solid #111" }}
+                  >
+                    <button
+                      onClick={() => choose(r)}
+                      className="block px-2 py-1 rounded text-xs font-bold mb-1"
+                      style={{ background: "#666", color: "#fff" }}
+                    >
+                      {expandedId === r.id ? "Close ↑" : "Choose ↓"}
+                    </button>
+                    <button
+                      onClick={() => deleteHold(r)}
+                      className="px-2 py-1 rounded text-xs font-bold"
+                      style={{ background: "#ef483d", color: "#fff" }}
+                    >
+                      Delete ▣
+                    </button>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+      <div
+        className="flex justify-between text-xs"
+        style={{ color: "var(--text-muted)" }}
+      >
+        <span>{filtered.length} records</span>
+        <span>
+          Page {page} of {pages}
+        </span>
+      </div>
+      {selectedHold && (
+        <div
+          className="rounded-md p-3 grid gap-4"
+          style={{
+            border: "1px solid #111",
+            background: "var(--surface-card)",
+          }}
+        >
+          <div className="grid gap-2 text-xs">
+            <div
+              className="rounded p-2"
+              style={{ background: "#f4f7f8", border: "1px solid #c4cdd2" }}
+            >
+              <p className="font-bold" style={{ color: "#52616b" }}>
+                Lender
+              </p>
+              <p className="mt-1" style={{ color: "#142238" }}>
+                {selectedHold.userName ?? selectedHold.userId ?? "—"}
+              </p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+              {[
+                ["Hold Amount", `₹${money(selectedHold.holdAmount)}`],
+                [
+                  "Current Hold",
+                  `₹${money(holdInformation?.currentHoldAmount ?? holdInformation?.holdAmount ?? holdInformation?.amount ?? selectedHold.currentHoldAmount ?? selectedHold.currentAmount)}`,
+                ],
+                [
+                  "Status",
+                  String(
+                    selectedHold.status ?? selectedHold.holdStatus ?? "OPEN",
+                  ).toUpperCase(),
+                ],
+              ].map(([l, v]) => (
+                <div
+                  key={l}
+                  className="rounded p-2"
+                  style={{ background: "#f4f7f8", border: "1px solid #c4cdd2" }}
+                >
+                  <p className="font-bold" style={{ color: "#52616b" }}>
+                    {l}
+                  </p>
+                  <p className="mt-1" style={{ color: "#142238" }}>
+                    {v}
+                  </p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs" style={{ color: "#52616b" }}>
+              <strong>Reason:</strong>{" "}
+              {selectedHold.comments ?? selectedHold.reason ?? "—"}
+            </p>
           </div>
-        )}
-
-        {/* Table */}
-        {!loading && filtered.length > 0 && (
+          <div className="flex justify-between items-center">
+            <p
+              className="text-sm font-extrabold"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Deal Information &amp; Interest Details
+            </p>
+            <button
+              onClick={process}
+              className="px-3 py-1.5 rounded text-xs font-bold"
+              style={{ background: "#0aaed6", color: "#fff" }}
+            >
+              Process Selected
+            </button>
+          </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table
+              className="w-full text-xs"
+              style={{ minWidth: 820, borderCollapse: "collapse" }}
+            >
               <thead>
-                <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                  {['#', 'User', 'Deal ID', 'Hold Amount', 'Comments', 'Date', 'Action'].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap"
-                      style={{ color: 'var(--text-muted)' }}>{h}</th>
+                <tr style={{ background: "#b3d9e5", color: "#142238" }}>
+                  {[
+                    "Deal Id",
+                    "Deal Name",
+                    "ROI",
+                    "Principal Amount",
+                    "Next Payment",
+                    "Deduct Principal",
+                    "Deduct Interest",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="px-2 py-2 text-left font-extrabold whitespace-nowrap"
+                      style={{ border: "1px solid #111" }}
+                    >
+                      {h}
+                    </th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {filtered.map((row, idx) => (
-                  <tr key={row.id ?? idx}
-                    className="transition-colors hover:bg-opacity-50"
-                    style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'transparent' : 'var(--input-bg)' }}>
-
-                    {/* # */}
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg"
-                        style={{ background: 'rgba(245,131,17,0.1)', color: '#f58311', border: '1px solid rgba(245,131,17,0.2)' }}>
-                        {idx + 1}
-                      </span>
-                    </td>
-
-                    {/* User */}
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0"
-                          style={{ background: 'rgba(38,115,187,0.1)', color: '#2673bb' }}>
-                          <UserIcon />
-                        </div>
-                        <div className="min-w-0">
-                          {row.userName && (
-                            <p className="font-semibold text-xs truncate max-w-[120px]" style={{ color: 'var(--text-primary)' }}>
-                              {row.userName}
-                            </p>
-                          )}
-                          <p className="font-mono text-xs truncate max-w-[120px]" style={{ color: 'var(--text-muted)' }}>
-                            {row.userId ?? '—'}
-                          </p>
-                        </div>
-                      </div>
-                    </td>
-
-                    {/* Deal ID */}
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs px-2 py-0.5 rounded-lg truncate max-w-[140px] inline-block"
-                        style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)', maxWidth: 140 }}>
-                        {row.dealId ? row.dealId.slice(0, 18) + '…' : '—'}
-                      </span>
-                    </td>
-
-                    {/* Hold Amount */}
-                    <td className="px-4 py-3">
-                      <span className="font-bold text-sm" style={{ color: '#f58311' }}>
-                        {fmtINR(row.holdAmount)}
-                      </span>
-                    </td>
-
-                    {/* Comments */}
-                    <td className="px-4 py-3 max-w-[160px]">
-                      <p className="text-xs truncate" style={{ color: 'var(--text-muted)', maxWidth: 160 }} title={row.comments}>
-                        {row.comments || '—'}
-                      </p>
-                    </td>
-
-                    {/* Date */}
-                    <td className="px-4 py-3 whitespace-nowrap">
-                      <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                        {fmtDate(row.createdAt ?? row.createdDate ?? row.date)}
-                      </p>
-                    </td>
-
-                    {/* Action — navigate to user's deals */}
-                    <td className="px-4 py-3">
-                      <button
-                        onClick={() => navigate(`/admin/hold-amount/deals/${row.userId}`, {
-                          state: { holdAmount: row.holdAmount, holdId: row.id, dealId: row.dealId, userName: row.userName }
-                        })}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 whitespace-nowrap"
-                        style={{ background: 'rgba(38,115,187,0.1)', color: '#2673bb', border: '1px solid rgba(38,115,187,0.25)' }}>
-                        View Deals <ArrowRight />
-                      </button>
+                {dealsLoading && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center">
+                      Loading deals…
                     </td>
                   </tr>
-                ))}
+                )}
+                {!dealsLoading && !deals.length && (
+                  <tr>
+                    <td colSpan={7} className="p-8 text-center">
+                      No running deals found
+                    </td>
+                  </tr>
+                )}
+                {!dealsLoading &&
+                  deals.map((d, i) => {
+                    const id = d.dealId ?? d.id ?? String(i);
+                    return (
+                      <tr key={id}>
+                        <td
+                          className="px-2 py-2"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          {id}
+                        </td>
+                        <td
+                          className="px-2 py-2"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          {d.dealName ?? d.propertyName ?? "—"}
+                        </td>
+                        <td
+                          className="px-2 py-2"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          {d.roi ?? d.rateOfInterest ?? "—"}%
+                        </td>
+                        <td
+                          className="px-2 py-2"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          ₹{money(principal(d))}
+                        </td>
+                        <td
+                          className="px-2 py-2"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          {nextPayments[id] ? (
+                            <span className="whitespace-nowrap">
+                              {date(nextPayments[id].actualInterestDate ?? nextPayments[id].interestDate)}
+                              <br />
+                              <strong>₹{money(nextPayments[id].interestAmount ?? nextPayments[id].amount)}</strong>
+                            </span>
+                          ) : (
+                            date(d.nextPaymentDate ?? d.nextInterestDate ?? d.firstInterestDate)
+                          )}
+                        </td>
+                        <td
+                          className="px-2 py-2 text-center"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={principalIds.has(id)}
+                            onChange={() => toggle(id, "principal")}
+                          />
+                        </td>
+                        <td
+                          className="px-2 py-2 text-center"
+                          style={{ border: "1px solid #111" }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={interestIds.has(id)}
+                            onChange={() => toggle(id, "interest")}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
               </tbody>
             </table>
           </div>
-        )}
-      </div>
+          {/* {deals.map((d) => (
+            <div
+              key={`interest-${d.dealId}`}
+              className="rounded p-3"
+              style={{ background: "#fafcfc", border: "1px solid #c4cdd2" }}
+            >
+              <p
+                className="text-xs font-bold mb-2"
+                style={{ color: "#2673bb" }}
+              >
+                {d.dealName ?? d.propertyName ?? d.dealId} — unpaid/upcoming
+                payment
+              </p>
+              <InterestDetails deal={d} userId={selectedHold.userId} />
+            </div>
+          ))} */}
+        </div>
+      )}
     </div>
   );
 }

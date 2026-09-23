@@ -71,6 +71,14 @@ export async function getApprovedWithdrawalUsersForFile({ fileType, withdrawalId
   return get(`/oxybrick-service/getApprovedWithdrawalUsersForFile?fileType=${encodeURIComponent(fileType)}&withdrawalId=${encodeURIComponent(withdrawalId)}`);
 }
 
+export async function updateWithdrawalPaidDate({ fileType, paidDate, withdrawalId }) {
+  return patch('/oxybrick-service/updateWithdrawalPaidDate', {
+    fileType,
+    paidDate,
+    withdrawalId,
+  });
+}
+
 export async function updateAdminWalletWithdrawalStatus({ id, walletStatus }) {
   const today = new Date().toISOString().split('T')[0]; // "YYYY-MM-DD"
   return patch('/oxybrick-service/adminAprroveWithdrawal', {

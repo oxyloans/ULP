@@ -4,6 +4,7 @@ import {
   generateWithdrawalFile,
   getApprovedWithdrawalUsersForFile,
   getAdminInitiatedWithdrawalRequests,
+  updateWithdrawalPaidDate,
 } from "../../api/afterlogin-admin";
 import { formatINR } from "../../utils/currency";
 
@@ -184,6 +185,15 @@ export default function AdminDealWithdrawalRequests() {
   const [generating, setGenerating] = useState("");
   const [generatedFiles, setGeneratedFiles] = useState(new Set());
 
+  const updateRows = (id, type, changes) => {
+    setData((current) => ({
+      ...current,
+      [type]: current[type].map((item) =>
+        item.id === id ? { ...item, ...changes } : item,
+      ),
+    }));
+  };
+
   const load = async () => {
     setLoading(true);
     setError("");
@@ -271,21 +281,27 @@ export default function AdminDealWithdrawalRequests() {
       const fileType = type === "principal" ? "principalwithdrawal" : "withdrawalinterest";
       await getApprovedWithdrawalUsersForFile({ fileType, withdrawalId: request.id });
       const generated = await generateWithdrawalFile({ fileType, withdrawalId: request.id });
-      if (generated?.downloadUrl) {
-        const anchor = document.createElement("a");
-        anchor.href = generated.downloadUrl;
-        anchor.target = "_blank";
-        anchor.rel = "noopener noreferrer";
-        anchor.download = generated.fileName || "withdrawal-file.xls";
-        document.body.appendChild(anchor);
-        anchor.click();
-        anchor.remove();
-      }
+      const fileChanges = type === "principal"
+        ? { principalFileName: generated?.fileName, principalDownloadUrl: generated?.downloadUrl, withdrawalStatus: "EXECUTED" }
+        : { interestFileName: generated?.fileName, interestDownloadUrl: generated?.downloadUrl, withdrawalInterestStatus: "EXECUTED" };
+      updateRows(request.id, type, fileChanges);
       setGeneratedFiles((current) => new Set([...current, key]));
     } catch (err) {
       setError(err?.message || `Failed to generate ${type} file`);
     } finally {
       setGenerating("");
+    }
+  };
+
+  const markAsPaid = async (request, type) => {
+    const fileType = type === "principal" ? "principalwithdrawal" : "withdrawalinterest";
+    setError("");
+    try {
+      const paidDate = new Date().toISOString();
+      await updateWithdrawalPaidDate({ fileType, paidDate, withdrawalId: request.id });
+      updateRows(request.id, type, type === "principal" ? { paidDate } : { interestPaidDate: paidDate });
+    } catch (err) {
+      setError(err?.message || `Failed to mark ${type} withdrawal as paid`);
     }
   };
 
@@ -409,6 +425,13 @@ export default function AdminDealWithdrawalRequests() {
                       tab === "principal"
                         ? item.withdrawalStatus
                         : item.withdrawalInterestStatus;
+                    const statusValue = String(status).toUpperCase();
+                    const downloadUrl = tab === "principal"
+                      ? item.principalDownloadUrl
+                      : item.interestDownloadUrl;
+                    const paidDate = tab === "principal"
+                      ? item.paidDate
+                      : item.interestPaidDate;
                     return (
                       <tr
                         key={`${tab}-${item.id}`}
@@ -448,7 +471,7 @@ export default function AdminDealWithdrawalRequests() {
                           <Status value={status} />
                         </td>
                         <td className="py-3 px-4">
-                          {String(status).toUpperCase() === "APPROVED" ? (
+                          {statusValue === "APPROVED" ? (
                             <button
                               onClick={() => generateFile(item, tab)}
                               disabled={generating === `${tab}-${item.id}`}
@@ -461,7 +484,7 @@ export default function AdminDealWithdrawalRequests() {
                                   ? "File Generated"
                                   : `Generate ${tab === "principal" ? "Principal" : "Interest"} File`}
                             </button>
-                          ) : String(status).toUpperCase() === "INITIATED" ? (
+                          ) : statusValue === "INITIATED" ? (
                             <button
                               onClick={() => setActive({ request: item, type: tab })}
                               className="px-3 py-1.5 rounded-lg text-xs font-bold"
@@ -469,12 +492,36 @@ export default function AdminDealWithdrawalRequests() {
                             >
                               {tab === "principal" ? "Principal Approve" : "Interest Approve"}
                             </button>
+                          ) : statusValue === "EXECUTED" ? (
+                            <div className="flex items-center gap-2 flex-wrap">
+                              {downloadUrl && (
+                                <a
+                                  href={downloadUrl}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  download
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                                  style={{ background: "rgba(16,185,129,0.14)", color: "#059669" }}
+                                >
+                                  Download File
+                                </a>
+                              )}
+                              {paidDate ? (
+                                <span className="text-xs font-semibold" style={{ color: "#10b981" }}>Paid</span>
+                              ) : (
+                                <button
+                                  onClick={() => markAsPaid(item, tab)}
+                                  className="px-3 py-1.5 rounded-lg text-xs font-bold"
+                                  style={{ background: "rgba(245,158,11,0.14)", color: "#d97706" }}
+                                >
+                                  Mark {tab === "principal" ? "Principal" : "Interest"} Paid
+                                </button>
+                              )}
+                            </div>
                           ) : (
-                            // <button onClick={() => downloadFile(item, tab)} className="px-3 py-1.5 rounded-lg text-xs font-bold" style={{ background: "var(--input-bg)", color: "var(--text-muted)" }}>
                             <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                               Processed
                             </span>
-                            // </button>
                           )}
                         </td>
                       </tr>
