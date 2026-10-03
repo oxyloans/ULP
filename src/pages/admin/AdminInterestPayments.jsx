@@ -362,6 +362,163 @@ function LenderBreakupModal({
   );
 }
 
+// ─── Pay Progress Modal ───────────────────────────────────────────────────────
+function PayProgressModal({ progress, onClose }) {
+  if (!progress) return null;
+  const { total, done, results } = progress;
+  const isComplete = done >= total;
+  const errorCount = results.filter(r => r.status === 'error').length;
+  const doneCount  = results.filter(r => r.status === 'done').length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.70)', backdropFilter: 'blur(6px)' }}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.45)' }}>
+
+        {/* Header */}
+        <div className="px-6 py-4 flex items-center justify-between"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(5,150,105,0.06)' }}>
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+              style={{ background: 'rgba(5,150,105,0.12)', border: '1px solid rgba(5,150,105,0.3)', color: '#059669' }}>
+              {isComplete
+                ? <CheckIcon />
+                : <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" strokeOpacity="0.25"/><path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/></svg>}
+            </div>
+            <div>
+              <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>
+                {isComplete ? 'Processing Complete' : 'Processing Payments…'}
+              </p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                {done} of {total} deal{total !== 1 ? 's' : ''} processed
+              </p>
+            </div>
+          </div>
+          {isComplete && (
+            <button onClick={onClose} className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
+              <CloseIcon />
+            </button>
+          )}
+        </div>
+
+        {/* Progress bar */}
+        <div className="px-6 pt-5 pb-2">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold" style={{ color: 'var(--text-muted)' }}>Progress</span>
+            <span className="text-sm font-black tabular-nums"
+              style={{ color: pct === 100 ? '#059669' : '#3b82f6', fontFamily: "'JetBrains Mono', monospace" }}>
+              {pct}%
+            </span>
+          </div>
+          <div className="w-full rounded-full overflow-hidden" style={{ height: 8, background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            <div
+              style={{
+                height: '100%',
+                width: `${pct}%`,
+                background: errorCount > 0 && isComplete
+                  ? 'linear-gradient(90deg,#059669,#ef4444)'
+                  : 'linear-gradient(90deg,#10b981,#059669)',
+                transition: 'width 0.4s ease',
+                borderRadius: '9999px',
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Deal rows */}
+        <div className="px-6 pb-2 max-h-64 overflow-y-auto">
+          <div className="grid gap-1.5 py-2">
+            {results.map((r, i) => (
+              <div key={r.id} className="flex items-center gap-3 px-3 py-2 rounded-xl"
+                style={{
+                  background: r.status === 'done'       ? 'rgba(5,150,105,0.07)'
+                            : r.status === 'error'      ? 'rgba(239,68,68,0.07)'
+                            : r.status === 'processing' ? 'rgba(59,130,246,0.07)'
+                            : 'var(--input-bg)',
+                  border: `1px solid ${
+                    r.status === 'done'       ? 'rgba(5,150,105,0.2)'
+                  : r.status === 'error'      ? 'rgba(239,68,68,0.2)'
+                  : r.status === 'processing' ? 'rgba(59,130,246,0.2)'
+                  : 'var(--border)'}`,
+                }}>
+                {/* Status icon */}
+                <span className="flex-shrink-0 w-5 h-5 rounded-full flex items-center justify-center"
+                  style={{
+                    background: r.status === 'done'       ? 'rgba(5,150,105,0.15)'
+                              : r.status === 'error'      ? 'rgba(239,68,68,0.15)'
+                              : r.status === 'processing' ? 'rgba(59,130,246,0.15)'
+                              : 'rgba(100,116,139,0.1)',
+                    color: r.status === 'done'       ? '#059669'
+                         : r.status === 'error'      ? '#ef4444'
+                         : r.status === 'processing' ? '#3b82f6'
+                         : 'var(--text-muted)',
+                  }}>
+                  {r.status === 'done' && <CheckIcon />}
+                  {r.status === 'error' && <CloseIcon />}
+                  {r.status === 'processing' && (
+                    <svg className="w-3 h-3 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                      <circle cx="12" cy="12" r="10" strokeOpacity="0.25"/>
+                      <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round"/>
+                    </svg>
+                  )}
+                  {r.status === 'pending' && (
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: 'var(--text-muted)' }} />
+                  )}
+                </span>
+
+                {/* Name + msg */}
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate" style={{ color: 'var(--text-primary)' }}>{i + 1}. {r.name}</p>
+                  {r.msg && <p className="text-[11px] mt-0.5 truncate"
+                    style={{ color: r.status === 'error' ? '#ef4444' : '#059669' }}>{r.msg}</p>}
+                </div>
+
+                {/* Status label */}
+                <span className="text-[10px] font-black uppercase tracking-wider flex-shrink-0"
+                  style={{
+                    color: r.status === 'done'       ? '#059669'
+                         : r.status === 'error'      ? '#ef4444'
+                         : r.status === 'processing' ? '#3b82f6'
+                         : 'var(--text-muted)',
+                  }}>
+                  {r.status === 'processing' ? 'Processing' : r.status === 'done' ? 'Done' : r.status === 'error' ? 'Failed' : 'Waiting'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer summary */}
+        {isComplete && (
+          <div className="px-6 pb-5 pt-2">
+            <div className="rounded-xl px-4 py-3 flex items-center justify-between gap-4 flex-wrap"
+              style={{ background: errorCount > 0 ? 'rgba(239,68,68,0.06)' : 'rgba(5,150,105,0.07)', border: `1px solid ${errorCount > 0 ? 'rgba(239,68,68,0.2)' : 'rgba(5,150,105,0.2)'}` }}>
+              <div className="flex items-center gap-4">
+                <span className="text-xs font-semibold" style={{ color: '#059669' }}>
+                  ✓ {doneCount} succeeded
+                </span>
+                {errorCount > 0 && (
+                  <span className="text-xs font-semibold" style={{ color: '#ef4444' }}>
+                    ✗ {errorCount} failed
+                  </span>
+                )}
+              </div>
+              <button onClick={onClose}
+                className="px-4 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02]"
+                style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 12px rgba(5,150,105,0.35)' }}>
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ─── Paid Date Modal ──────────────────────────────────────────────────────────
 export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel, loading }) {
   const [paidDate, setPaidDate] = useState('');
@@ -633,6 +790,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
   const [tab, setTab]           = useState('INITIATED');
   const [paidModal, setPaidModal]   = useState(false);
   const [payLoading, setPayLoading] = useState(false);
+  const [payProgress, setPayProgress] = useState(null); // { deals, results: [{id,name,status:'pending'|'processing'|'done'|'error',msg}] }
   const [lenderModalOpen, setLenderModalOpen] = useState(false);
   const [lenderModalLoading, setLenderModalLoading] = useState(false);
   const [lenderModalError, setLenderModalError] = useState('');
@@ -733,48 +891,68 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
     const normalizedPaidDate = normalizeDateToYmd(paidDate);
     if (!normalizedPaidDate) return;
     setPayLoading(true);
+    setPaidModal(false);
+
+    // Initialise progress — all pending
+    const initialResults = selectedDeals.map(d => ({ id: d.id, name: d.dealName, status: 'pending', msg: '' }));
+    setPayProgress({ total: selectedDeals.length, done: 0, results: initialResults });
+
     const errors = [];
-    await Promise.all(
-      selectedDeals.map(async (deal) => {
-        try {
-          // Fetch lender breakup for each selected Generated deal
-          const res = await getInterestBreakUpByDeal(deal.id);
-          const rows = Array.isArray(res?.usersDealsBasedInterestInfoDto)
-            ? res.usersDealsBasedInterestInfoDto
-            : Array.isArray(res) ? res : [];
-          const actualInterestDate = normalizeDateToYmd(res?.actualInterestDate ?? deal?.actualInterestDate ?? deal?.paymentDate) ?? normalizedPaidDate;
-          const sheetGeneratedDate = normalizeDateToYmd(res?.sheetGeneratedOn ?? res?.sheetGeneratedDate ?? deal?.sheetGeneratedOn) ?? normalizedPaidDate;
-          if (rows.length === 0) {
-            // No lenders — just mark locally
-            setPaidMap(prev => ({ ...prev, [deal.id]: { date: normalizedPaidDate } }));
-            return;
-          }
+
+    for (let i = 0; i < selectedDeals.length; i++) {
+      const deal = selectedDeals[i];
+
+      // Mark current as processing
+      setPayProgress(prev => ({
+        ...prev,
+        results: prev.results.map(r => r.id === deal.id ? { ...r, status: 'processing' } : r),
+      }));
+
+      try {
+        const res = await getInterestBreakUpByDeal(deal.id);
+        const rows = Array.isArray(res?.usersDealsBasedInterestInfoDto)
+          ? res.usersDealsBasedInterestInfoDto
+          : Array.isArray(res) ? res : [];
+        const actualInterestDate = normalizeDateToYmd(res?.actualInterestDate ?? deal?.actualInterestDate ?? deal?.paymentDate) ?? normalizedPaidDate;
+        const sheetGeneratedDate = normalizeDateToYmd(res?.sheetGeneratedOn ?? res?.sheetGeneratedDate ?? deal?.sheetGeneratedOn) ?? normalizedPaidDate;
+
+        if (rows.length > 0) {
           await updateLenderInterestPayments({
             actualInterestDate,
             dealId: deal.id,
             paidDate: normalizedPaidDate,
             sheetGeneratedDate,
-            usersDealsBasedInterestInfoDto: rows.map((r) => ({
+            usersDealsBasedInterestInfoDto: rows.map(r => ({
               days: Number(r?.days ?? 0),
               interestAmount: Number(r?.interestAmount ?? 0),
               userId: r?.userId ?? null,
             })),
           });
-          setPaidMap(prev => ({ ...prev, [deal.id]: { date: normalizedPaidDate } }));
-          setDeals(prev => prev.map(row =>
-            row.id === deal.id ? { ...row, paymentDate: normalizedPaidDate, status: 'EXECUTED' } : row
-          ));
-        } catch (e) {
-          errors.push(`${deal.dealName}: ${e?.message ?? 'Failed'}`);
         }
-      })
-    );
-    setSelected(new Set());
-    setPaidModal(false);
-    setPayLoading(false);
-    if (errors.length) {
-      setError(`Some deals failed: ${errors.join('; ')}`);
+
+        setPaidMap(prev => ({ ...prev, [deal.id]: { date: normalizedPaidDate } }));
+        setDeals(prev => prev.map(row =>
+          row.id === deal.id ? { ...row, paymentDate: normalizedPaidDate, status: 'EXECUTED' } : row
+        ));
+        setPayProgress(prev => ({
+          ...prev,
+          done: prev.done + 1,
+          results: prev.results.map(r => r.id === deal.id ? { ...r, status: 'done', msg: `Paid on ${normalizedPaidDate}` } : r),
+        }));
+      } catch (e) {
+        const msg = e?.message ?? 'Failed';
+        errors.push(`${deal.dealName}: ${msg}`);
+        setPayProgress(prev => ({
+          ...prev,
+          done: prev.done + 1,
+          results: prev.results.map(r => r.id === deal.id ? { ...r, status: 'error', msg } : r),
+        }));
+      }
     }
+
+    setSelected(new Set());
+    setPayLoading(false);
+    // Keep progress modal open so user can see final result; they dismiss it manually
   };
 
   const handleOpenLenders = async (deal) => {
@@ -946,6 +1124,13 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
           loading={payLoading}
           onSubmit={handleMarkPaid}
           onCancel={() => setPaidModal(false)}
+        />
+      )}
+
+      {payProgress && (
+        <PayProgressModal
+          progress={payProgress}
+          onClose={() => setPayProgress(null)}
         />
       )}
 
