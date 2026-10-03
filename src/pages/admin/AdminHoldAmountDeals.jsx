@@ -476,14 +476,9 @@ function InterestStatement({ dealId, dealName, userId }) {
 
 // ─── Deal Card ────────────────────────────────────────────────────────────────
 function DealCard({ deal, userId, holdAmount, onMapSuccess, selectedIds, onToggle }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded,  setExpanded]  = useState(false);
   const [showModal, setShowModal] = useState(false);
   const isSelected = selectedIds.has(deal.dealId);
-
-  const interest = deal.interestInfoList ?? deal.lenderInterestInfoList ?? deal.interestDetails ?? [];
-
-  // Total interest earned from this deal
-  const totalInterest = interest.reduce((s, r) => s + (Number(r.interestAmount ?? r.amount) || 0), 0);
 
   return (
     <>
@@ -519,23 +514,28 @@ function DealCard({ deal, userId, holdAmount, onMapSuccess, selectedIds, onToggl
             {isSelected && <CheckIcon />}
           </button>
 
-          {/* Deal info — clickable to expand */}
+          {/* Deal info — clickable to expand/collapse interest statement */}
           <button className="flex-1 min-w-0 text-left" onClick={() => setExpanded(x => !x)}>
             <p className="text-sm font-semibold truncate" style={{ color: 'var(--text-primary)' }}>
               {deal.dealName ?? deal.propertyName ?? deal.dealId}
             </p>
             <div className="flex items-center gap-3 mt-0.5 flex-wrap text-xs" style={{ color: 'var(--text-muted)' }}>
-              <span>Investment: <strong style={{ color: 'var(--text-primary)' }}>{fmtINR(deal.participatedAmount ?? deal.participationAmount ?? deal.amount)}</strong></span>
-              <span>·</span>
-              <span>Interest: <strong style={{ color: '#35a13e' }}>{fmtINR(totalInterest)}</strong></span>
-              {deal.roi && <><span>·</span><span>ROI: <strong style={{ color: '#2673bb' }}>{deal.roi}%</strong></span></>}
+              <span>
+                Investment: <strong style={{ color: 'var(--text-primary)' }}>
+                  {fmtINR(deal.participatedAmount ?? deal.investmentAmount ?? deal.participationAmount ?? deal.amount)}
+                </strong>
+              </span>
+              {deal.roi && <><span>·</span><span>ROI: <strong style={{ color: INDIGO }}>{deal.roi}%</strong></span></>}
+              <span style={{ color: AMBER, fontWeight: 600 }}>
+                {expanded ? '▲ Hide Statement' : '▼ View Interest Statement'}
+              </span>
             </div>
           </button>
 
           {/* Status chip */}
           {deal.status && (
             <span className="text-xs font-bold px-2.5 py-1 rounded-full flex-shrink-0"
-              style={{ background: 'rgba(53,161,62,0.1)', color: '#35a13e', border: '1px solid rgba(53,161,62,0.25)' }}>
+              style={{ background: `${GREEN}15`, color: GREEN, border: `1px solid ${GREEN}30` }}>
               {deal.status}
             </span>
           )}
@@ -554,25 +554,17 @@ function DealCard({ deal, userId, holdAmount, onMapSuccess, selectedIds, onToggl
           </button>
         </div>
 
-        {/* Expanded: deal details + interest table */}
+        {/* Expanded: interest statement from getUserViewInterestStatement API */}
         {expanded && (
-          <div className="px-5 pb-5 pt-1 grid gap-4"
-            style={{ borderTop: '1px solid var(--border)', background: 'rgba(245,131,17,0.02)' }}>
-
-            {/* Interest statement */}
-            <div>
-              <div className="flex items-center gap-2 mb-2 px-1.5 mt-4">
-                <CoinIcon />
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--text-muted)' }}>
-                  Interest Breakdown ({interest.length})
-                </p>
-              </div>
-              <InterestStatement
-                dealId={deal.dealId}
-                dealName={deal.dealName ?? deal.propertyName ?? deal.dealId}
-                userId={userId}
-              />
+          <div className="px-5 pb-5 pt-3"
+            style={{ borderTop: '1px solid var(--border)', background: `${AMBER}03` }}>
+            <div className="flex items-center gap-2 mb-3">
+              <CoinIcon />
+              <p className="text-xs font-bold uppercase tracking-wider" style={{ color: AMBER }}>
+                Interest Statement
+              </p>
             </div>
+            <InterestStatement dealId={deal.dealId} />
           </div>
         )}
       </div>

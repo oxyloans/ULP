@@ -382,7 +382,7 @@ export function PaidDateModal({ selectedCount, selectedTotal, onSubmit, onCancel
             <div>
               <p className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Confirm Paid Date</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                Enter `YYYY-MM-DD` for paid date · {selectedCount} deal{selectedCount !== 1 ? 's' : ''} · {fmtINR(selectedTotal)}
+                Enter the paid date · {selectedCount} deal{selectedCount !== 1 ? 's' : ''} · {fmtINR(selectedTotal)} interest
               </p>
             </div>
           </div>
@@ -710,36 +710,71 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
     : tab === 'GENERATED' ? generatedDeals
     : executedDeals;
 
-  const pendingFiltered = filtered.filter(d => getStatus(d) === 'INITIATED');
-  const allPendingSelected = pendingFiltered.length > 0 && pendingFiltered.every(d => selected.has(d.id));
+  const generatedFiltered = filtered.filter(d => getStatus(d) === 'GENERATED');
+  const allGeneratedSelected = generatedFiltered.length > 0 && generatedFiltered.every(d => selected.has(d.id));
 
   const toggleAll = () => {
-    if (allPendingSelected) {
-      setSelected(prev => { const n = new Set(prev); pendingFiltered.forEach(d => n.delete(d.id)); return n; });
+    if (allGeneratedSelected) {
+      setSelected(prev => { const n = new Set(prev); generatedFiltered.forEach(d => n.delete(d.id)); return n; });
     } else {
-      setSelected(prev => { const n = new Set(prev); pendingFiltered.forEach(d => n.add(d.id)); return n; });
+      setSelected(prev => { const n = new Set(prev); generatedFiltered.forEach(d => n.add(d.id)); return n; });
     }
   };
   const toggleOne = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
 
   const selectedDeals = deals.filter(d => selected.has(d.id));
-  const selectedTotal = selectedDeals.reduce((s, d) => s + d.amount, 0);
+  const selectedTotal = selectedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? d.amount ?? 0), 0);
   const totalInitiatedInterest = initiatedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
   const totalGeneratedInterest = generatedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
   const totalExecutedInterest  = executedDeals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
   const totalInterest = deals.reduce((s, d) => s + Number(getInterestAmount(d) ?? 0), 0);
 
   const handleMarkPaid = async (paidDate) => {
+    const normalizedPaidDate = normalizeDateToYmd(paidDate);
+    if (!normalizedPaidDate) return;
     setPayLoading(true);
-    await new Promise(r => setTimeout(r, 900));
-    setPaidMap(prev => {
-      const n = { ...prev };
-      selected.forEach(id => { n[id] = { date: paidDate }; });
-      return n;
-    });
+    const errors = [];
+    await Promise.all(
+      selectedDeals.map(async (deal) => {
+        try {
+          // Fetch lender breakup for each selected Generated deal
+          const res = await getInterestBreakUpByDeal(deal.id);
+          const rows = Array.isArray(res?.usersDealsBasedInterestInfoDto)
+            ? res.usersDealsBasedInterestInfoDto
+            : Array.isArray(res) ? res : [];
+          const actualInterestDate = normalizeDateToYmd(res?.actualInterestDate ?? deal?.actualInterestDate ?? deal?.paymentDate) ?? normalizedPaidDate;
+          const sheetGeneratedDate = normalizeDateToYmd(res?.sheetGeneratedOn ?? res?.sheetGeneratedDate ?? deal?.sheetGeneratedOn) ?? normalizedPaidDate;
+          if (rows.length === 0) {
+            // No lenders — just mark locally
+            setPaidMap(prev => ({ ...prev, [deal.id]: { date: normalizedPaidDate } }));
+            return;
+          }
+          await updateLenderInterestPayments({
+            actualInterestDate,
+            dealId: deal.id,
+            paidDate: normalizedPaidDate,
+            sheetGeneratedDate,
+            usersDealsBasedInterestInfoDto: rows.map((r) => ({
+              days: Number(r?.days ?? 0),
+              interestAmount: Number(r?.interestAmount ?? 0),
+              userId: r?.userId ?? null,
+            })),
+          });
+          setPaidMap(prev => ({ ...prev, [deal.id]: { date: normalizedPaidDate } }));
+          setDeals(prev => prev.map(row =>
+            row.id === deal.id ? { ...row, paymentDate: normalizedPaidDate, status: 'EXECUTED' } : row
+          ));
+        } catch (e) {
+          errors.push(`${deal.dealName}: ${e?.message ?? 'Failed'}`);
+        }
+      })
+    );
     setSelected(new Set());
     setPaidModal(false);
     setPayLoading(false);
+    if (errors.length) {
+      setError(`Some deals failed: ${errors.join('; ')}`);
+    }
   };
 
   const handleOpenLenders = async (deal) => {
@@ -931,24 +966,6 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap">
-            {selected.size > 0 && (
-              <>
-                <button
-                  onClick={() => downloadCSV(
-                    selectedDeals.map(d => ({ ...d, paymentDate: getPaidDate(d) ?? d.paymentDate ?? '' })),
-                    `interest-${period.label.replace(' ','-')}-selected.csv`
-                  )}
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
-                  style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
-                  <DownloadIcon /> Download Selected ({selected.size})
-                </button>
-                <button onClick={() => setPaidModal(true)}
-                  className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
-                  style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
-                  <CheckIcon /> Paid ({selected.size})
-                </button>
-              </>
-            )}
             <button
               onClick={loadDeals}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold transition-all hover:scale-105"
@@ -984,9 +1001,9 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
           </div>
           {selected.size > 0 && (
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl"
-              style={{ background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)' }}>
-              <span className="text-xs font-bold" style={{ color: '#c084fc' }}>
-                {selected.size} selected · {fmtINR(selectedTotal)}
+              style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}>
+              <span className="text-xs font-bold" style={{ color: '#3b82f6' }}>
+                {selected.size} selected · {fmtINR(selectedTotal)} interest
               </span>
               <button onClick={() => setSelected(new Set())}
                 className="w-5 h-5 rounded-md flex items-center justify-center"
@@ -1024,6 +1041,25 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                 </div>
               </div>
             )}
+            {tab === 'GENERATED' && selected.size > 0 && !loading && (
+              <div className="ml-auto flex items-center gap-2">
+                <button
+                  onClick={() => downloadCSV(
+                    selectedDeals.map(d => ({ ...d, paymentDate: getPaidDate(d) ?? d.paymentDate ?? '' })),
+                    `interest-${period.label.replace(' ','-')}-selected.csv`
+                  )}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all hover:scale-105"
+                  style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)' }}>
+                  <DownloadIcon /> Download Selected ({selected.size})
+                </button>
+                <button
+                  onClick={() => setPaidModal(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                  style={{ background: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff', boxShadow: '0 4px 14px rgba(5,150,105,0.35)' }}>
+                  <CheckIcon /> Mark Paid ({selected.size})
+                </button>
+              </div>
+            )}
           </div>
 
           {loading && (
@@ -1039,21 +1075,24 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
               <table className="w-full text-sm">
                 <thead>
                   <tr style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
-                    {/* <th className="py-3 px-4 text-xs uppercase tracking-widest font-semibold text-left whitespace-nowrap"
-                      style={{ color: 'var(--text-muted)' }}>
-                      <div className="flex items-center gap-2">
-                        <button onClick={toggleAll}
-                          className="w-5 h-5 rounded-md flex items-center justify-center transition-all flex-shrink-0"
-                          style={{
-                            background: allPendingSelected ? 'rgba(168,85,247,0.8)' : 'var(--input-bg)',
-                            border: '1.5px solid rgba(168,85,247,0.4)', color: '#fff',
-                          }}>
-                          {allPendingSelected && <CheckIcon />}
-                        </button>
-                        <span>Payment</span>
-                      </div>
-                    </th> */}
-                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Principal Amount', 'Interest Amount', 'Payment Date', 'Status', 'Lenders Breakup', 'Download'].map(h => (
+                    {/* Select checkbox column — only shown when the Generated tab is active */}
+                    {(tab === 'GENERATED' || tab === 'ALL') && (
+                      <th className="py-3 px-4 text-xs uppercase tracking-widest font-semibold text-left whitespace-nowrap"
+                        style={{ color: 'var(--text-muted)', width: 44 }}>
+                        {tab === 'GENERATED' && (
+                          <button onClick={toggleAll}
+                            title={allGeneratedSelected ? 'Deselect all' : 'Select all Generated'}
+                            className="w-5 h-5 rounded-md flex items-center justify-center transition-all"
+                            style={{
+                              background: allGeneratedSelected ? 'rgba(59,130,246,0.8)' : 'var(--input-bg)',
+                              border: '1.5px solid rgba(59,130,246,0.4)', color: '#fff',
+                            }}>
+                            {allGeneratedSelected && <CheckIcon />}
+                          </button>
+                        )}
+                      </th>
+                    )}
+                    {['#', 'Deal Name', 'ROI', 'Lenders', 'Principal Amount', 'Interest Amount', 'Payment Date', 'Status', 'View', 'Actions'].map(h => (
                       <th key={h} className="text-left py-3 px-4 text-xs uppercase tracking-widest font-semibold whitespace-nowrap"
                         style={{ color: 'var(--text-muted)' }}>{h}</th>
                     ))}
@@ -1061,36 +1100,38 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                 </thead>
                 <tbody>
                   {filtered.length === 0 ? (
-                    <tr><td colSpan={10} className="py-14 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No deals in this category</td></tr>
+                    <tr><td colSpan={(tab === 'GENERATED' || tab === 'ALL') ? 11 : 10} className="py-14 text-center text-sm" style={{ color: 'var(--text-muted)' }}>No deals in this category</td></tr>
                   ) : filtered.map((deal, idx) => {
                     const isPaid    = getStatus(deal) === 'PAID';
+                    const isGenerated = getStatus(deal) === 'GENERATED';
                     const isChecked = selected.has(deal.id);
                     const paidDate  = getPaidDate(deal);
+                    const showCheckboxCol = (tab === 'GENERATED' || tab === 'ALL');
                     return (
                       <tr key={deal.id}
-                        style={{ borderBottom: '1px solid var(--border)', background: isChecked ? 'rgba(168,85,247,0.05)' : 'transparent' }}
+                        style={{ borderBottom: '1px solid var(--border)', background: isChecked ? 'rgba(59,130,246,0.05)' : 'transparent' }}
                         onMouseEnter={e => { if (!isChecked) e.currentTarget.style.background = 'var(--row-hover)'; }}
-                        onMouseLeave={e => { e.currentTarget.style.background = isChecked ? 'rgba(168,85,247,0.05)' : 'transparent'; }}>
+                        onMouseLeave={e => { e.currentTarget.style.background = isChecked ? 'rgba(59,130,246,0.05)' : 'transparent'; }}>
 
-                        {/* Payment checkbox */}
-                        {/* <td className="py-3.5 px-4">
-                          {!isPaid ? (
-                            <button onClick={() => toggleOne(deal.id)}
-                              className="w-5 h-5 rounded-md flex items-center justify-center transition-all"
-                              style={{
-                                background: isChecked ? 'rgba(168,85,247,0.8)' : 'var(--input-bg)',
-                                border: `1.5px solid ${isChecked ? 'rgba(168,85,247,0.8)' : 'rgba(168,85,247,0.3)'}`,
-                                color: '#fff',
-                              }}>
-                              {isChecked && <CheckIcon />}
-                            </button>
-                          ) : (
-                            <span className="w-5 h-5 rounded-md flex items-center justify-center"
-                              style={{ background: 'rgba(5,150,105,0.15)', border: '1.5px solid rgba(5,150,105,0.4)', color: '#059669' }}>
-                              <CheckIcon />
-                            </span>
-                          )}
-                        </td> */}
+                        {/* Checkbox — only rendered for Generated deals when col is shown */}
+                        {showCheckboxCol && (
+                          <td className="py-3.5 px-4">
+                            {isGenerated ? (
+                              <button onClick={() => toggleOne(deal.id)}
+                                title={isChecked ? 'Deselect deal' : 'Select to mark paid'}
+                                className="w-5 h-5 rounded-md flex items-center justify-center transition-all"
+                                style={{
+                                  background: isChecked ? 'rgba(59,130,246,0.85)' : 'var(--input-bg)',
+                                  border: `1.5px solid ${isChecked ? 'rgba(59,130,246,0.85)' : 'rgba(59,130,246,0.35)'}`,
+                                  color: '#fff',
+                                }}>
+                                {isChecked && <CheckIcon />}
+                              </button>
+                            ) : (
+                              <span className="w-5 h-5 block" />
+                            )}
+                          </td>
+                        )}
 
                         <td className="py-3.5 px-4">
                           <span className="text-xs font-bold tabular-nums" style={{ color: 'var(--text-muted)' }}>{idx + 1}</span>
@@ -1143,18 +1184,32 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                           </button>
                         </td>
 
-                        {/* Per-row download */}
+                        {/* Per-row actions: Mark Paid (Generated only) + Download */}
                         <td className="py-3.5 px-4">
-                          <button
-                            disabled={!isPaid && !paidDate}
-                            onClick={() => downloadCSV(
-                              [{ ...deal, paymentDate: paidDate ?? deal.paymentDate ?? '' }],
-                              `${deal.dealName.replace(/\s+/g,'-')}-${period.label.replace(' ','-')}.csv`
+                          <div className="flex items-center gap-2">
+                            {isGenerated && (
+                              <button
+                                onClick={() => {
+                                  setSelected(new Set([deal.id]));
+                                  setPaidModal(true);
+                                }}
+                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 whitespace-nowrap"
+                                style={{ background: 'rgba(5,150,105,0.1)', color: '#059669', border: '1px solid rgba(5,150,105,0.25)' }}>
+                                <CheckIcon />
+                                Mark Paid
+                              </button>
                             )}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
-                            style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
-                            <DownloadIcon />
-                          </button>
+                            <button
+                              disabled={!isPaid && !paidDate}
+                              onClick={() => downloadCSV(
+                                [{ ...deal, paymentDate: paidDate ?? deal.paymentDate ?? '' }],
+                                `${deal.dealName.replace(/\s+/g,'-')}-${period.label.replace(' ','-')}.csv`
+                              )}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 disabled:opacity-40"
+                              style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                              <DownloadIcon />
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
