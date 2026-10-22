@@ -50,6 +50,7 @@ import GoldDealContribute from './pages/GoldDealContribute.jsx';
 import GoldParticipationDetails from './pages/GoldParticipationDetails.jsx';
 import GoldLotParticipate from './pages/GoldLotParticipate.jsx';
 import InterestPaymentDates from './pages/InterestPaymentDates.jsx';
+import ClosedDeals from './pages/ClosedDeals.jsx';
 
 import AdminWalletApprovals from './pages/admin/AdminWalletApprovals.jsx';
 import CreateDeal from './pages/admin/CreateDeal.jsx';
@@ -210,6 +211,7 @@ function UserLayout() {
             <Route path="/wallet/history" element={<WalletHistory />} />
             <Route path="/wallet/withdrawal-requests" element={<WalletWithdrawalRequests />} />
             <Route path="/withdrawal-history" element={<WithdrawalHistory />} />
+            <Route path="/closed-deals" element={<ClosedDeals />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/family" element={<FamilyManagement />} />
             <Route path="/oxyloans-family" element={<OxyLoansFamily />} />

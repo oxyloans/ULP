@@ -1244,7 +1244,7 @@ export function InterestDealsTable({ period, onBack, pageTitle, mockDeals, fetch
                   <CheckIcon /> Mark Paid ({selected.size})
                 </button>
               </div>
-            )}
+            )} 
           </div>
 
           {loading && (

@@ -512,3 +512,18 @@ export async function getUserWithdrawalRequests() {
   return get(`/oxybrick-service/getUserWithdrawalRequests/${userId}`);
 }
 
+
+// ══════════════════════════════════════════════════════════════════════════════
+// CLOSED DEALS
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/getClosedDeals/{userId}?pageIndex=0&pageSize=10
+ * Returns paginated list of closed deals for the logged-in user.
+ */
+export async function getClosedDeals({ pageIndex = 0, pageSize = 10 } = {}) {
+  const userId = getUserId();
+  return get(
+    `/oxybrick-service/getClosedDeals/${userId}?pageIndex=${pageIndex}&pageSize=${pageSize}`
+  );
+}
