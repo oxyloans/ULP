@@ -619,10 +619,10 @@ function InterestStatementModal({ deal, onClose }) {
                         return (
                           <tr key={r?.id ?? i} style={{ borderBottom: "1px solid var(--border)" }}>
                             <td className="py-2.5 px-3 font-semibold">{i + 1}</td>
-                            <td className="py-2.5 px-3 font-bold">{r?.interestDate ?? "—"}</td>
-                            <td className="py-2.5 px-3 font-semibold font-mono">{r?.noOfDays ?? "—"}</td>
+                            <td className="py-2.5 px-3 font-bold">{r?.actualInterestDate ?? "—"}</td>
+                            <td className="py-2.5 px-3 font-semibold font-mono">{r?.days ?? "—"}</td>
                             <td className="py-2.5 px-3 font-extrabold text-emerald-500 font-mono">{fmtINR(r?.interestAmount)}</td>
-                            <td className="py-2.5 px-3 font-semibold">{r?.disbursedDate ?? "—"}</td>
+                            <td className="py-2.5 px-3 font-semibold">{r?.paidDate ?? "—"}</td>
                             <td className="py-2.5 px-3">
                               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full"
                                 style={isPaid ? {
@@ -634,7 +634,7 @@ function InterestStatementModal({ deal, onClose }) {
                                   color: '#f59e0b',
                                   border: '1px solid rgba(245,158,11,0.2)',
                                 }}>
-                                {r?.status || "Pending"}
+                                {r?.status === "NOTYETPAID" ? "NOT YET PAID" : "-" || "Pending"}
                               </span>
                             </td>
                           </tr>
