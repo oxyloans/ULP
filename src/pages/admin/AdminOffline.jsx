@@ -511,7 +511,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
           <p className="font-bold text-sm" style={{ color: expanded ? tabColor : 'var(--text-primary)', transition: 'color 0.2s' }}>
             {deal.dealName}
           </p>
-          <div className='flex flex-wrap row'>
+          <div className='flex flex-wrap row mt-0.5'>
           <p className="text-xs font-mono mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {String(deal.dealId ?? deal.id ?? '').slice(0, 8)}…
           </p>
@@ -646,6 +646,7 @@ export default function AdminOffline() {
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
   const [search, setSearch]         = useState('');
+  const [dealFilter, setDealFilter] = useState('ALL');
   const [expandedDealId, setExpandedDealId] = useState(null);
   const [dealToClose, setDealToClose] = useState(null);
   const [closingDealLoader, setClosingDealLoader] = useState(false);
@@ -668,7 +669,7 @@ export default function AdminOffline() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { setExpandedDealId(null); load(activeTab); }, [activeTab]);
+  useEffect(() => { setExpandedDealId(null); setDealFilter('ALL'); load(activeTab); }, [activeTab]);
 
   const confirmManualCloseDeal = () => {
     if (!dealToClose) return;
@@ -698,6 +699,11 @@ export default function AdminOffline() {
   const filtered = deals.filter(d => {
     const matchesSearch = !search || d.dealName?.toLowerCase().includes(search.toLowerCase());
     if (!matchesSearch) return false;
+
+    if (dealFilter === 'ACTIVE')   { if (d.dealStatus === 'ACHIEVED') return false; }
+    if (dealFilter === 'ACHIEVED') { if (d.dealStatus !== 'ACHIEVED') return false; }
+    if (dealFilter === 'FULL')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total <= 0 || invested < total) return false; }
+    if (dealFilter === 'OPEN')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total > 0 && invested >= total) return false; }
 
     if (activeTab === 'NORMAL') {
       return d.globalDealType !== 'ASSET' && d.globalDealType !== 'GOLD';
@@ -780,6 +786,29 @@ export default function AdminOffline() {
           className="rounded-xl text-sm outline-none flex-1"
           style={{ padding: '9px 14px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', minWidth: 200 }}
         />
+        {/* Deal status filter */}
+        <div className="relative flex-shrink-0">
+          <select
+            value={dealFilter}
+            onChange={e => setDealFilter(e.target.value)}
+            className="rounded-xl text-sm font-semibold outline-none appearance-none pr-8 cursor-pointer"
+            style={{
+              padding: '9px 32px 9px 14px',
+              background: dealFilter !== 'ALL' ? `${tabColor}15` : 'var(--input-bg)',
+              border: `1px solid ${dealFilter !== 'ALL' ? tabColor + '50' : 'var(--border)'}`,
+              color: dealFilter !== 'ALL' ? tabColor : 'var(--text-muted)',
+            }}
+          >
+            <option value="ALL">All Deals</option>
+            <option value="ACTIVE">Active</option>
+            <option value="ACHIEVED">Achieved</option>
+            <option value="OPEN">Has Capacity</option>
+            <option value="FULL">Fully Filled</option>
+          </select>
+          <span className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: dealFilter !== 'ALL' ? tabColor : 'var(--text-muted)' }}>
+            <ChevronDown />
+          </span>
+        </div>
         {!loading && (
           <span className="text-xs font-semibold flex-shrink-0" style={{ color: 'var(--text-muted)' }}>
             {filtered.length} deal{filtered.length !== 1 ? 's' : ''}
