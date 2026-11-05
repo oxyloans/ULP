@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRunningClosedDeals, getDealParticipants, getAdminDeals, returnPrincipal, closeDealManually } from '../../api/afterlogin-admin';
+import { getRunningClosedDeals, getDealParticipants, getAdminDeals, getDealsByStatusType, returnPrincipal, closeDealManually } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -19,13 +19,55 @@ function fmtINR(n) {
   return formatINR(n);
 }
 
-const TABS = [
-  { key: 'NORMAL', label: 'SD Lots',         color: '#10b981' },
-  { key: 'GOLD',   label: 'Gold Lots',       color: '#f59e0b' },
-  { key: 'ASSET',  label: 'Asset Deals',     color: '#06b6d4' },
-  { key: 'closed', label: 'Closed',          color: '#6366f1' },
-  { key: 'TEST',   label: 'Test',            color: '#a855f7' },
+// Tab groups: each group has a name, color, and status sub-tabs
+const TAB_GROUPS = [
+  {
+    key:   'SD',
+    label: 'SD Lots',
+    color: '#10b981',
+    globalDealType: 'NORMAL',   // filter: exclude ASSET & GOLD
+    subTabs: [
+      { key: 'SD_NOTACHIEVED', label: 'Not Achieved', statusType: 'NOTACHIEVED', color: '#10b981' },
+      { key: 'SD_ACHIEVED',    label: 'Achieved',     statusType: 'ACHIEVED',    color: '#6366f1' },
+      { key: 'SD_CLOSED',      label: 'Closed',       statusType: 'CLOSED',      color: '#ef4444' },
+    ],
+  },
+  {
+    key:   'GOLD',
+    label: 'Gold Lots',
+    color: '#f59e0b',
+    globalDealType: 'GOLD',
+    subTabs: [
+      { key: 'GOLD_NOTACHIEVED', label: 'Not Achieved', statusType: 'NOTACHIEVED', color: '#f59e0b' },
+      { key: 'GOLD_ACHIEVED',    label: 'Achieved',     statusType: 'ACHIEVED',    color: '#6366f1' },
+      { key: 'GOLD_CLOSED',      label: 'Closed',       statusType: 'CLOSED',      color: '#ef4444' },
+    ],
+  },
+  {
+    key:   'ASSET',
+    label: 'Asset Deals',
+    color: '#06b6d4',
+    globalDealType: 'ASSET',
+    subTabs: [
+      { key: 'ASSET_NOTACHIEVED', label: 'Not Achieved', statusType: 'NOTACHIEVED', color: '#06b6d4' },
+      { key: 'ASSET_ACHIEVED',    label: 'Achieved',     statusType: 'ACHIEVED',    color: '#6366f1' },
+      { key: 'ASSET_CLOSED',      label: 'Closed',       statusType: 'CLOSED',      color: '#ef4444' },
+    ],
+  },
+  {
+    key:   'TEST',
+    label: 'Test',
+    color: '#a855f7',
+    globalDealType: null,
+    subTabs: [
+      { key: 'TEST_ONLY', label: 'All Test', statusType: null, color: '#a855f7' },
+    ],
+  },
 ];
+
+// Flat lookup: subTab key → { group, subTab }
+const SUB_TAB_MAP = {};
+TAB_GROUPS.forEach(g => g.subTabs.forEach(s => { SUB_TAB_MAP[s.key] = { group: g, subTab: s }; }));
 
 // ─── Feedback modal for success / error messages ──────────────────────────────
 function FeedbackModal({ message, onClose }) {
@@ -567,7 +609,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
         {/* ROI */}
         <td className="py-3.5 px-4 font-bold tabular-nums text-sm"
           style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
-          {deal.rateofinterest ?? deal.monthlyInterest ?? '—'}%
+          {deal.rateOfInterest ?? deal.monthlyInterest ?? '—'}%
         </td>
 
         {/* Status + Actions */}
@@ -641,7 +683,8 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 export default function AdminOffline() {
-  const [activeTab, setActiveTab]   = useState('NORMAL');
+  const [activeGroup, setActiveGroup]   = useState('SD');
+  const [activeSubTab, setActiveSubTab] = useState('SD_NOTACHIEVED');
   const [deals, setDeals]           = useState([]);
   const [loading, setLoading]       = useState(true);
   const [error, setError]           = useState('');
@@ -657,19 +700,35 @@ export default function AdminOffline() {
     setExpandedDealId(prev => prev === dealId ? null : dealId);
   };
 
-  const load = (tab = activeTab) => {
+  const load = (subTabKey = activeSubTab) => {
     setLoading(true); setError(''); setDeals([]);
-    const apiTab = (tab === 'ASSET' || tab === 'GOLD') ? 'NORMAL' : tab;
-    getAdminDeals(apiTab)
+
+    const { group, subTab } = SUB_TAB_MAP[subTabKey] ?? {};
+
+    // TEST: use old getAdminDeals API
+    if (group?.key === 'TEST') {
+      getAdminDeals('TEST')
+        .then(res => {
+          const list = res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
+          setDeals(list);
+        })
+        .catch(e => setError(e.message ?? 'Failed to load deals'))
+        .finally(() => setLoading(false));
+      return;
+    }
+
+    // All others: getDealsByStatusType
+    const statusType = subTab?.statusType ?? 'NOTACHIEVED';
+    getDealsByStatusType(statusType)
       .then(res => {
-        const list = res?.listOfLendersInformation ?? (Array.isArray(res) ? res : []);
+        const list = res?.deals ?? (Array.isArray(res) ? res : []);
         setDeals(list);
       })
       .catch(e => setError(e.message ?? 'Failed to load deals'))
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { setExpandedDealId(null); setDealFilter('ALL'); load(activeTab); }, [activeTab]);
+  useEffect(() => { setExpandedDealId(null); setDealFilter('ALL'); load(activeSubTab); }, [activeSubTab]);
 
   const confirmManualCloseDeal = () => {
     if (!dealToClose) return;
@@ -683,7 +742,7 @@ export default function AdminOffline() {
       .then(() => {
         setDealToClose(null);
         alert(`Deal "${dealName}" has been deactivated successfully.`);
-        load(activeTab);
+        load(activeSubTab);
       })
       .catch(err => {
         setError(err.message || `Failed to close "${dealName}" manually.`);
@@ -694,7 +753,9 @@ export default function AdminOffline() {
       });
   };
 
-  const tabColor = TABS.find(t => t.key === activeTab)?.color ?? '#10b981';
+  const currentGroup  = TAB_GROUPS.find(g => g.key === activeGroup) ?? TAB_GROUPS[0];
+  const currentSubTab = SUB_TAB_MAP[activeSubTab]?.subTab ?? currentGroup.subTabs[0];
+  const tabColor      = currentSubTab.color;
 
   const filtered = deals.filter(d => {
     const matchesSearch = !search || d.dealName?.toLowerCase().includes(search.toLowerCase());
@@ -705,15 +766,16 @@ export default function AdminOffline() {
     if (dealFilter === 'FULL')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total <= 0 || invested < total) return false; }
     if (dealFilter === 'OPEN')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total > 0 && invested >= total) return false; }
 
-    if (activeTab === 'NORMAL') {
-      return d.globalDealType !== 'ASSET' && d.globalDealType !== 'GOLD';
+    if (activeGroup === 'SD') {
+      return d.dealType !== 'TEST' && d.globalDealType !== 'ASSET' && d.globalDealType !== 'GOLD';
     }
-    if (activeTab === 'GOLD') {
-      return d.globalDealType === 'GOLD';
+    if (activeGroup === 'GOLD') {
+      return d.dealType !== 'TEST' && d.globalDealType === 'GOLD';
     }
-    if (activeTab === 'ASSET') {
-      return d.globalDealType === 'ASSET';
+    if (activeGroup === 'ASSET') {
+      return d.dealType !== 'TEST' && d.globalDealType === 'ASSET';
     }
+    // TEST — show all
     return true;
   });
 
@@ -765,20 +827,41 @@ export default function AdminOffline() {
       </div>
 
       {/* Tabs + Search — same row */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="flex gap-1 p-1 rounded-2xl flex-shrink-0"
+      <div className="grid gap-2">
+        {/* Group tabs (SD / Gold / Asset / Test) */}
+        <div className="flex gap-1 p-1 rounded-2xl flex-shrink-0 flex-wrap"
           style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
-          {TABS.map(t => (
-            <button key={t.key} onClick={() => setActiveTab(t.key)}
+          {TAB_GROUPS.map(g => (
+            <button key={g.key}
+              onClick={() => {
+                setActiveGroup(g.key);
+                setActiveSubTab(g.subTabs[0].key);
+              }}
               className="px-5 py-2 rounded-xl text-sm font-bold transition-all"
-              style={activeTab === t.key
-                ? { background: t.color, color: '#fff', boxShadow: `0 4px 14px ${t.color}40` }
+              style={activeGroup === g.key
+                ? { background: g.color, color: '#fff', boxShadow: `0 4px 14px ${g.color}40` }
                 : { background: 'transparent', color: 'var(--text-muted)' }}>
-              {t.label}
+              {g.label}
             </button>
           ))}
         </div>
-        <input
+
+        {/* Status sub-tabs */}
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex gap-1 p-1 rounded-xl flex-shrink-0"
+            style={{ background: 'var(--input-bg)', border: `1px solid ${currentGroup.color}25` }}>
+            {currentGroup.subTabs.map(s => (
+              <button key={s.key}
+                onClick={() => setActiveSubTab(s.key)}
+                className="px-4 py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={activeSubTab === s.key
+                  ? { background: s.color, color: '#fff', boxShadow: `0 3px 10px ${s.color}40` }
+                  : { background: 'transparent', color: 'var(--text-muted)' }}>
+                {s.label}
+              </button>
+            ))}
+          </div>
+          <input
           type="text"
           placeholder="Search deal name…"
           value={search}
@@ -814,7 +897,8 @@ export default function AdminOffline() {
             {filtered.length} deal{filtered.length !== 1 ? 's' : ''}
           </span>
         )}
-      </div>
+        </div>{/* end inner sub-tab + search row */}
+      </div>{/* end outer grid */}
 
       {/* Loading */}
       {loading && (
@@ -822,7 +906,7 @@ export default function AdminOffline() {
           style={{ background: 'var(--surface-card)', border: '1px solid var(--border)' }}>
           <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
             style={{ borderColor: tabColor, borderTopColor: 'transparent' }} />
-          <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Loading {activeTab} deals…</span>
+          <span className="text-sm font-semibold" style={{ color: 'var(--text-muted)' }}>Loading {currentGroup.label} · {currentSubTab.label}…</span>
         </div>
       )}
 
@@ -849,7 +933,7 @@ export default function AdminOffline() {
             style={{ borderBottom: '1px solid var(--border)', background: `${tabColor}08` }}>
             <div className="w-2 h-2 rounded-full" style={{ background: tabColor, boxShadow: `0 0 6px ${tabColor}` }} />
             <h2 className="text-sm font-bold capitalize" style={{ color: 'var(--text-primary)' }}>
-              {activeTab} Deals
+              {currentGroup.label} · {currentSubTab.label}
             </h2>
             <span className="ml-auto text-xs font-semibold px-2 py-0.5 rounded-full"
               style={{ background: `${tabColor}15`, color: tabColor }}>
@@ -871,7 +955,7 @@ export default function AdminOffline() {
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-14 text-center text-sm" style={{ color: 'var(--text-muted)' }}>
-                      No {activeTab} deals found
+                      No {currentGroup.label} · {currentSubTab.label} deals found
                     </td>
                   </tr>
                 ) : filtered.map((deal, idx) => (
@@ -882,7 +966,7 @@ export default function AdminOffline() {
                     tabColor={tabColor}
                     expandedId={expandedDealId}
                     onToggle={handleToggle}
-                    showDeactivate={activeTab !== 'closed'}
+                    showDeactivate={currentSubTab.statusType !== 'CLOSED'}
                     onDeactivate={setDealToClose}
                     onEdit={(d) => navigate(`/admin/create-deal/${d.dealId ?? d.id}`)}
                   />

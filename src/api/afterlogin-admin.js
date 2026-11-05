@@ -119,6 +119,15 @@ export async function getAdminDeals(dealType = 'NORMAL') {
 }
 
 /**
+ * GET /oxybrick-service/getDealsByStatusType/{statusType}
+ * statusType: NOTACHIEVED | CLOSED
+ * Returns deals filtered by their achievement/closure status.
+ */
+export async function getDealsByStatusType(statusType = 'NOTACHIEVED') {
+  return get(`/oxybrick-service/getDealsByStatusType/${statusType}`);
+}
+
+/**
  * PATCH /oxybrick-service/createGlobalDeal
  * Used for BOTH create and update.
  * Body: {
