@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { ModeProvider } from './context/ModeContext';
@@ -89,6 +89,7 @@ import AdminHoldAmountDeals from './pages/admin/AdminHoldAmountDeals.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 import GoldDealTest from './pages/GoldDealTest.jsx';
+import DiwaliGreeting from './components/DiwaliGreeting.jsx';
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -286,20 +287,51 @@ function AdminLayout() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 function AppRoutes() {
   const { user } = useAuth();
-  return (
-    <Routes>
-      {/* Public routes */}
-      <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <Login />} />
-      <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
-      <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
-      <Route path="/oauth/callback" element={<OAuthCallback />} />
-      <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />
-      <Route path="/support"  element={<PreLoginContact />} />
+  const [showDiwali, setShowDiwali] = useState(false);
 
-      {/* Protected routes */}
-      <Route path="/admin/*" element={<AdminLayout />} />
-      <Route path="/*"       element={<UserLayout />} />
-    </Routes>
+  // Show the greeting ONLY AFTER the user logs in (never on public/login pages)
+  useEffect(() => {
+    if (!user) {
+      setShowDiwali(false);
+      return;
+    }
+
+    const sessionKey = `diwaliGreetingShown_${user.userId || 'session'}`;
+    const shown = sessionStorage.getItem(sessionKey);
+    if (!shown) {
+      const timer = setTimeout(() => {
+        setShowDiwali(true);
+        sessionStorage.setItem(sessionKey, '1');
+      }, 700);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
+
+  // Global listener to reopen greeting anytime
+  useEffect(() => {
+    const handleOpen = () => setShowDiwali(true);
+    window.addEventListener('openDiwaliGreeting', handleOpen);
+    return () => window.removeEventListener('openDiwaliGreeting', handleOpen);
+  }, []);
+
+  return (
+    <>
+      {showDiwali && <DiwaliGreeting onClose={() => setShowDiwali(false)} />}
+
+      <Routes>
+        {/* Public routes */}
+        <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <Login />} />
+        <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
+        <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
+        <Route path="/oauth/callback" element={<OAuthCallback />} />
+        <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />
+        <Route path="/support"  element={<PreLoginContact />} />
+
+        {/* Protected routes */}
+        <Route path="/admin/*" element={<AdminLayout />} />
+        <Route path="/*"       element={<UserLayout />} />
+      </Routes>
+    </>
   );
 }
 

@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import { DiwaliHeaderButton } from './DiwaliGreeting';
 import { useAuth } from '../context/AuthContext';
 import { hasPermission, ADMIN_ROLES, PERM } from '../config/adminRoles';
 import logo from '../assets/ulpnew1.png';
@@ -101,6 +102,7 @@ export default function AdminTopbar({ onMenuClick }) {
           )}
           </>
         )}
+        <DiwaliHeaderButton />
         <ThemeToggle />
         <button className="relative w-8 h-8 rounded-xl flex items-center justify-center transition-all hover:scale-105"
           style={{ background: 'var(--topbar-icon-bg)', border: '1px solid var(--topbar-icon-border)', color: 'var(--topbar-icon-color)' }}>

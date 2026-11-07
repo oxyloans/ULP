@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import ThemeToggle from './ThemeToggle';
+import { DiwaliHeaderButton } from './DiwaliGreeting';
 import { useFamily } from '../context/FamilyContext';
 import { useAuth } from '../context/AuthContext';
 import { getUserProfile } from '../api/afterlogin-user';
@@ -417,6 +418,7 @@ export default function Topbar({ onMenuClick, onAddMember }) {
 
       {/* Right actions */}
       <div className="flex items-center gap-1.5 flex-shrink-0">
+        <DiwaliHeaderButton />
         <FamilySwitcher onAddMember={onAddMember} loggedInName={loggedInName} />
         <ThemeToggle />
         <button className="topbar-icon-btn relative">
