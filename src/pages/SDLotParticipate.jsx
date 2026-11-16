@@ -70,6 +70,8 @@ export default function SDLotParticipate() {
   const [showConfirm, setShowConfirm]           = useState(false);
   const [showBankDetails, setShowBankDetails]   = useState(false);
   const [existingParticipation, setExistingParticipation] = useState(null);
+  const [principalReturningType, setPrincipalReturningType] = useState('');
+  const [interestReturningType, setInterestReturningType]   = useState('');
   const [interestGuideChecked, setInterestGuideChecked] = useState(false);
   const [showInterestGuide, setShowInterestGuide]       = useState(false);
   const [checkboxError, setCheckboxError]               = useState(false);
@@ -210,6 +212,8 @@ export default function SDLotParticipate() {
     if (alreadyInvested > 0 && (alreadyInvested + numAmount) > (lot?.maxInvestment ?? Infinity))
       return `You've already invested ${fmtINR(alreadyInvested)}. You can add at most ${fmtINR(userMaxRemaining)} more.`;
     if (numAmount > dealRemaining) return `Only ${fmtINR(dealRemaining)} capacity remaining in this deal.`;
+    if (!principalReturningType) return 'Please select where you want your principal returned.';
+    if (!interestReturningType)  return 'Please select where you want your interest returned.';
     return '';
   };
 
@@ -225,7 +229,7 @@ export default function SDLotParticipate() {
     setSubmitting(true);
     setSubmitError('');
     try {
-      await participateInDeal({ dealId: lot.id, lenderReturnsType, participatedAmount: numAmount, rateofinterest: selectedRate });
+      await participateInDeal({ dealId: lot.id, lenderReturnsType, participatedAmount: numAmount, rateofinterest: selectedRate, principalReturningType, interestReturningType });
       setSubmitted(true);
     } catch (e) {
       setSubmitError(e.message ?? 'Participation failed. Please try again.');
@@ -576,6 +580,109 @@ export default function SDLotParticipate() {
             <p className="text-sm" style={{ color: 'var(--text-primary)', lineHeight: 1.6 }}>{lot.description}</p>
           </div>
         )}
+
+        {/* Return Destination Selectors */}
+        <div className="mb-5 rounded-2xl overflow-hidden" style={{ border: '1px solid var(--border)', background: 'var(--surface-card)' }}>
+          <div className="px-4 py-3 flex items-center gap-2" style={{ borderBottom: '1px solid var(--border)', background: 'var(--input-bg)' }}>
+            <BankIcon />
+            <p className="text-sm font-black uppercase tracking-widest" style={{ color: 'var(--text-primary)' }}>Return Preferences</p>
+          </div>
+          <div className="p-4 grid gap-4">
+            {[
+              {
+                label: 'Where to return Principal?',
+                sub: 'Choose how you want your invested amount returned at maturity',
+                value: principalReturningType,
+                setter: setPrincipalReturningType,
+                hasError: error === 'Please select where you want your principal returned.',
+              },
+              {
+                label: 'Where to return Interest?',
+                sub: 'Choose how you want your periodic interest payments delivered',
+                value: interestReturningType,
+                setter: setInterestReturningType,
+                hasError: error === 'Please select where you want your interest returned.',
+              },
+            ].map(({ label, sub, value, setter, hasError }) => (
+              <div key={label}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: hasError ? '#ef4444' : 'var(--text-primary)' }}>{label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{sub}</p>
+                  </div>
+                  {!value && (
+                    <span className="text-xs font-bold px-2 py-1 rounded-lg flex-shrink-0"
+                      style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.25)' }}>
+                      Required
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    {
+                      value: 'BANKACCOUNT',
+                      label: 'Bank Account',
+                      desc: 'Direct bank transfer',
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                          <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/>
+                        </svg>
+                      ),
+                    },
+                    {
+                      value: 'WALLET',
+                      label: 'Wallet',
+                      desc: 'Added to your wallet',
+                      icon: (
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+                          <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="18" cy="12" r="2"/>
+                        </svg>
+                      ),
+                    },
+                  ].map(opt => {
+                    const active = value === opt.value;
+                    return (
+                      <button key={opt.value} type="button"
+                        onClick={() => { setter(opt.value); setError(''); }}
+                        className="relative flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all hover:scale-[1.02]"
+                        style={active
+                          ? { background: 'rgba(99,102,241,0.08)', border: '2px solid #6366f1', cursor: 'pointer' }
+                          : hasError
+                          ? { background: 'rgba(239,68,68,0.04)', border: '1.5px dashed rgba(239,68,68,0.5)', cursor: 'pointer' }
+                          : { background: 'var(--input-bg)', border: '1.5px dashed var(--border)', cursor: 'pointer' }
+                        }>
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 transition-all"
+                          style={active
+                            ? { background: 'rgba(99,102,241,0.15)', color: '#6366f1' }
+                            : { background: 'var(--surface-card)', color: 'var(--text-muted)' }
+                          }>
+                          {opt.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-bold leading-tight" style={{ color: active ? '#6366f1' : 'var(--text-primary)' }}>{opt.label}</p>
+                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{opt.desc}</p>
+                        </div>
+                        <div className="w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
+                          style={active
+                            ? { borderColor: '#6366f1', background: '#6366f1' }
+                            : { borderColor: 'var(--border)', background: 'transparent' }
+                          }>
+                          {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                {hasError && (
+                  <p className="text-xs font-semibold mt-1.5 flex items-center gap-1" style={{ color: '#ef4444' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    {error}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
 
         {/* Investment Amount Input */}
         <div className="mb-5">

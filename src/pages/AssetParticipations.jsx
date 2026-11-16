@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal } from 'antd';
-import { getRunningDeals, getUserViewInterestStatement, getSdLots, getUserOfflineParticipationDealsInfo, userWithdrawalReturned } from '../api/afterlogin-user';
+import { getRunningDeals, getUserViewInterestStatement, getSdLots, getUserOfflineParticipationDealsInfo, userWithdrawalReturned, updateReturnPreferences } from '../api/afterlogin-user';
 import { formatINR } from '../utils/currency';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -56,6 +56,191 @@ const RED    = '#ef4444';
 const INDIGO = '#6366f1';
 const GREEN  = '#10b981';
 const AMBER  = '#f59e0b';
+
+function ReturnPreferencesModal({ deal, onClose, onSuccess }) {
+  const [principal, setPrincipal] = useState('');
+  const [interest,  setInterest]  = useState('');
+  const [step,      setStep]      = useState('select'); // 'select' | 'confirm' | 'success'
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState('');
+
+  const opts = [
+    {
+      value: 'BANKACCOUNT',
+      label: 'Bank Account',
+      desc: 'Direct bank transfer',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/>
+        </svg>
+      ),
+    },
+    {
+      value: 'WALLET',
+      label: 'Wallet',
+      desc: 'Added to your wallet',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="18" cy="12" r="2"/>
+        </svg>
+      ),
+    },
+  ];
+
+  const CYAN   = '#06b6d4';
+  const canProceed = principal && interest;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await updateReturnPreferences({ dealId: deal.dealId, principalReturningType: principal, interestReturningType: interest });
+      setStep('success');
+    } catch (e) {
+      setError(e?.message ?? 'Update failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const OptionCard = ({ value, selected, onSelect, hasError }) => {
+    const opt = opts.find(o => o.value === value);
+    if (!opt) return null;
+    const active = selected === value;
+    return (
+      <button type="button" onClick={() => onSelect(value)}
+        className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-left transition-all hover:scale-[1.02] w-full"
+        style={active
+          ? { background: `${CYAN}10`, border: `2px solid ${CYAN}`, cursor: 'pointer' }
+          : hasError
+          ? { background: `${RED}05`, border: `1.5px dashed ${RED}80`, cursor: 'pointer' }
+          : { background: 'var(--input-bg)', border: '1.5px dashed var(--border)', cursor: 'pointer' }
+        }>
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={active ? { background: `${CYAN}18`, color: CYAN } : { background: 'var(--surface-card)', color: 'var(--text-muted)' }}>
+          {opt.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold" style={{ color: active ? CYAN : 'var(--text-primary)' }}>{opt.label}</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{opt.desc}</p>
+        </div>
+        <div className="w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
+          style={active ? { borderColor: CYAN, background: CYAN } : { borderColor: 'var(--border)', background: 'transparent' }}>
+          {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <Modal
+      open={true}
+      onCancel={step === 'success' ? () => { onSuccess(); onClose(); } : onClose}
+      footer={null}
+      title={
+        <div className="pr-6">
+          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: CYAN, margin: 0 }}>Return Preferences</p>
+          <h2 className="text-base font-black truncate mt-0.5" style={{ color: 'var(--text-primary)', margin: 0 }}>{deal.dealName}</h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header: { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body: { padding: '20px' },
+        close: { color: 'var(--text-muted)' },
+      }}
+      width="min(480px, 96vw)"
+      centered
+    >
+      {step === 'success' ? (
+        <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${GREEN}18`, border: `2px solid ${GREEN}40` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Preferences Updated!</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              Principal → <span className="font-bold" style={{ color: CYAN }}>{principal === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet'}</span>
+              &nbsp;&nbsp;·&nbsp;&nbsp;
+              Interest → <span className="font-bold" style={{ color: GREEN }}>{interest === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet'}</span>
+            </p>
+          </div>
+          <button onClick={() => { onSuccess(); onClose(); }}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-105"
+            style={{ background: `linear-gradient(135deg,${CYAN},#0891b2)`, boxShadow: `0 4px 14px ${CYAN}40` }}>
+            Done
+          </button>
+        </div>
+      ) : step === 'confirm' ? (
+        <div className="grid gap-4">
+          <div className="rounded-xl p-4 grid gap-2" style={{ background: `${CYAN}08`, border: `1px solid ${CYAN}25` }}>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Confirm changes for <span style={{ color: CYAN }}>{deal.dealName}</span></p>
+            {[
+              { label: 'Principal return', value: principal === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet', color: CYAN  },
+              { label: 'Interest return',  value: interest  === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet', color: GREEN },
+            ].map(r => (
+              <div key={r.label} className="flex items-center justify-between px-3 py-2 rounded-lg"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
+                <span className="text-sm font-black" style={{ color: r.color }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+          {error && <p className="text-xs font-semibold" style={{ color: RED }}>{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => { setStep('select'); setError(''); }} disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+              style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              Back
+            </button>
+            <button onClick={handleConfirm} disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+              style={{ background: loading ? `${CYAN}60` : `linear-gradient(135deg,${CYAN},#0891b2)`, boxShadow: `0 4px 14px ${CYAN}35`, cursor: loading ? 'not-allowed' : 'pointer' }}>
+              {loading ? 'Saving…' : 'Confirm'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-5">
+          {[
+            { label: 'Where to return Principal?', desc: 'Choose where your invested amount goes at maturity', value: principal, setter: setPrincipal },
+            { label: 'Where to return Interest?',  desc: 'Choose where your periodic interest payments go',   value: interest,  setter: setInterest  },
+          ].map(({ label, desc, value: val, setter }) => {
+            const hasError = !val;
+            return (
+              <div key={label}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{desc}</p>
+                  </div>
+                  {!val && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ml-2"
+                      style={{ background: `${AMBER}15`, color: AMBER, border: `1px solid ${AMBER}30` }}>
+                      Required
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {opts.map(opt => (
+                    <OptionCard key={opt.value} value={opt.value} selected={val} onSelect={setter} hasError={hasError} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <button onClick={() => canProceed && setStep('confirm')} disabled={!canProceed}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+            style={{ background: canProceed ? `linear-gradient(135deg,${CYAN},#0891b2)` : `${CYAN}40`, boxShadow: canProceed ? `0 4px 14px ${CYAN}35` : 'none', cursor: canProceed ? 'pointer' : 'not-allowed' }}>
+            Review Changes
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
+}
 
 function AssetWithdrawalModal({ deal, totalAmount, onClose, onSuccess }) {
   const [amount, setAmount]   = useState('');
@@ -665,6 +850,7 @@ export default function AssetParticipations() {
   const [migratedError, setMigratedError] = useState("");
   const [interestDeal, setInterestDeal] = useState(null);
   const [withdrawDeal, setWithdrawDeal] = useState(null); // { deal, totalAmount }
+  const [returnPrefDeal, setReturnPrefDeal] = useState(null); // { dealId, dealName }
   const [sourceFilter, setSourceFilter] = useState("all");
 
   // SD Lot remaining deals state
@@ -838,11 +1024,18 @@ export default function AssetParticipations() {
           onSuccess={() => { setWithdrawDeal(null); loadData(); }}
         />
       )}
+      {returnPrefDeal && (
+        <ReturnPreferencesModal
+          deal={returnPrefDeal}
+          onClose={() => setReturnPrefDeal(null)}
+          onSuccess={() => setReturnPrefDeal(null)}
+        />
+      )}
 
       {/* Header */}
-      <div className="flex items-center justify-between flex-wrap gap-3 text-left">
+      <div className="flex items-start justify-between flex-wrap gap-3 text-left">
         <div>
-          <h1 className="text-2xl font-black flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
+          <h1 className="text-xl sm:text-2xl font-black flex items-center gap-2.5" style={{ color: 'var(--text-primary)' }}>
             <span style={{ color: '#06b6d4' }}><Building /></span> My Asset Investments
           </h1>
           <p className="text-sm mt-0.5" style={{ color: 'var(--text-muted)' }}>
@@ -850,7 +1043,7 @@ export default function AssetParticipations() {
           </p>
         </div>
         <button onClick={() => navigate('/asset')}
-          className="px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+          className="px-4 py-2 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02] whitespace-nowrap"
           style={{ background: 'linear-gradient(135deg,#06b6d4,#0891b2)', boxShadow: '0 4px 14px rgba(6,182,212,0.3)', cursor: 'pointer' }}>
           + Browse Properties
         </button>
@@ -954,58 +1147,80 @@ export default function AssetParticipations() {
                   const canMore = maxParticipation > 0 && totalAmount < maxParticipation;
 
                   return (
-                    <div key={item.key} className="rounded-2xl overflow-hidden border p-5 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 transition-all hover:translate-y-[-1px]"
-                      style={{ background: 'var(--surface-card)', borderColor: 'var(--border)', boxShadow: '0 2px 15px rgba(0,0,0,0.05)' }}>
-                      
-                      <div className="text-left flex items-start gap-4">
-                        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0"
-                          style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.25)', color: '#06b6d4' }}>
-                          <Building />
-                        </div>
-                        <div>
-                          <h3 className="text-base font-black" style={{ color: 'var(--text-primary)' }}>{p.dealName}</h3>
-                          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                            Invested Date: <span className="font-semibold">{p.participationDate || p.participatedDate || '—'}</span> &nbsp;·&nbsp; Interest Date: <span className="font-semibold">{p.interestDate || '—'}</span>
-                          </p>
-                          {updatesCount > 0 && (
-                            <span className="inline-block mt-1 text-[10px] font-bold px-2 py-0.5 rounded-full" style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}>
-                              +{updatesCount} Top-up updates
+                    <div key={item.key} className="rounded-2xl overflow-hidden transition-all hover:translate-y-[-1px]"
+                      style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 2px 15px rgba(0,0,0,0.05)' }}>
+
+                      <div className="flex">
+                        <div className="w-1 flex-shrink-0" style={{ background: 'linear-gradient(180deg,#06b6d4,#10b981)' }} />
+                        <div className="flex-1 px-4 py-3 min-w-0">
+
+                          {/* ── Line 1: icon + deal name (full header) ── */}
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
+                              style={{ background: 'rgba(6,182,212,0.12)', border: '1px solid rgba(6,182,212,0.25)', color: '#06b6d4' }}>
+                              <Building />
+                            </div>
+                            <h3 className="text-base font-extrabold" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                              {p.dealName}
+                            </h3>
+                          </div>
+
+                          {/* ── Line 2: date + payout + top-ups ── */}
+                          <div className="flex items-center gap-1.5 mt-1 ml-[42px] flex-wrap">
+                            <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                              {p.participationDate || p.participatedDate || '—'} · {payoutTypeLabel}
                             </span>
-                          )}
-                        </div>
-                      </div>
+                            {updatesCount > 0 && (
+                              <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                                · +{updatesCount} top-up{updatesCount > 1 ? 's' : ''}
+                              </span>
+                            )}
+                          </div>
 
-                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-4 w-full sm:w-auto justify-between sm:justify-end">
-                        <div className="text-left sm:text-right">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted" style={{ color: 'var(--text-muted)' }}>Invested Amount</p>
-                          <p className="text-lg font-black text-indigo-500 font-mono mt-0.5">{fmtINR(totalAmount)}</p>
-                        </div>
+                          {/* ── Line 3: stats + buttons in one row ── */}
+                          <div className="flex items-center gap-2 mt-2.5 flex-wrap">
+                            {[
+                              { label: 'Invested', value: fmtINR(totalAmount), color: '#6366f1' },
+                              { label: 'ROI',      value: `${roi}%`,           color: '#10b981' },
+                              { label: 'Payout',   value: payoutTypeLabel,     color: '#06b6d4' },
+                              { label: 'Top-ups',  value: String(updatesCount),color: '#f59e0b' },
+                            ].map(s => (
+                              <div key={s.label} className="flex flex-col items-center px-2.5 py-1.5 rounded-xl"
+                                style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}>
+                                <span className="text-sm font-black leading-none whitespace-nowrap" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</span>
+                                <span className="text-[10px] mt-0.5 font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</span>
+                              </div>
+                            ))}
 
-                        <div className="text-left sm:text-right">
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted" style={{ color: 'var(--text-muted)' }}>ROI Payout</p>
-                          <p className="text-lg font-black text-emerald-500 font-mono mt-0.5">{roi}% <span className="text-[10px] font-medium text-muted">({payoutTypeLabel.toLowerCase()})</span></p>
-                        </div>
+                            <div className="w-px self-stretch flex-shrink-0" style={{ background: 'var(--border)' }} />
 
-                        <div className="flex items-center gap-2">
-                          <button onClick={() => setInterestDeal({ dealId: p.dealId, dealName: p.dealName })}
-                            className="px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 flex items-center gap-1.5 border"
-                            style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', borderColor: 'var(--border)', cursor: 'pointer' }}>
-                            <EyeIcon /> Statement
-                          </button>
-
-                          <button onClick={() => setWithdrawDeal({ deal: p, totalAmount })}
-                            className="px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 flex items-center gap-1.5 border-none"
-                            style={{ background: `${RED}10`, color: RED, border: `1px solid ${RED}28`, cursor: 'pointer' }}>
-                            <WithdrawIcon /> Withdraw
-                          </button>
-
-                          {canMore && (
-                            <button onClick={() => navigate(`/asset/participate/${p.dealId}`)}
-                              className="px-3 py-2 rounded-xl text-xs font-black transition-all hover:scale-105 flex items-center gap-1 text-white border-none"
-                              style={{ background: 'linear-gradient(135deg,#06b6d4,#0891b2)', boxShadow: '0 4px 12px rgba(6,182,212,0.25)', cursor: 'pointer' }}>
-                              + Add Funds
+                            <button onClick={() => setInterestDeal({ dealId: p.dealId, dealName: p.dealName })}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 whitespace-nowrap"
+                              style={{ background: 'var(--input-bg)', color: 'var(--text-primary)', border: '1px solid var(--border)', cursor: 'pointer' }}>
+                              <EyeIcon /> Statement
                             </button>
-                          )}
+                            <button onClick={() => setReturnPrefDeal({ dealId: p.dealId, dealName: p.dealName })}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 whitespace-nowrap"
+                              style={{ background: 'rgba(6,182,212,0.08)', color: '#06b6d4', border: '1px solid rgba(6,182,212,0.28)', cursor: 'pointer' }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3 flex-shrink-0">
+                                <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+                              </svg>
+                              Return Prefs
+                            </button>
+                            <button onClick={() => setWithdrawDeal({ deal: p, totalAmount })}
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105 whitespace-nowrap"
+                              style={{ background: `${RED}10`, color: RED, border: `1px solid ${RED}28`, cursor: 'pointer' }}>
+                              <WithdrawIcon /> Withdraw
+                            </button>
+                            {canMore && (
+                              <button onClick={() => navigate(`/asset/participate/${p.dealId}`)}
+                                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-black transition-all hover:scale-105 text-white whitespace-nowrap"
+                                style={{ background: 'linear-gradient(135deg,#06b6d4,#0891b2)', boxShadow: '0 4px 12px rgba(6,182,212,0.25)', cursor: 'pointer' }}>
+                                + Add Funds
+                              </button>
+                            )}
+                          </div>
+
                         </div>
                       </div>
                     </div>

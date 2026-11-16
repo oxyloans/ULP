@@ -89,7 +89,7 @@ import AdminHoldAmountDeals from './pages/admin/AdminHoldAmountDeals.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 import GoldDealTest from './pages/GoldDealTest.jsx';
-import DiwaliGreeting from './components/DiwaliGreeting.jsx';
+
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
 function FloatingSupportBtn() {
@@ -287,36 +287,8 @@ function AdminLayout() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 function AppRoutes() {
   const { user } = useAuth();
-  const [showDiwali, setShowDiwali] = useState(false);
-
-  // Show the greeting ONLY AFTER the user logs in (never on public/login pages)
-  useEffect(() => {
-    if (!user) {
-      setShowDiwali(false);
-      return;
-    }
-
-    const sessionKey = `diwaliGreetingShown_${user.userId || 'session'}`;
-    const shown = sessionStorage.getItem(sessionKey);
-    if (!shown) {
-      const timer = setTimeout(() => {
-        setShowDiwali(true);
-        sessionStorage.setItem(sessionKey, '1');
-      }, 700);
-      return () => clearTimeout(timer);
-    }
-  }, [user]);
-
-  // Global listener to reopen greeting anytime
-  useEffect(() => {
-    const handleOpen = () => setShowDiwali(true);
-    window.addEventListener('openDiwaliGreeting', handleOpen);
-    return () => window.removeEventListener('openDiwaliGreeting', handleOpen);
-  }, []);
-
   return (
-    <>
-      {showDiwali && <DiwaliGreeting onClose={() => setShowDiwali(false)} />}
+    <>}
 
       <Routes>
         {/* Public routes */}

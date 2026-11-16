@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState, useEffect } from "react";
 import { Modal } from "antd";
 import { useNavigate } from "react-router-dom";
-import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement, userWithdrawalReturned } from "../api/afterlogin-user";
+import { getRunningDeals, getUserOfflineParticipationDealsInfo, getUserViewInterestStatement, userWithdrawalReturned, updateReturnPreferences } from "../api/afterlogin-user";
 import { formatINR } from "../utils/currency";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
@@ -72,6 +72,190 @@ const WithdrawIcon = () => (
 
 function fmtINR(n) {
   return formatINR(n ?? 0);
+}
+
+function ReturnPreferencesModal({ deal, onClose, onSuccess }) {
+  const [principal, setPrincipal] = useState('');
+  const [interest,  setInterest]  = useState('');
+  const [step,      setStep]      = useState('select'); // 'select' | 'confirm' | 'success'
+  const [loading,   setLoading]   = useState(false);
+  const [error,     setError]     = useState('');
+
+  const opts = [
+    {
+      value: 'BANKACCOUNT',
+      label: 'Bank Account',
+      desc: 'Direct bank transfer',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/>
+        </svg>
+      ),
+    },
+    {
+      value: 'WALLET',
+      label: 'Wallet',
+      desc: 'Added to your wallet',
+      icon: (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-5 h-5">
+          <path d="M20 12V8H6a2 2 0 0 1-2-2c0-1.1.9-2 2-2h12v4"/><path d="M4 6v12c0 1.1.9 2 2 2h14v-4"/><circle cx="18" cy="12" r="2"/>
+        </svg>
+      ),
+    },
+  ];
+
+  const canProceed = principal && interest;
+
+  const handleConfirm = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      await updateReturnPreferences({ dealId: deal.dealId, principalReturningType: principal, interestReturningType: interest });
+      setStep('success');
+    } catch (e) {
+      setError(e?.message ?? 'Update failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const OptionCard = ({ value, selected, onSelect, hasError }) => {
+    const opt = opts.find(o => o.value === value);
+    if (!opt) return null;
+    const active = selected === value;
+    return (
+      <button type="button" onClick={() => onSelect(value)}
+        className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 sm:py-3 rounded-xl text-left transition-all hover:scale-[1.02] w-full"
+        style={active
+          ? { background: `${INDIGO}10`, border: `2px solid ${INDIGO}`, cursor: 'pointer' }
+          : hasError
+          ? { background: `${RED}05`, border: `1.5px dashed ${RED}80`, cursor: 'pointer' }
+          : { background: 'var(--input-bg)', border: '1.5px dashed var(--border)', cursor: 'pointer' }
+        }>
+        <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl flex items-center justify-center flex-shrink-0"
+          style={active ? { background: `${INDIGO}18`, color: INDIGO } : { background: 'var(--surface-card)', color: 'var(--text-muted)' }}>
+          {opt.icon}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-bold" style={{ color: active ? INDIGO : 'var(--text-primary)' }}>{opt.label}</p>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{opt.desc}</p>
+        </div>
+        <div className="w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center transition-all"
+          style={active ? { borderColor: INDIGO, background: INDIGO } : { borderColor: 'var(--border)', background: 'transparent' }}>
+          {active && <div className="w-1.5 h-1.5 rounded-full bg-white" />}
+        </div>
+      </button>
+    );
+  };
+
+  return (
+    <Modal
+      open={true}
+      onCancel={step === 'success' ? () => { onSuccess(); onClose(); } : onClose}
+      footer={null}
+      title={
+        <div className="pr-6">
+          <p className="text-[10px] font-black uppercase tracking-widest" style={{ color: INDIGO, margin: 0 }}>Return Preferences</p>
+          <h2 className="text-base font-black truncate mt-0.5" style={{ color: 'var(--text-primary)', margin: 0 }}>{deal.dealName}</h2>
+        </div>
+      }
+      styles={{
+        content: { background: 'var(--surface-card)', border: '1px solid var(--border)', borderRadius: 16, boxShadow: '0 32px 80px rgba(0,0,0,0.35)' },
+        header: { background: 'transparent', borderBottom: '1px solid var(--border)', paddingBottom: 12 },
+        body: { padding: '20px' },
+        close: { color: 'var(--text-muted)' },
+      }}
+      width="min(480px, 96vw)"
+      centered
+    >
+      {step === 'success' ? (
+        <div className="flex flex-col items-center gap-4 py-6 text-center">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center" style={{ background: `${GREEN}18`, border: `2px solid ${GREEN}40` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke={GREEN} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-8 h-8">
+              <polyline points="20 6 9 17 4 12"/>
+            </svg>
+          </div>
+          <div>
+            <p className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Preferences Updated!</p>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              Principal → <span className="font-bold" style={{ color: INDIGO }}>{principal === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet'}</span>
+              &nbsp;&nbsp;·&nbsp;&nbsp;
+              Interest → <span className="font-bold" style={{ color: GREEN }}>{interest === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet'}</span>
+            </p>
+          </div>
+          <button onClick={() => { onSuccess(); onClose(); }}
+            className="px-6 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-105"
+            style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, boxShadow: `0 4px 14px ${INDIGO}40` }}>
+            Done
+          </button>
+        </div>
+      ) : step === 'confirm' ? (
+        <div className="grid gap-4">
+          <div className="rounded-xl p-4 grid gap-2" style={{ background: `${INDIGO}08`, border: `1px solid ${INDIGO}25` }}>
+            <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Confirm changes for <span style={{ color: INDIGO }}>{deal.dealName}</span></p>
+            {[
+              { label: 'Principal return', value: principal === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet', color: INDIGO },
+              { label: 'Interest return',  value: interest  === 'BANKACCOUNT' ? 'Bank Account' : 'Wallet', color: GREEN  },
+            ].map(r => (
+              <div key={r.label} className="flex items-center justify-between px-3 py-2 rounded-lg"
+                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+                <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>{r.label}</span>
+                <span className="text-sm font-black" style={{ color: r.color }}>{r.value}</span>
+              </div>
+            ))}
+          </div>
+          {error && <p className="text-xs font-semibold" style={{ color: RED }}>{error}</p>}
+          <div className="flex gap-2">
+            <button onClick={() => { setStep('select'); setError(''); }} disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold"
+              style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
+              Back
+            </button>
+            <button onClick={handleConfirm} disabled={loading}
+              className="flex-1 py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+              style={{ background: loading ? `${INDIGO}60` : `linear-gradient(135deg,${INDIGO},#4338ca)`, boxShadow: `0 4px 14px ${INDIGO}35`, cursor: loading ? 'not-allowed' : 'pointer' }}>
+              {loading ? 'Saving…' : 'Confirm'}
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="grid gap-5">
+          {[
+            { label: 'Where to return Principal?', desc: 'Choose where your invested amount goes at maturity', value: principal, setter: setPrincipal },
+            { label: 'Where to return Interest?',  desc: 'Choose where your periodic interest payments go',   value: interest,  setter: setInterest  },
+          ].map(({ label, desc, value: val, setter }) => {
+            const hasError = !val;
+            return (
+              <div key={label}>
+                <div className="flex items-center justify-between mb-2">
+                  <div>
+                    <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{label}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{desc}</p>
+                  </div>
+                  {!val && (
+                    <span className="text-xs font-bold px-2 py-0.5 rounded-lg flex-shrink-0 ml-2"
+                      style={{ background: `${AMBER}15`, color: AMBER, border: `1px solid ${AMBER}30` }}>
+                      Required
+                    </span>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {opts.map(opt => (
+                    <OptionCard key={opt.value} value={opt.value} selected={val} onSelect={setter} hasError={hasError} />
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+          <button onClick={() => canProceed && setStep('confirm')} disabled={!canProceed}
+            className="w-full py-2.5 rounded-xl text-sm font-bold text-white transition-all hover:scale-[1.02]"
+            style={{ background: canProceed ? `linear-gradient(135deg,${INDIGO},#4338ca)` : `${INDIGO}40`, boxShadow: canProceed ? `0 4px 14px ${INDIGO}35` : 'none', cursor: canProceed ? 'pointer' : 'not-allowed' }}>
+            Review Changes
+          </button>
+        </div>
+      )}
+    </Modal>
+  );
 }
 
 function WithdrawalModal({ deal, totalInvested, onClose, onSuccess }) {
@@ -638,7 +822,7 @@ function InterestStatementModal({ deal, onClose }) {
   );
 }
 
-function DealRow({ p, index, navigate, onViewInterest, onWithdraw }) {
+function DealRow({ p, index, navigate, onViewInterest, onWithdraw, onReturnPref }) {
   const [expanded, setExpanded] = useState(false);
   const updates = p.updatedParticipation ?? [];
 
@@ -669,126 +853,122 @@ function DealRow({ p, index, navigate, onViewInterest, onWithdraw }) {
 
   return (
     <div
-      className="rounded-2xl overflow-hidden transition-all duration-300"
-      style={{ background: "var(--surface-card)", border: "1px solid var(--border)", boxShadow: "0 2px 16px rgba(0,0,0,0.06)" }}
+      className="rounded-2xl transition-all duration-300 relative overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, rgba(99,102,241,0.06) 0%, rgba(129,140,248,0.04) 50%, rgba(255,255,255,0) 100%)',
+        border: `1.5px solid ${INDIGO}25`,
+        boxShadow: '0 2px 16px rgba(99,102,241,0.08)',
+      }}
       onMouseEnter={e => {
-        e.currentTarget.style.boxShadow = "0 8px 40px rgba(0,0,0,0.14)";
-        e.currentTarget.style.transform = "translateY(-2px)";
-        e.currentTarget.style.borderColor = `${INDIGO}40`;
+        e.currentTarget.style.boxShadow = `0 8px 32px rgba(99,102,241,0.18)`;
+        e.currentTarget.style.transform = 'translateY(-2px)';
+        e.currentTarget.style.borderColor = `${INDIGO}50`;
       }}
       onMouseLeave={e => {
-        e.currentTarget.style.boxShadow = "0 2px 16px rgba(0,0,0,0.06)";
-        e.currentTarget.style.transform = "translateY(0)";
-        e.currentTarget.style.borderColor = "var(--border)";
+        e.currentTarget.style.boxShadow = '0 2px 16px rgba(99,102,241,0.08)';
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.borderColor = `${INDIGO}25`;
       }}
     >
-      <div className="flex">
-        <div className="w-1 flex-shrink-0" style={{ background: `linear-gradient(180deg,${INDIGO},${GREEN})` }} />
-        <div className="flex-1 px-4 py-3">
-          <div className="flex items-center gap-2.5 flex-wrap">
+      {/* Subtle background decoration */}
+      <div className="absolute top-0 right-0 w-40 h-40 pointer-events-none" style={{
+        background: `radial-gradient(circle at top right, ${INDIGO}10 0%, transparent 70%)`,
+      }} />
 
-            <div className="flex items-center gap-2.5 flex-1 min-w-0">
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-black"
-                style={{ background: `${INDIGO}15`, color: INDIGO, border: `2px solid ${INDIGO}30`, boxShadow: `0 0 20px ${INDIGO}20` }}
-              >
-                {index + 1}
-              </div>
-              <div className="min-w-0">
-                <p
-                  className="text-lg font-extrabold truncate"
-                  style={{ color: "var(--text-primary)", fontFamily: "'JetBrains Mono',monospace", letterSpacing: "-0.02em" }}
-                >
-                  {p.dealName}
-                </p>
-                <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                  <span className="flex items-center gap-1 text-xs" style={{ color: "var(--text-muted)" }}>
-                    <CalIcon /> Since {p.participatedDate}
-                  </span>
-                  <span
-                    className="text-xs px-2.5 py-0.5 rounded-full font-bold"
-                    style={{ background: `${GREEN}15`, color: GREEN, border: `1px solid ${GREEN}30` }}
-                  >
-                     Active
-                  </span>
-                  {p.amountTye && (
-                    <span
-                      className="text-xs px-2.5 py-0.5 rounded-full font-semibold"
-                      style={{ background: `${PURPLE}12`, color: PURPLE, border: `1px solid ${PURPLE}25` }}
-                    >
-                      {PAYOUT[p.amountTye]?.label ?? p.amountTye}
-                    </span>
-                  )}
-                </div>
-              </div>
+      <div className="relative p-4 grid gap-3">
+
+        {/* ── Row 1: icon + name/meta + index badge ── */}
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            {/* Deal icon */}
+            <div className="w-11 h-11 rounded-2xl flex items-center justify-center flex-shrink-0"
+              style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, boxShadow: `0 4px 12px ${INDIGO}40` }}>
+              <TrendUpIcon />
             </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {[
-                { label: "Total Invested",   value: fmtINR(totalInvested), color: INDIGO },
-                { label: "Monthly Interest", value: fmtINR(totalMonthly),  color: GREEN  },
-                { label: "ROI",              value: `${p.rateOfInterest ?? 0}%`, color: AMBER },
-                { label: "Entries",          value: String(allEntries.length), color: PURPLE },
-              ].map(s => (
-                <div
-                  key={s.label}
-                  className="flex flex-col items-center px-3 py-2 rounded-xl min-w-[72px] transition-all duration-200"
-                  style={{ background: `${s.color}08`, border: `1px solid ${s.color}15` }}
-                  onMouseEnter={e => { e.currentTarget.style.background = `${s.color}14`; e.currentTarget.style.transform = "scale(1.05)"; }}
-                  onMouseLeave={e => { e.currentTarget.style.background = `${s.color}08`; e.currentTarget.style.transform = "scale(1)"; }}
-                >
-                  <span
-                    className="text-[20px] font-black leading-none"
-                    style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}
-                  >
-                    {s.value}
-                  </span>
-                  <span className="text-[11px] mt-1 font-semibold whitespace-nowrap" style={{ color: "var(--text-muted)" }}>{s.label}</span>
-                </div>
-              ))}
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-shrink-0">
-              <button
-                onClick={() => onViewInterest(p)}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
-                style={{ background: `${GREEN}12`, color: GREEN, border: `1px solid ${GREEN}30` }}
-              >
-                <EyeIcon /> View Interest
-              </button>
-              <button
-                onClick={() => onWithdraw(p, totalInvested)}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
-                style={{ background: `${RED}10`, color: RED, border: `1px solid ${RED}28` }}
-              >
-                <WithdrawIcon /> Withdraw
-              </button>
-              {canMore && (
-                <button
-                  onClick={() => navigate(`/sd-lot/participate/${p.dealId}`)}
-                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
-                  style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, color: "#fff", boxShadow: `0 4px 16px ${INDIGO}50` }}
-                >
-                  <PlusIcon /> Add Funds
-                </button>
-              )}
-              <button
-                onClick={() => setExpanded(v => !v)}
-                className="flex items-center gap-1 px-3 py-2 rounded-xl text-xs font-bold transition-all"
-                style={{
-                  background: expanded ? `${INDIGO}12` : "var(--input-bg)",
-                  color: INDIGO,
-                  border: `1px solid ${expanded ? `${INDIGO}30` : "var(--border)"}`,
-                }}
-              >
-                Details
-                <span style={{ transform: expanded ? "rotate(180deg)" : "", transition: "transform 0.3s", display: "inline-flex" }}>
-                  <ChevronIcon />
+            {/* Name + meta */}
+            <div className="min-w-0">
+              <p className="text-base font-extrabold leading-tight" style={{ color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>
+                {p.dealName}
+              </p>
+              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                  <CalIcon /> {p.participatedDate}
                 </span>
-              </button>
+                {p.amountTye && (
+                  <span className="flex items-center gap-1 text-xs" style={{ color: 'var(--text-muted)' }}>
+                    · <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3 h-3"><path d="M21 12a9 9 0 0 1-9 9m9-9a9 9 0 0 0-9-9m9 9H3m9 9a9 9 0 0 1-9-9m9 9c1.66 0 3-4.03 3-9s-1.34-9-3-9m0 18c-1.66 0-3-4.03-3-9s1.34-9 3-9"/></svg>
+                    {PAYOUT[p.amountTye]?.label ?? p.amountTye}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
+          {/* Index badge */}
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 text-sm font-black text-white"
+            style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, boxShadow: `0 2px 8px ${INDIGO}40` }}>
+            {index + 1}
+          </div>
         </div>
+
+        {/* ── Row 2: stat chips ── */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {[
+            { label: 'Total Invested',   value: fmtINR(totalInvested),         color: INDIGO,  bg: `${INDIGO}08`,  icon: <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> },
+            { label: 'Monthly Interest', value: fmtINR(totalMonthly),           color: GREEN,   bg: `${GREEN}08`,   icon: <WalletIcon /> },
+            { label: 'ROI',              value: `${p.rateOfInterest ?? 0}%`,    color: AMBER,   bg: `${AMBER}08`,   icon: <span className="text-xs font-black" style={{ color: AMBER }}>%</span> },
+            { label: 'Entries',          value: String(allEntries.length),       color: PURPLE,  bg: `${PURPLE}08`,  icon: <LayersIcon /> },
+          ].map(s => (
+            <div key={s.label} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl"
+              style={{ background: s.bg, border: `1px solid ${s.color}18` }}>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0"
+                style={{ background: `${s.color}15`, color: s.color }}>
+                {s.icon}
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-black leading-none whitespace-nowrap" style={{ color: s.color, fontFamily: "'JetBrains Mono',monospace" }}>{s.value}</p>
+                <p className="text-[10px] mt-0.5 font-semibold whitespace-nowrap" style={{ color: 'var(--text-muted)' }}>{s.label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Row 3: action buttons ── */}
+        <div className="flex items-center gap-2 flex-wrap pt-1" style={{ borderTop: `1px solid ${INDIGO}12` }}>
+          <button onClick={() => onViewInterest(p)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            style={{ background: `${GREEN}10`, color: GREEN, border: `1px solid ${GREEN}28` }}>
+            <EyeIcon /> View Interest
+          </button>
+          <button onClick={() => onReturnPref(p)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            style={{ background: `${INDIGO}08`, color: INDIGO, border: `1px solid ${INDIGO}25` }}>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 flex-shrink-0">
+              <path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>
+            </svg>
+            Return Prefs
+          </button>
+          <button onClick={() => onWithdraw(p, totalInvested)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+            style={{ background: `${RED}08`, color: RED, border: `1px solid ${RED}22` }}>
+            <WithdrawIcon /> Withdraw
+          </button>
+          {canMore && (
+            <button onClick={() => navigate(`/sd-lot/participate/${p.dealId}`)}
+              className="flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95 text-white whitespace-nowrap"
+              style={{ background: `linear-gradient(135deg,${INDIGO},#4338ca)`, boxShadow: `0 4px 14px ${INDIGO}40` }}>
+              <PlusIcon /> Add Funds
+            </button>
+          )}
+          <button onClick={() => setExpanded(v => !v)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ml-auto"
+            style={{ background: expanded ? `${INDIGO}10` : 'var(--input-bg)', color: 'var(--text-muted)', border: `1px solid var(--border)` }}>
+            Details
+            <span style={{ transform: expanded ? 'rotate(180deg)' : '', transition: 'transform 0.3s', display: 'inline-flex' }}>
+              <ChevronIcon />
+            </span>
+          </button>
+        </div>
+
       </div>
 
       {expanded && (
@@ -1083,6 +1263,7 @@ export default function MyParticipations() {
   const [sourceFilter, setSourceFilter] = useState("all");
   const [interestDeal, setInterestDeal] = useState(null);
   const [withdrawDeal, setWithdrawDeal] = useState(null); // { deal, totalInvested }
+  const [returnPrefDeal, setReturnPrefDeal] = useState(null); // { dealId, dealName }
 
   const load = () => {
     setLoading(true);
@@ -1239,17 +1420,17 @@ export default function MyParticipations() {
               pointerEvents: "none",
             }}
           />
-          <div className="relative flex items-center justify-between px-6 py-5 gap-4 flex-wrap">
-            <div className="flex items-center gap-4">
+          <div className="relative flex items-center justify-between px-4 py-4 sm:px-6 sm:py-5 gap-4 flex-wrap">
+            <div className="flex items-center gap-3 sm:gap-4 min-w-0">
               <div
-                className="w-12 h-12 rounded-xl flex items-center justify-center flex-shrink-0"
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center flex-shrink-0"
                 style={{ background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.25)", backdropFilter: "blur(8px)", color: "#fff" }}
               >
                 <LayersIcon />
               </div>
-              <div>
-                <div className="flex items-center gap-2.5 mb-1">
-                  <h1 className="text-2xl font-black text-white" style={{ letterSpacing: "-0.03em" }}>SD Deals</h1>
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="text-xl sm:text-2xl font-black text-white" style={{ letterSpacing: "-0.03em" }}>SD Deals</h1>
                   <span className="mp-live-dot" />
                   <span
                     className="text-xs font-bold px-2 py-0.5 rounded-full"
@@ -1292,11 +1473,11 @@ export default function MyParticipations() {
               {STATS.map((s, idx) => (
                 <div
                   key={s.label}
-                  className="mp-kpi-card relative flex flex-col gap-3 px-5 py-5"
+                  className="mp-kpi-card relative flex flex-col gap-3 px-4 py-4 sm:px-5 sm:py-5"
                   style={{
-                    borderRight: idx < 3 ? "1px solid var(--border)" : "none",
-                    borderBottom: "3px solid transparent",
                     borderTop: `3px solid ${s.color}`,
+                    borderRight: `1px solid var(--border)`,
+                    borderBottom: `1px solid var(--border)`,
                   }}
                 >
                   <div className="flex items-center justify-between">
@@ -1454,7 +1635,7 @@ export default function MyParticipations() {
           <div className="grid gap-4">
             {filteredItems.map((item, i) => (
               item.source === "running"
-                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} onViewInterest={setInterestDeal} onWithdraw={(p, amt) => setWithdrawDeal({ deal: p, totalInvested: amt })} />
+                ? <DealRow key={item.key} p={item.payload} index={i} navigate={navigate} onViewInterest={setInterestDeal} onWithdraw={(p, amt) => setWithdrawDeal({ deal: p, totalInvested: amt })} onReturnPref={(p) => setReturnPrefDeal({ dealId: p.dealId, dealName: p.dealName })} />
                 : <MigratedDealRow key={item.key} d={item.payload} index={i} />
             ))}
           </div>
@@ -1467,6 +1648,13 @@ export default function MyParticipations() {
           totalInvested={withdrawDeal.totalInvested}
           onClose={() => setWithdrawDeal(null)}
           onSuccess={() => { setWithdrawDeal(null); load(); }}
+        />
+      )}
+      {returnPrefDeal && (
+        <ReturnPreferencesModal
+          deal={returnPrefDeal}
+          onClose={() => setReturnPrefDeal(null)}
+          onSuccess={() => setReturnPrefDeal(null)}
         />
       )}
     </>

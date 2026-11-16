@@ -122,6 +122,20 @@ export async function participateInDeal({ dealId, lenderReturnsType, participate
 }
 
 /**
+ * PATCH /oxybrick-service/updateInterestAndPrincipalReturnChoice
+ * Body: { dealId, interestReturningType, principalReturningType, userId }
+ */
+export async function updateReturnPreferences({ dealId, interestReturningType, principalReturningType }) {
+  const userId = getUserId();
+  return patch('/oxybrick-service/updateInterestAndPrincipalReturnChoice', {
+    dealId,
+    interestReturningType,
+    principalReturningType,
+    userId,
+  });
+}
+
+/**
  * GET /oxybrick-service/allLoanActiveDeals/{month}/{year}/{startDate}/{endDate}
  * Example:
  * /oxybrick-service/allLoanActiveDeals/May/2026/30-05-2026/30-05-2026
