@@ -462,13 +462,15 @@ export default function LoginOTP() {
       {/* Header */}
       <header className="relative z-20 flex items-center justify-end gap-3 px-8 py-5">
         <Link to="/support"
-          className="w-10 h-10 flex items-center justify-center rounded-full transition-all hover:scale-105"
+          className="w-10 h-10 flex items-center justify-center rounded-full cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105"
           style={{ background: dark ? 'rgba(99,102,241,0.12)' : cardBg, border: `1px solid ${borderC}`, color: subC }}
           title="Support">
           <ChatIcon />
         </Link>
-        <button onClick={() => setTheme(dark ? 'light' : 'dark')}
-          className="w-10 h-10 flex items-center justify-center rounded-full transition-all hover:scale-105"
+        <button
+          type="button"
+          onClick={() => setTheme(dark ? 'light' : 'dark')}
+          className="w-10 h-10 flex items-center justify-center rounded-full cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105"
           style={{ background: dark ? 'rgba(99,102,241,0.12)' : cardBg, border: `1px solid ${borderC}`, color: subC }}>
           {dark ? <SunIcon /> : <MoonIcon />}
         </button>
@@ -700,9 +702,10 @@ export default function LoginOTP() {
 
                   {/* Send OTP button */}
                   <button
+                    type="button"
                     onClick={handleSendOtp}
                     disabled={sendLoading}
-                    className="w-full py-4 rounded-2xl font-extrabold text-sm text-white btn-shimmer transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 mb-4"
+                    className="w-full py-4 rounded-2xl font-extrabold text-sm text-white btn-shimmer cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105 active:brightness-95 disabled:opacity-60 flex items-center justify-center gap-2 mb-4"
                     style={{
                       background: 'linear-gradient(135deg,#6366f1 0%,#4f46e5 50%,#4338ca 100%)',
                       boxShadow: '0 8px 28px rgba(99,102,241,0.45), 0 2px 8px rgba(99,102,241,0.3)',
@@ -826,9 +829,10 @@ export default function LoginOTP() {
                       </span>
                     </div>
                     <button
+                      type="button"
                       onClick={handleResend}
                       disabled={timerActive || sendLoading}
-                      className="flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105"
+                      className="flex items-center gap-1.5 text-sm font-bold px-3 py-1.5 rounded-xl cursor-pointer select-none touch-manipulation transition-colors disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-105"
                       style={{
                         color: timerActive ? subC : '#6366f1',
                         background: timerActive ? 'transparent' : (dark ? 'rgba(99,102,241,0.1)' : 'rgba(99,102,241,0.08)'),
@@ -852,9 +856,10 @@ export default function LoginOTP() {
 
                   {/* Verify button */}
                   <button
+                    type="button"
                     onClick={handleVerify}
                     disabled={verifyLoading || otp.join('').length !== 6}
-                    className="w-full py-4 rounded-2xl font-extrabold text-sm text-white btn-shimmer transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2 mb-4"
+                    className="w-full py-4 rounded-2xl font-extrabold text-sm text-white btn-shimmer cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105 active:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2 mb-4"
                     style={{
                       background: 'linear-gradient(135deg,#6366f1 0%,#4f46e5 50%,#4338ca 100%)',
                       boxShadow: '0 8px 28px rgba(99,102,241,0.45), 0 2px 8px rgba(99,102,241,0.3)',

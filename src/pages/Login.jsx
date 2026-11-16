@@ -3,6 +3,8 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { GOOGLE_AUTH_URL } from "../api/beforelogin";
+import { clearSession } from "../api/client";
+import { extractAuthError } from "../utils/authError";
 import logo from "../assets/fav.png";
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -162,11 +164,16 @@ const injectStyles = () => {
       .neu-outer { box-shadow: 20px 20px 40px #c8cdd6, -20px -20px 40px #ffffff; }
       .neu-inner { box-shadow: inset 5px 5px 10px #d1d5db, inset -5px -5px 10px #ffffff; }
       .neu-pill  { box-shadow: 5px 5px 12px #d1d5db, -5px -5px 12px #ffffff; }
-      .neu-pill:hover { box-shadow: 3px 3px 8px #d1d5db, -3px -3px 8px #ffffff; }
+      @media (hover: hover) and (pointer: fine) {
+        .neu-pill:hover { box-shadow: 3px 3px 8px #d1d5db, -3px -3px 8px #ffffff; }
+      }
       /* Dark neumorphic */
       .d-neu-outer { box-shadow: 18px 18px 36px #0b0d12, -18px -18px 36px #1e2330; }
       .d-neu-inner { box-shadow: inset 5px 5px 10px #0b0d12, inset -5px -5px 10px #1e2330; }
       .d-neu-pill  { box-shadow: 5px 5px 12px #0b0d12, -5px -5px 12px #1e2330; }
+      @media (hover: hover) and (pointer: fine) {
+        .d-neu-pill:hover { box-shadow: 3px 3px 8px #0b0d12, -3px -3px 8px #1e2330; }
+      }
       /* Focus ring on inputs */
       .neu-input-focus:focus { outline: none; box-shadow: inset 4px 4px 8px #d1d5db, inset -4px -4px 8px #ffffff, 0 0 0 2.5px #3b82f6; }
       .d-neu-input-focus:focus { outline: none; box-shadow: inset 4px 4px 8px #0b0d12, inset -4px -4px 8px #1e2330, 0 0 0 2.5px #3b82f6; }
@@ -178,32 +185,28 @@ const injectStyles = () => {
 export default function Login() {
   useEffect(() => injectStyles(), []);
 
-  const { login }           = useAuth();
-  const { theme, setTheme } = useTheme();
-  const navigate            = useNavigate();
-  const location            = useLocation();
+  const { login, logout, user } = useAuth();
+  const { theme, setTheme }     = useTheme();
+  const navigate                = useNavigate();
+  const location                = useLocation();
 
   const [credential, setCredential] = useState("");
   const [password, setPassword]     = useState("");
   const [showPw, setShowPw]         = useState(false);
-  const [error, setError]           = useState("");
+  const [error, setError]           = useState(() => extractAuthError(location));
   const [loading, setLoading]       = useState(false);
   const [loginText, setLoginText]   = useState("");
 
   const dark = theme === "dark";
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const urlErr = params.get('error') || location.state?.error;
+    const urlErr = extractAuthError(location);
     if (urlErr) {
-      const decoded = decodeURIComponent(urlErr);
-      if (decoded.toLowerCase().includes('local account') || decoded.toLowerCase().includes('signed up with local')) {
-        setError("This account was created with a password or OTP. Please sign in using your email/mobile and password below.");
-      } else {
-        setError(decoded);
-      }
+      setError(urlErr);
+      clearSession();
+      if (user) logout?.();
     }
-  }, [location]);
+  }, [location, user, logout]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -283,14 +286,15 @@ export default function Login() {
       {/* ── Header ── */}
       <header className="relative z-20 flex items-center justify-end gap-3 px-8 py-5">
         <Link to="/support"
-          className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${pillShadow}`}
+          className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer select-none touch-manipulation transition-colors ${pillShadow}`}
           style={{ background: cardBg, color: subC }}
           title="Support">
           <ChatIcon />
         </Link>
         <button
+          type="button"
           onClick={() => setTheme(dark ? "light" : "dark")}
-          className={`w-10 h-10 flex items-center justify-center rounded-full transition-all ${pillShadow}`}
+          className={`w-10 h-10 flex items-center justify-center rounded-full cursor-pointer select-none touch-manipulation transition-colors ${pillShadow}`}
           style={{ background: cardBg, color: subC }}
           title={dark ? "Switch to Light" : "Switch to Dark"}>
           {dark ? <SunIcon /> : <MoonIcon />}
@@ -453,7 +457,10 @@ export default function Login() {
               {/* Error Alert */}
               {error && (
                 <div className="flex items-start gap-2.5 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold fade-in"
-                  style={{ color: "#dc2626", background: "#fef2f2", border: "1.5px solid #fecaca", boxShadow: "0 2px 8px rgba(220,38,38,0.1)" }}>
+                  style={dark
+                    ? { color: "#f87171", background: "rgba(239,68,68,0.12)", border: "1.5px solid rgba(239,68,68,0.3)" }
+                    : { color: "#dc2626", background: "#fef2f2", border: "1.5px solid #fecaca", boxShadow: "0 2px 8px rgba(220,38,38,0.1)" }
+                  }>
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 flex-shrink-0 mt-0.5">
                     <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
                   </svg>
@@ -496,7 +503,7 @@ export default function Login() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-xs font-bold uppercase tracking-wider" style={{ color: subC }}>Password</label>
-                  <Link to="#" className="text-xs font-semibold" style={{ color: "#3b82f6" }}>Forgot Password?</Link>
+                  <Link to="#" className="text-xs font-semibold cursor-pointer" style={{ color: "#3b82f6" }}>Forgot Password?</Link>
                 </div>
                 <div className="relative">
                   <span className="absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: iconC }}>
@@ -511,8 +518,10 @@ export default function Login() {
                     className={`w-full rounded-2xl text-sm font-medium ${innerShadow}`}
                     style={{ padding: "13px 50px 13px 46px", background: inputBg, color: textC, border: "none" }}
                   />
-                  <button type="button" onClick={() => setShowPw(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
+                  <button type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setShowPw(v => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer select-none touch-manipulation transition-opacity hover:opacity-70"
                     style={{ color: iconC }}>
                     {showPw ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
@@ -525,7 +534,7 @@ export default function Login() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 mt-1 rounded-2xl font-extrabold text-sm text-white transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
+                className="w-full py-3.5 mt-1 rounded-2xl font-extrabold text-sm text-white cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105 active:brightness-95 disabled:opacity-60 flex items-center justify-center gap-2"
                 style={{
                   background: "linear-gradient(135deg,#3b82f6 0%,#2563eb 50%,#1d4ed8 100%)",
                   boxShadow: "0 8px 28px rgba(29,78,216,0.45), 0 2px 8px rgba(29,78,216,0.3)",
@@ -544,12 +553,12 @@ export default function Login() {
             {/* Sign up */}
             <p className="text-center mt-5 text-sm" style={{ color: subC }}>
               Don't have an account?{" "}
-              <Link to="/register" className="font-bold" style={{ color: "#3b82f6" }}>Sign Up</Link>
+              <Link to="/register" className="font-bold cursor-pointer" style={{ color: "#3b82f6" }}>Sign Up</Link>
             </p>
 
             {/* OTP Login */}
             <Link to="/login-otp"
-              className="mt-3 w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+              className="mt-3 w-full py-3 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105"
               style={{
                 background: dark ? 'rgba(255,255,255,0.04)' : 'rgba(30,58,138,0.04)',
                 color: dark ? '#93c5fd' : '#2563eb',
@@ -568,7 +577,7 @@ export default function Login() {
               <div className="flex-1 h-px" style={{ background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }} />
             </div>
             <a href={GOOGLE_AUTH_URL}
-              className={`flex items-center justify-center gap-3 w-full py-3 rounded-2xl font-semibold text-sm transition-all hover:scale-[1.02] ${pillShadow}`}
+              className={`flex items-center justify-center gap-3 w-full py-3 rounded-2xl font-semibold text-sm cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105 ${pillShadow}`}
               style={{ background: cardBg, color: textC, border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)' }}>
               {/* Google G logo */}
               <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">

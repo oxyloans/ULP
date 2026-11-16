@@ -1,15 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-
-function formatErrorMessage(msg) {
-  if (!msg) return 'Sign-in failed. Please try again.';
-  const m = msg.toLowerCase();
-  if (m.includes('local account') || m.includes('signed up with local') || m.includes('use your local')) {
-    return "Looks like you're signed up with a local account. Please use your email/mobile and password to login.";
-  }
-  return msg;
-}
+import { clearSession } from '../api/client';
+import { formatAuthErrorMessage, extractAuthError } from '../utils/authError';
 
 export default function OAuthCallback() {
   const navigate        = useNavigate();
@@ -21,16 +14,15 @@ export default function OAuthCallback() {
     const search = location.search || (typeof window !== 'undefined' ? window.location.search : '');
     const params = new URLSearchParams(search);
     const token  = params.get('token');
-    const error  = params.get('error');
+    const urlErr = extractAuthError(location);
 
     // If an error is returned from Google / backend
-    if (error) {
-      const rawMsg = decodeURIComponent(error).trim();
-      const friendlyMsg = formatErrorMessage(rawMsg);
+    if (urlErr) {
+      clearSession();
       // Immediately navigate to /login with the error parameter and state
-      navigate(`/login?error=${encodeURIComponent(friendlyMsg)}`, {
+      navigate(`/login?error=${encodeURIComponent(urlErr)}`, {
         replace: true,
-        state: { error: friendlyMsg }
+        state: { error: urlErr }
       });
       return;
     }
@@ -49,15 +41,16 @@ export default function OAuthCallback() {
       if (result.success) {
         navigate(result.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
       } else {
-        const rawMsg = result.error ?? 'Sign-in failed. Please try again.';
-        const friendlyMsg = formatErrorMessage(rawMsg);
+        clearSession();
+        const friendlyMsg = formatAuthErrorMessage(result.error ?? 'Sign-in failed. Please try again.');
         navigate(`/login?error=${encodeURIComponent(friendlyMsg)}`, {
           replace: true,
           state: { error: friendlyMsg }
         });
       }
     }).catch(err => {
-      const friendlyMsg = formatErrorMessage(err.message ?? 'Sign-in failed. Please try again.');
+      clearSession();
+      const friendlyMsg = formatAuthErrorMessage(err.message ?? 'Sign-in failed. Please try again.');
       navigate(`/login?error=${encodeURIComponent(friendlyMsg)}`, {
         replace: true,
         state: { error: friendlyMsg }

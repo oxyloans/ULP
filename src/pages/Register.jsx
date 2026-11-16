@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 import { sendMobileOtp, signUp, GOOGLE_AUTH_URL } from '../api/beforelogin';
+import { extractAuthError } from '../utils/authError';
 import logo from '../assets/fav.png';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -49,9 +50,15 @@ const injectStyles = () => {
       .neu-outer { box-shadow: 20px 20px 40px #c8cdd6, -20px -20px 40px #ffffff; }
       .neu-inner { box-shadow: inset 5px 5px 10px #d1d5db, inset -5px -5px 10px #ffffff; }
       .neu-pill  { box-shadow: 5px 5px 12px #d1d5db, -5px -5px 12px #ffffff; }
+      @media (hover: hover) and (pointer: fine) {
+        .neu-pill:hover { box-shadow: 3px 3px 8px #d1d5db, -3px -3px 8px #ffffff; }
+      }
       .d-neu-outer { box-shadow: 18px 18px 36px #0b0d12, -18px -18px 36px #1e2330; }
       .d-neu-inner { box-shadow: inset 5px 5px 10px #0b0d12, inset -5px -5px 10px #1e2330; }
       .d-neu-pill  { box-shadow: 5px 5px 12px #0b0d12, -5px -5px 12px #1e2330; }
+      @media (hover: hover) and (pointer: fine) {
+        .d-neu-pill:hover { box-shadow: 3px 3px 8px #0b0d12, -3px -3px 8px #1e2330; }
+      }
       .neu-input-focus:focus { outline:none; box-shadow:inset 4px 4px 8px #d1d5db,inset -4px -4px 8px #ffffff,0 0 0 2.5px #3b82f6; }
       .d-neu-input-focus:focus { outline:none; box-shadow:inset 4px 4px 8px #0b0d12,inset -4px -4px 8px #1e2330,0 0 0 2.5px #3b82f6; }
       .pw-strength-bar { transition: width 0.35s ease, background 0.35s ease; }
@@ -225,16 +232,9 @@ export default function Register() {
   const dark = theme === 'dark';
 
   useEffect(() => {
-    const search = location.search || (typeof window !== 'undefined' ? window.location.search : '');
-    const params = new URLSearchParams(search);
-    const urlErr = params.get('error') || location.state?.error;
+    const urlErr = extractAuthError(location);
     if (urlErr) {
-      const decoded = decodeURIComponent(urlErr).trim();
-      if (decoded.toLowerCase().includes('local account') || decoded.toLowerCase().includes('signed up with local') || decoded.toLowerCase().includes('use your local')) {
-        setApiError("Looks like you're already registered with a local account. Please use your email/mobile and password to sign in.");
-      } else {
-        setApiError(decoded);
-      }
+      setApiError(urlErr);
     }
   }, [location]);
 
@@ -257,7 +257,7 @@ export default function Register() {
   const [showPw,     setShowPw]     = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
   const [regLoading, setRegLoading] = useState(false);
-  const [apiError,   setApiError]   = useState('');
+  const [apiError,   setApiError]   = useState(() => extractAuthError(location));
   const [regText,    setRegText]    = useState('');
 
   const [form, setForm] = useState({
@@ -389,8 +389,8 @@ export default function Register() {
         <p className="text-sm mb-6" style={{ color: subC }}>
           Welcome to ULP. Your account is ready — log in to get started.
         </p>
-        <button onClick={() => navigate('/login')}
-          className="w-full py-3.5 rounded-2xl font-extrabold text-sm text-white"
+        <button type="button" onClick={() => navigate('/login')}
+          className="w-full py-3.5 rounded-2xl font-extrabold text-sm text-white cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105"
           style={{ background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', boxShadow: '0 8px 28px rgba(29,78,216,0.4)', letterSpacing: '0.1em' }}>
           GO TO LOGIN
         </button>
@@ -411,8 +411,10 @@ export default function Register() {
 
       {/* Header */}
       <header className="relative z-20 flex items-center justify-end gap-3 px-8 py-5">
-        <button onClick={() => setTheme(dark ? 'light' : 'dark')}
-          className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-all ${pillShadow}`}
+        <button
+          type="button"
+          onClick={() => setTheme(dark ? 'light' : 'dark')}
+          className={`flex items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full cursor-pointer select-none touch-manipulation transition-colors ${pillShadow}`}
           style={{ background: cardBg, color: subC }}>
           {dark ? <SunIcon /> : <MoonIcon />}
           {dark ? 'Light Mode' : 'Dark Mode'}
@@ -498,7 +500,7 @@ export default function Register() {
                       maxLength={10} />
                   </div>
                   <button type="button" onClick={handleSendOtp} disabled={otpLoading || otpSent}
-                    className="px-4 py-3 rounded-2xl font-bold text-xs whitespace-nowrap transition-all disabled:opacity-60 flex items-center gap-1.5"
+                    className="px-4 py-3 rounded-2xl font-bold text-xs whitespace-nowrap cursor-pointer select-none touch-manipulation transition-colors disabled:opacity-60 flex items-center gap-1.5"
                     style={otpSent
                       ? { background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1.5px solid rgba(16,185,129,0.3)' }
                       : { background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', boxShadow: '0 4px 14px rgba(29,78,216,0.4)' }
@@ -514,7 +516,7 @@ export default function Register() {
                   <p className="text-xs mt-1 font-medium" style={{ color: '#10b981' }}>
                     OTP sent to +91 {form.mobile} ·{' '}
                     <button type="button" onClick={() => { setOtpSent(false); set('otp', ''); }}
-                      className="underline font-bold" style={{ color: '#3b82f6' }}>Resend</button>
+                      className="underline font-bold cursor-pointer" style={{ color: '#3b82f6' }}>Resend</button>
                   </p>
                 )}
               </div>
@@ -533,8 +535,10 @@ export default function Register() {
                 <label className="block text-xs font-bold mb-1.5 uppercase tracking-wider" style={{ color: subC }}>Gender</label>
                 <div className="flex gap-2">
                   {['Male', 'Female', 'Other'].map(g => (
-                    <button key={g} type="button" onClick={() => set('gender', g)}
-                      className="flex-1 py-3 rounded-2xl font-bold text-xs transition-all"
+                    <button key={g} type="button"
+                      onMouseDown={(e) => { e.preventDefault(); set('gender', g); }}
+                      onClick={() => set('gender', g)}
+                      className="flex-1 py-3 rounded-2xl font-bold text-xs cursor-pointer select-none touch-manipulation transition-colors"
                       style={form.gender === g
                         ? { background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', color: '#fff', boxShadow: '0 4px 14px rgba(29,78,216,0.35)' }
                         : { background: inputBg, color: subC, boxShadow: dark ? 'inset 3px 3px 6px #0b0d12,inset -3px -3px 6px #1e2330' : 'inset 3px 3px 6px #d1d5db,inset -3px -3px 6px #ffffff' }
@@ -555,8 +559,10 @@ export default function Register() {
                     value={form.password} onChange={e => set('password', e.target.value)}
                     className={`w-full rounded-2xl text-sm font-medium ${innerShadow}`}
                     style={{ ...inp('password'), paddingRight: 50 }} />
-                  <button type="button" onClick={() => setShowPw(v => !v)}
-                    className="absolute right-4 top-1/2 -translate-y-1/2 transition-opacity hover:opacity-70"
+                  <button type="button"
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => setShowPw(v => !v)}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 cursor-pointer select-none touch-manipulation transition-opacity hover:opacity-70"
                     style={{ color: iconC }}>
                     {showPw ? <EyeOffIcon /> : <EyeIcon />}
                   </button>
@@ -600,7 +606,7 @@ export default function Register() {
 
               {/* Submit */}
               <button type="submit" disabled={regLoading || !otpSent}
-                className="w-full py-3.5 mt-1 rounded-2xl font-extrabold text-sm text-white transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full py-3.5 mt-1 rounded-2xl font-extrabold text-sm text-white cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105 active:brightness-95 disabled:opacity-50 flex items-center justify-center gap-2"
                 style={{ background: 'linear-gradient(135deg,#3b82f6 0%,#2563eb 50%,#1d4ed8 100%)', boxShadow: '0 8px 28px rgba(29,78,216,0.45)', letterSpacing: '0.12em' }}>
                 {regLoading && (
                   <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -624,7 +630,7 @@ export default function Register() {
 
               {/* Google Sign-Up */}
               <a href={GOOGLE_AUTH_URL}
-                className={`flex items-center justify-center gap-3 w-full py-3 rounded-2xl font-semibold text-sm transition-all hover:scale-[1.02] ${pillShadow}`}
+                className={`flex items-center justify-center gap-3 w-full py-3 rounded-2xl font-semibold text-sm cursor-pointer select-none touch-manipulation transition-colors hover:brightness-105 ${pillShadow}`}
                 style={{ background: cardBg, color: textC, border: dark ? '1px solid rgba(255,255,255,0.08)' : '1px solid rgba(0,0,0,0.08)', textDecoration: 'none' }}>
                 <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
                   <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
@@ -638,7 +644,7 @@ export default function Register() {
 
             <p className="text-center mt-4 text-sm" style={{ color: subC }}>
               Already have an account?{' '}
-              <Link to="/login" className="font-bold" style={{ color: '#3b82f6' }}>Sign In</Link>
+              <Link to="/login" className="font-bold cursor-pointer" style={{ color: '#3b82f6' }}>Sign In</Link>
             </p>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { FamilyProvider } from './context/FamilyContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ProfileProvider } from './context/ProfileContext';
 import { RoleThemeProvider } from './context/RoleThemeContext';
+import { hasAuthErrorInUrl } from './utils/authError';
 
 // User layout
 import Sidebar from './components/Sidebar.jsx';
@@ -159,7 +160,8 @@ function AdminFloatingSupportBtn() {
 function RequireAuth({ children, role }) {
   const { user } = useAuth();
   const location = useLocation();
-  if (!user) {
+  const hasError = hasAuthErrorInUrl(location);
+  if (hasError || !user) {
     const search = location.search ? location.search : '';
     return <Navigate replace to={`/login${search}`} />;
   }
@@ -291,21 +293,36 @@ function AdminLayout() {
 // ─── Root ─────────────────────────────────────────────────────────────────────
 function AppRoutes() {
   const { user } = useAuth();
+  const location = useLocation();
+  const hasErrorParam = hasAuthErrorInUrl(location);
+
+  const loginElement = (user && !hasErrorParam)
+    ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} />
+    : <Login />;
+
+  const registerElement = (user && !hasErrorParam)
+    ? <Navigate replace to="/dashboard" />
+    : <Register />;
+
   return (
     <>
       <Routes>
-        {/* Public routes */}
-        <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <Login />} />
-        <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
-        <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
+        {/* Public routes — handles both standard and trailing-slash routes */}
+        <Route path="/login"                 element={loginElement} />
+        <Route path="/login/"                element={loginElement} />
+        <Route path="/register"              element={registerElement} />
+        <Route path="/register/"             element={registerElement} />
+        <Route path="/login-otp"             element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
+        <Route path="/login-otp/"            element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
+        <Route path="/hidden-login"          element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
+        <Route path="/hidden-login/"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
         <Route path="/oauth/callback"        element={<OAuthCallback />} />
         <Route path="/oauth/callback/"       element={<OAuthCallback />} />
         <Route path="/login/oauth/callback"  element={<OAuthCallback />} />
         <Route path="/login/oauth/callback/" element={<OAuthCallback />} />
         <Route path="/login/oauth/*"         element={<OAuthCallback />} />
         <Route path="/oauth/*"               element={<OAuthCallback />} />
-        <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />
-        <Route path="/support"  element={<PreLoginContact />} />
+        <Route path="/support"               element={<PreLoginContact />} />
 
         {/* Protected routes */}
         <Route path="/admin/*" element={<AdminLayout />} />
