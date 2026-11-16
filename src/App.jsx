@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { ModeProvider } from './context/ModeContext';
 import { FamilyProvider } from './context/FamilyContext';
@@ -158,7 +158,11 @@ function AdminFloatingSupportBtn() {
 // ─── Protected route ──────────────────────────────────────────────────────────
 function RequireAuth({ children, role }) {
   const { user } = useAuth();
-  if (!user) return <Navigate replace to="/login" />;
+  const location = useLocation();
+  if (!user) {
+    const search = location.search ? location.search : '';
+    return <Navigate replace to={`/login${search}`} />;
+  }
   if (role && user.role !== role) return <Navigate replace to="/dashboard" />;
   return children;
 }
@@ -288,14 +292,18 @@ function AdminLayout() {
 function AppRoutes() {
   const { user } = useAuth();
   return (
-    <>}
-
+    <>
       <Routes>
         {/* Public routes */}
         <Route path="/login"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <Login />} />
         <Route path="/login-otp"     element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
         <Route path="/hidden-login"  element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
-        <Route path="/oauth/callback" element={<OAuthCallback />} />
+        <Route path="/oauth/callback"        element={<OAuthCallback />} />
+        <Route path="/oauth/callback/"       element={<OAuthCallback />} />
+        <Route path="/login/oauth/callback"  element={<OAuthCallback />} />
+        <Route path="/login/oauth/callback/" element={<OAuthCallback />} />
+        <Route path="/login/oauth/*"         element={<OAuthCallback />} />
+        <Route path="/oauth/*"               element={<OAuthCallback />} />
         <Route path="/register" element={user ? <Navigate replace to="/dashboard" /> : <Register />} />
         <Route path="/support"  element={<PreLoginContact />} />
 

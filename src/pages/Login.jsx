@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTheme } from "../context/ThemeContext";
 import { GOOGLE_AUTH_URL } from "../api/beforelogin";
@@ -181,6 +181,7 @@ export default function Login() {
   const { login }           = useAuth();
   const { theme, setTheme } = useTheme();
   const navigate            = useNavigate();
+  const location            = useLocation();
 
   const [credential, setCredential] = useState("");
   const [password, setPassword]     = useState("");
@@ -190,6 +191,19 @@ export default function Login() {
   const [loginText, setLoginText]   = useState("");
 
   const dark = theme === "dark";
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const urlErr = params.get('error') || location.state?.error;
+    if (urlErr) {
+      const decoded = decodeURIComponent(urlErr);
+      if (decoded.toLowerCase().includes('local account') || decoded.toLowerCase().includes('signed up with local')) {
+        setError("This account was created with a password or OTP. Please sign in using your email/mobile and password below.");
+      } else {
+        setError(decoded);
+      }
+    }
+  }, [location]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -310,7 +324,7 @@ export default function Login() {
               <img src={logo} alt="Oxy Portfolio" className="w-10 h-10 rounded-full object-cover flex-shrink-0"
                 style={{ background: '#fff', boxShadow: '0 0 12px rgba(255,255,255,0.25)' }} />
               <div>
-                <p className="text-white font-black text-base tracking-wide leading-none letter-spacing-[0.3em]">ULP</p>
+                <p className="text-white font-black text-base tracking-wide leading-none tracking-[0.3em]">ULP</p>
                 <p className="text-blue-300 text-xs font-medium mt-0.5 opacity-80">Financial Intelligence Platform</p>
               </div>
             </div>
@@ -436,6 +450,17 @@ export default function Login() {
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
 
+              {/* Error Alert */}
+              {error && (
+                <div className="flex items-start gap-2.5 px-4 py-3 rounded-2xl text-xs sm:text-sm font-semibold fade-in"
+                  style={{ color: "#dc2626", background: "#fef2f2", border: "1.5px solid #fecaca", boxShadow: "0 2px 8px rgba(220,38,38,0.1)" }}>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-5 h-5 flex-shrink-0 mt-0.5">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <p className="flex-1 leading-snug">{error}</p>
+                </div>
+              )}
+
               {/* Email / Mobile */}
               <div>
                 <label className="block text-xs font-bold mb-2 uppercase tracking-wider" style={{ color: subC }}>
@@ -494,16 +519,7 @@ export default function Login() {
                 </div>
               </div>
 
-              {/* Error */}
-              {error && (
-                <div className="flex items-center gap-2.5 px-4 py-3 rounded-xl text-sm font-semibold"
-                  style={{ color: "#dc2626", background: "#fef2f2", border: "1px solid #fecaca" }}>
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="w-4 h-4 flex-shrink-0">
-                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
-                  </svg>
-                  {error}
-                </div>
-              )}
+
 
               {/* Submit */}
               <button
@@ -563,6 +579,10 @@ export default function Login() {
               </svg>
               Continue with Google
             </a>
+            <p className="text-center text-xs mt-2" style={{ color: dark ? 'rgba(148,163,184,0.7)' : 'rgba(100,116,139,0.8)' }}>
+              Only works for accounts created with Google.{' '}
+              <span style={{ color: dark ? '#93c5fd' : '#2563eb', fontWeight: 600 }}>Email &amp; password accounts must use the form above.</span>
+            </p>
 
             </div>{/* end secure login card */}
 
