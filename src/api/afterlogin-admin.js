@@ -664,6 +664,14 @@ export async function getAdminOxyLoansDealsStats() {
 }
 
 /**
+ * GET /oxybrick-service/getInterestFilesByDate?date=DD%2FMM%2FYYYY
+ * date param must be in DD/MM/YYYY format (URL-encoded).
+ */
+export async function getInterestFilesByDate(date) {
+  return get(`/oxybrick-service/getInterestFilesByDate?date=${encodeURIComponent(date)}`);
+}
+
+/**
  * GET https://fintech.oxyloans.com/oxyloans/v1/user/AdminViewDealsWiseInfo
  * Returns OxyLoans detailed deals-wise information.
  */

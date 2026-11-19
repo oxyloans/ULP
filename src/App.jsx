@@ -87,6 +87,7 @@ import OfflineRunningDeals from './pages/admin/stats/OfflineRunningDeals.jsx';
 import AdminHoldAmount from './pages/admin/AdminHoldAmount.jsx';
 import AdminListHoldAmounts from './pages/admin/AdminListHoldAmounts.jsx';
 import AdminHoldAmountDeals from './pages/admin/AdminHoldAmountDeals.jsx';
+import AdminInterestFiles from './pages/admin/AdminInterestFiles.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 import GoldDealTest from './pages/GoldDealTest.jsx';
@@ -264,6 +265,7 @@ function AdminLayout() {
               <Route path="interest/gold"         element={<RequireAdminPerm routeKey="interest/gold"><AdminGoldPayouts /></RequireAdminPerm>} />
               <Route path="interest/asset"        element={<RequireAdminPerm routeKey="interest/asset"><AdminAssetPayouts /></RequireAdminPerm>} />
               <Route path="interest/principal-interest" element={<RequireAdminPerm routeKey="interest/principal-interest"><AdminPrincipalInterest /></RequireAdminPerm>} />
+              <Route path="interest/generated-files"   element={<RequireAdminPerm routeKey="interest/generated-files"><AdminInterestFiles /></RequireAdminPerm>} />
               <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
               <Route path="register-user"         element={<RequireAdminPerm routeKey="register-user"><AdminRegisterUser /></RequireAdminPerm>} />
               <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />

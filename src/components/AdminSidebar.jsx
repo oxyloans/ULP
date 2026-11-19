@@ -31,6 +31,7 @@ const interestSubItems = [
   // { title: 'Gold Payout',      path: '/admin/interest/gold',   perm: PERM.INTEREST },
   { title: 'Asset Payout',     path: '/admin/interest/asset',  perm: PERM.INTEREST },
   { title: 'Principal & Interest', path: '/admin/interest/principal-interest', perm: PERM.INTEREST },
+  { title: 'Generated Files',  path: '/admin/interest/generated-files', perm: PERM.INTEREST },
 ];
 const migratedSubItems = [
   { title: 'Migrated Users',      path: '/admin/migrated-users',      perm: PERM.MIGRATED },

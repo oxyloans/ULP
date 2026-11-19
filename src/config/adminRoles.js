@@ -159,6 +159,7 @@ export const ROUTE_PERM_MAP = {
   'interest/gold':       PERM.INTEREST,
   'interest/asset':      PERM.INTEREST,
   'interest/principal-interest': PERM.INTEREST,
+  'interest/generated-files':    PERM.INTEREST,
 
   'assets/load':         PERM.ASSETS,
   'assets/view':         [PERM.ASSETS, PERM.STATS],
