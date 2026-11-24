@@ -16,6 +16,7 @@ const CloseIcon      = () => <svg viewBox="0 0 24 24" fill="none" stroke="curren
 const ProfileIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const Building       = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="4" width="18" height="17" rx="1"/><path d="M3 8h18"/><rect x="6" y="11" width="3" height="3" rx="0.5"/><rect x="10.5" y="11" width="3" height="3" rx="0.5"/><rect x="15" y="11" width="3" height="3" rx="0.5"/><rect x="6" y="16" width="3" height="2" rx="0.5"/><rect x="15" y="16" width="3" height="2" rx="0.5"/><rect x="10" y="16" width="4" height="5" rx="0.5"/><path d="M1 21h22"/></svg>
 const GoldIcon       = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><circle cx="12" cy="12" r="9"/><path d="M9 9h1.5a1.5 1.5 0 0 1 0 3H9v3"/><path d="M9 12h3"/></svg>
+const RealGoldIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M4 9l1.5-3h13L20 9"/><path d="M3 9h18l-1.6 8.2A2 2 0 0 1 17.44 19H6.56a2 2 0 0 1-1.96-1.8z"/><path d="M3 9h18"/></svg>
 const ParticipateIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
 const OxyLoansIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/><line x1="19" y1="1" x2="19" y2="7"/><line x1="16" y1="4" x2="22" y2="4"/></svg>
 const HistoryIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-5"/><polyline points="12 7 12 12 15 15"/></svg>
@@ -32,6 +33,7 @@ const NAV_ITEMS = [
     children: [
       { title: 'SD Lots',    path: '/sd-lots',    Icon: SDLotIcon, comingSoon: false },
       { title: 'Gold Deals', path: '/gold-deals', Icon: GoldIcon,  comingSoon: false },
+      { title: 'Real Gold',  path: '/real-gold-deals', Icon: RealGoldIcon, comingSoon: false },
       { title: 'Asset',      path: '/asset',      Icon: Building,  comingSoon: false },
     ],
   },
@@ -40,7 +42,8 @@ const NAV_ITEMS = [
     Icon: ParticipateIcon,
     children: [
       { title: 'SD Deals',        path: '/my-participations',         Icon: SDLotIcon,      comingSoon: false },
-      { title: 'Gold Deals',      path: '/gold-deals-participation',  Icon: GoldIcon,       comingSoon: false },
+      { title: 'Gold Deals',      path: '/gold-deals-participation',       Icon: GoldIcon,       comingSoon: false },
+      { title: 'Real Gold',       path: '/real-gold-deals-participation',  Icon: RealGoldIcon,   comingSoon: false },
       { title: 'Asset',           path: '/asset-deals-participation', Icon: Building,       comingSoon: false },
       { title: 'Closed Deals',    path: '/closed-deals',              Icon: LockClosedIcon, comingSoon: false },
       // { title: 'OxyLoans Deals',  path: '/oxyloans-deals',            Icon: OxyLoansIcon, comingSoon: false },
@@ -52,8 +55,8 @@ const NAV_ITEMS = [
   { title: 'Contact Us',         path: '/contact',             Icon: ContactIcon,  comingSoon: false },
 ];
 
-const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset', '/gold-deals',];
-const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/gold-deals/participation/','/asset-deals-participation','/oxyloans-deals','/closed-deals'];
+const DEALS_PATHS        = ['/sd-lots', '/sd-lot', '/asset', '/gold-deals', '/real-gold-deals'];
+const PARTICIPATE_PATHS  = ['/my-participations','/gold-deals-participation','/real-gold-deals-participation','/gold-deals/participation/','/asset-deals-participation','/oxyloans-deals','/closed-deals'];
 
 function pathMatches(pathname, basePath) {
   return pathname === basePath || pathname.startsWith(`${basePath}/`);

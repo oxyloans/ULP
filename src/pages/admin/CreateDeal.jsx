@@ -11,6 +11,7 @@ const DEAL_TABS = [
   { key: "ASSET",    label: "Asset - Fractional Lending" },
   { key: "SDLOT",   label: "SD Lot" },
   { key: "GOLD",    label: "Gold Lot" },
+  { key: "REALGOLD",label: "Real Gold" },
   { key: "BORROWER",label: "Borrower Deal" },
 ];
 
@@ -18,55 +19,68 @@ const DEAL_TABS = [
 const DEAL_TYPE_CARDS = [
   {
     key: "ASSET",
-    label: "Asset — Fractional Lending",
-    description: "Create a fractional lending deal backed by a physical asset. Includes legal/valuation reports, geo coordinates and media uploads.",
-    color: "#818cf8",
-    bg: "rgba(129,140,248,0.08)",
-    border: "rgba(129,140,248,0.25)",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 9h18"/><path d="M9 21V9"/>
-      </svg>
-    ),
+    label: "Asset – Purchased Bonding",
+    description: "Create a secured lending deal backed by a physical asset. Investor repayments are protected with an underlying collateral.",
+    textColor: "#4338ca",
+    btnColor: "#4f46e5",
+    border: "#e8e0fd",
+    bg: "linear-gradient(135deg, #f7f6fe 0%, #ebe4fc 100%)",
+    shadow: "0 10px 25px -5px rgba(124, 58, 237, 0.08)",
+    icon: "/deal-icons/icon_asset.png",
+    art: "/deal-icons/art_asset.png",
+    artAlt: "Bond 3D Illustration",
   },
   {
     key: "SDLOT",
     label: "SD Lot",
-    description: "Standard SD Lot deal. Set financial details, interest rates, key dates and bank transfer info.",
-    color: "#6366f1",
-    bg: "rgba(99,102,241,0.08)",
-    border: "rgba(99,102,241,0.25)",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/>
-      </svg>
-    ),
+    description: "Create a short-term, retailer financed deal for business distributors with faster turnaround.",
+    textColor: "#1d4ed8",
+    btnColor: "#2563eb",
+    border: "#e2e5fe",
+    bg: "linear-gradient(135deg, #f3f2ff 0%, #e1e2fe 100%)",
+    shadow: "0 10px 25px -5px rgba(59, 130, 246, 0.08)",
+    icon: "/deal-icons/icon_sdlot.png",
+    art: "/deal-icons/art_sdlot.png",
+    artAlt: "SD Lot 3D Chart Illustration",
   },
   {
     key: "GOLD",
-    label: "Gold Lot",
-    description: "Gold-backed lot deal. Same structure as SD Lot with globalDealType set to GOLD.",
-    color: "#f59e0b",
-    bg: "rgba(245,158,11,0.08)",
-    border: "rgba(245,158,11,0.25)",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>
-      </svg>
-    ),
+    label: "Gold Loan",
+    description: "Create a secured loan deal where the investment is backed by gold collateral (e.g., gold ornaments, coins, etc.).",
+    textColor: "#b45309",
+    btnColor: "#d97706",
+    border: "#f5e2d1",
+    bg: "linear-gradient(135deg, #fbf6f3 0%, #f8eadb 100%)",
+    shadow: "0 10px 25px -5px rgba(245, 158, 11, 0.08)",
+    icon: "/deal-icons/icon_gold.png",
+    art: "/deal-icons/art_gold.png",
+    artAlt: "Gold Loan 3D Gold Bars Illustration",
+  },
+  {
+    key: "REALGOLD",
+    label: "Real Gold",
+    description: "Create a deal backed by physical gold grants, where investment funds are used for gold procurement and pledged gold as collateral.",
+    textColor: "#c2410c",
+    btnColor: "#ea580c",
+    border: "#f1ded6",
+    bg: "linear-gradient(135deg, #fbf5f5 0%, #fbe0d1 100%)",
+    shadow: "0 10px 25px -5px rgba(234, 88, 12, 0.08)",
+    icon: "/deal-icons/icon_realgold.png",
+    art: "/deal-icons/art_realgold.png",
+    artAlt: "Real Gold 3D Coin Stack Illustration",
   },
   {
     key: "BORROWER",
     label: "Borrower Deal",
-    description: "Create a deal linked to an existing borrower. Select from the borrower list — project info auto-fills. Uses the same financial, date and bank fields as an asset deal.",
-    color: "#10b981",
-    bg: "rgba(16,185,129,0.08)",
-    border: "rgba(16,185,129,0.25)",
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>
-      </svg>
-    ),
+    description: "Create a deal linked to an existing borrower. Select from the borrower list, set investment terms, and use the same financial data and credit profile as the borrower.",
+    textColor: "#047857",
+    btnColor: "#059669",
+    border: "#d4f0e5",
+    bg: "linear-gradient(135deg, #f4faf8 0%, #cceddf 100%)",
+    shadow: "0 10px 25px -5px rgba(16, 185, 129, 0.08)",
+    icon: "/deal-icons/icon_borrower.png",
+    art: "/deal-icons/art_borrower.png",
+    artAlt: "Borrower Deal 3D Document Illustration",
   },
 ];
 const ASSET_AREA_TYPES = ["PLOT", "FLAT", "ACRE"];
@@ -107,6 +121,7 @@ function generateDealName({ globalDealType, dealAmount, monthlyInterest, duratio
     ASSET:    "ASSET",
     SDLOT:    "SD",
     GOLD:     "GOLD",
+    REALGOLD: "RGOLD",
     BORROWER: borrowerName ? borrowerName.split(" ")[0].toUpperCase().slice(0,6) : "BRW",
   }[globalDealType] ?? "DEAL";
 
@@ -418,7 +433,7 @@ function Field({ label, required, error, hint, children }) {
 
 function DealTabs({ active, onChange }) {
   return (
-    <div className="grid gap-2 sm:grid-cols-4 rounded-2xl p-2"
+    <div className="grid gap-2 grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 rounded-2xl p-2"
       style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
       {DEAL_TABS.map((tab, index) => {
         const isActive = active === tab.key;
@@ -495,6 +510,7 @@ const EMPTY_FORM = {
   propertyTds:          "",
   tdsPercentage:        "",
   description:          "",
+  goldGrams:            "",
 };
 
 const EMPTY_ASSET_FORM = {
@@ -734,7 +750,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   // Populate form when editDeal is loaded (either from prop or async fetch)
   useEffect(() => {
     if (!editDeal) return;
-    if (editDeal.globalDealType === "GOLD" || editDeal.globalDealType === "SDLOT" || editDeal.globalDealType === "ASSET") {
+    if (editDeal.globalDealType === "GOLD" || editDeal.globalDealType === "SDLOT" || editDeal.globalDealType === "ASSET" || editDeal.globalDealType === "REALGOLD") {
       setActiveTab(editDeal.globalDealType);
     }
     if (editDeal.globalDealType === "ASSET") {
@@ -799,6 +815,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         propertyTds:               editDeal.propertyTds               ?? "",
         tdsPercentage:             editDeal.tdsPercentage             ? String(editDeal.tdsPercentage)       : "",
         description:               editDeal.description               ?? "",
+        goldGrams:                 editDeal.goldGrams                 ? String(editDeal.goldGrams)           : "",
       });
     }
   }, [editDeal]);
@@ -829,9 +846,9 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     setErrors({});
     setAssetErrors({});
     setBorrowerErrors({});
-    if (tab === "SDLOT" || tab === "GOLD") {
+    if (tab === "SDLOT" || tab === "GOLD" || tab === "REALGOLD") {
       set("globalDealType", tab);
-      set("dealSubType", tab === "GOLD" ? "INVESTMENT" : "STUDENT");
+      set("dealSubType", tab === "GOLD" ? "INVESTMENT" : tab === "REALGOLD" ? "PLEDGINGGOLD" : "STUDENT");
     }
   };
 
@@ -842,7 +859,8 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   const validate = () => {
     const e = {};
     if (!form.dealName.trim())              e.dealName              = "Deal name is required";
-    if (!form.dealAmount)                   e.dealAmount            = "Deal amount is required";
+    if (!form.dealAmount && form.globalDealType !== "REALGOLD") e.dealAmount = "Deal amount is required";
+    if (form.globalDealType === "REALGOLD" && !form.goldGrams) e.goldGrams = "Gold grams is required";
     if (!form.duration)                     e.duration              = "Duration is required";
     if (!form.minimumParticipation)         e.minimumParticipation  = "Minimum participation is required";
     if (!form.maxParticipation)             e.maxParticipation      = "Maximum participation is required";
@@ -850,6 +868,11 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
     if (!form.fundsAcceptanceEndDate)       e.fundsAcceptanceEndDate   = "End date is required";
     if (!form.loanActiveDate)               e.loanActiveDate        = "Loan active date is required";
     if (!form.emiEndDate)                   e.emiEndDate            = "EMI end date is required";
+    if (form.globalDealType === "GOLD" || form.globalDealType === "REALGOLD") {
+      if (!form.propertyTds)        e.propertyTds   = "TDS type is required";
+      if (!form.tdsPercentage)      e.tdsPercentage = "TDS percentage is required";
+      if (!form.description.trim()) e.description  = "Description is required";
+    }
     const min = numVal(form.minimumParticipation), max = numVal(form.maxParticipation);
     if (min && max && min >= max) e.maxParticipation = "Max must be greater than min";
     return e;
@@ -925,6 +948,13 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
         if (form.propertyTds)         payload.propertyTds         = form.propertyTds.trim();
         if (form.tdsPercentage)       payload.tdsPercentage       = parseFloat(form.tdsPercentage)       || 0;
         if (form.description)         payload.description         = form.description.trim();
+      }
+      // Real gold — gold grams (sent as double)
+      if (form.globalDealType === "REALGOLD") {
+        payload.goldGrams = parseFloat(form.goldGrams) || 0;
+        if (form.propertyTds)    payload.propertyTds   = form.propertyTds.trim();
+        if (form.tdsPercentage) payload.tdsPercentage = parseFloat(form.tdsPercentage) || 0;
+        if (form.description)   payload.description   = form.description.trim();
       }
       if (isEdit && editDeal?.id) payload.id = editDeal.id;
 
@@ -1030,7 +1060,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
   };
 
   const resetForm = () => {
-    setForm({ ...EMPTY_FORM, globalDealType: activeTab === "GOLD" ? "GOLD" : "SDLOT" });
+    setForm({ ...EMPTY_FORM, globalDealType: activeTab === "GOLD" ? "GOLD" : activeTab === "REALGOLD" ? "REALGOLD" : "SDLOT", dealSubType: activeTab === "GOLD" ? "INVESTMENT" : activeTab === "REALGOLD" ? "PLEDGINGGOLD" : "STUDENT" });
     setAssetForm(EMPTY_ASSET_FORM);
     setBorrowerForm(EMPTY_BORROWER_FORM);
     setBorrowerErrors({});
@@ -1050,48 +1080,125 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
 
   // ─── Deal type landing screen (shown before form when creating new deal) ──
   if (!isEdit && !dealTypeSelected) return (
-    <div className="max-w-2xl mx-auto grid gap-6">
-      <div>
-        <div className="flex items-center gap-2 mb-3">
-          <button onClick={() => navigate("/admin/dashboard")}
-            className="flex items-center gap-1.5 text-sm font-semibold hover:opacity-70 transition-opacity"
-            style={{ color: "var(--text-muted)" }}>
-            <ArrowLeft /> Dashboard
-          </button>
-          <span style={{ color: "var(--border)" }}>/</span>
-          <span className="text-sm font-semibold" style={{ color: "var(--text-primary)" }}>Create Deal</span>
-        </div>
-        <h1 className="text-2xl font-black" style={{ color: "var(--text-primary)" }}>Which deal do you want to launch?</h1>
-        <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>Select a deal type to continue.</p>
+    <div className="w-full max-w-5xl mx-auto rounded-3xl p-5 sm:p-6 lg:p-7 relative overflow-hidden transition-all duration-300"
+      style={{
+        background: "linear-gradient(145deg, #f8f7fe 0%, #ffffff 45%, #f4f0fe 100%)",
+        border: "1.5px solid rgba(220, 215, 254, 0.7)",
+        boxShadow: "0 15px 40px -15px rgba(99, 102, 241, 0.07)",
+      }}>
+      
+      {/* Decorative ambient wave gradient in bottom right */}
+      <div className="absolute -bottom-28 -right-28 w-[380px] h-[380px] rounded-full pointer-events-none opacity-40 blur-3xl"
+        style={{ background: "radial-gradient(circle, #ddd6fe 0%, #c4b5fd 40%, transparent 70%)" }} />
+      <div className="absolute -top-32 -left-32 w-72 h-72 rounded-full pointer-events-none opacity-25 blur-3xl"
+        style={{ background: "radial-gradient(circle, #e0e7ff 0%, #c7d2fe 50%, transparent 70%)" }} />
+
+      {/* Header / Breadcrumb */}
+      <div className="relative z-10 flex items-center gap-2 text-xs sm:text-sm font-medium mb-3.5" style={{ color: "#64748b" }}>
+        <button
+          onClick={() => navigate("/admin/dashboard")}
+          className="flex items-center gap-1.5 hover:text-slate-900 transition-colors">
+          <svg className="w-3.5 h-3.5 text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+            <polyline points="9 22 9 12 15 12 15 22"/>
+          </svg>
+          Dashboard
+        </button>
+        <span className="text-slate-400 font-semibold">›</span>
+        <span className="font-bold text-purple-700">Create Deal</span>
       </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        {DEAL_TYPE_CARDS.map(card => (
-          <button
-            key={card.key}
-            type="button"
-            onClick={() => {
-              setActiveTab(card.key === "BORROWER" ? "BORROWER" : card.key);
-              if (card.key === "SDLOT" || card.key === "GOLD") {
-                set("globalDealType", card.key);
-                set("dealSubType", card.key === "GOLD" ? "INVESTMENT" : "STUDENT");
-              }
-              setDealTypeSelected(true);
-            }}
-            className="text-left rounded-2xl p-5 flex flex-col gap-3 transition-all hover:scale-[1.02] active:scale-[0.98]"
-            style={{ background: card.bg, border: `1.5px solid ${card.border}` }}>
-            <div className="w-10 h-10 rounded-xl flex items-center justify-center"
-              style={{ background: card.color + "22", color: card.color, border: `1px solid ${card.color}44` }}>
-              {card.icon}
+
+      {/* Headline */}
+      <div className="relative z-10 mb-5">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900 leading-tight">
+          Which deal do you want to{" "}
+          <span className="relative inline-block text-purple-700">
+            launch?
+            <svg className="absolute -bottom-1.5 left-0 w-full overflow-visible" height="8" viewBox="0 0 100 10" fill="none">
+              <path d="M2 7 C 30 1, 70 1, 98 6" stroke="#7c3aed" strokeWidth="3" strokeLinecap="round" />
+            </svg>
+          </span>
+        </h1>
+        <p className="text-xs sm:text-sm text-slate-500 font-normal mt-1.5">
+          Select a deal type to get started and launch a new investment opportunity.
+        </p>
+      </div>
+
+      {/* Floating animation keyframes style */}
+      <style>{`
+        @keyframes dealLevitate {
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-4px); }
+        }
+        .animate-deal-levitate {
+          animation: dealLevitate 3.5s ease-in-out infinite;
+        }
+      `}</style>
+
+      {/* Cards Grid: 2 columns, compact height, SD Lot renamed & realistic graphics */}
+      <div className="relative z-10 grid gap-3.5 sm:gap-4 grid-cols-1 md:grid-cols-2">
+        {DEAL_TYPE_CARDS.map(card => {
+          return (
+            <div
+              key={card.key}
+              onClick={() => {
+                setActiveTab(card.key === "BORROWER" ? "BORROWER" : card.key);
+                if (card.key === "SDLOT" || card.key === "GOLD" || card.key === "REALGOLD") {
+                  set("globalDealType", card.key);
+                  set("dealSubType", card.key === "GOLD" ? "INVESTMENT" : card.key === "REALGOLD" ? "PLEDGINGGOLD" : "STUDENT");
+                }
+                setDealTypeSelected(true);
+              }}
+              className="group relative rounded-2xl p-4 sm:p-5 flex flex-row items-center justify-between cursor-pointer transition-all duration-300 hover:-translate-y-1 hover:shadow-xl active:scale-[0.99] overflow-hidden"
+              style={{
+                background: card.bg,
+                border: `1.5px solid ${card.border}`,
+                boxShadow: card.shadow,
+                minHeight: 140,
+              }}>
+              
+              {/* Left Content */}
+              <div className="flex items-start gap-3.5 flex-1 min-w-0 pr-1.5 z-10">
+                {/* Image Icon from Reference */}
+                <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-full overflow-hidden shrink-0 shadow-sm transition-transform duration-300 group-hover:scale-105">
+                  <img src={card.icon} alt={card.label} className="w-full h-full object-cover select-none" />
+                </div>
+
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-base sm:text-lg font-black tracking-tight text-slate-800 leading-snug">
+                    {card.label}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-normal leading-relaxed mt-1 line-clamp-2">
+                    {card.description}
+                  </p>
+                  {/* Select Pill Button */}
+                  <div className="mt-2.5">
+                    <span
+                      className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold bg-white shadow-sm border border-slate-100/90 transition-all duration-200 group-hover:shadow-md group-hover:gap-2"
+                      style={{ color: card.btnColor }}>
+                      Select
+                      <svg className="w-3.5 h-3.5 transition-transform duration-200 group-hover:translate-x-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="9 18 15 12 9 6"/>
+                      </svg>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right 3D Artwork with smooth floating animation */}
+              <div className="shrink-0 w-28 h-24 sm:w-34 sm:h-28 lg:w-38 lg:h-32 flex items-center justify-center relative select-none">
+                <img
+                  src={card.art}
+                  alt={card.artAlt}
+                  className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-105 animate-deal-levitate"
+                  style={{
+                    filter: "drop-shadow(0 4px 10px rgba(0,0,0,0.06))",
+                  }}
+                />
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-black" style={{ color: card.color }}>{card.label}</p>
-              <p className="text-xs mt-1 leading-relaxed" style={{ color: "var(--text-muted)" }}>{card.description}</p>
-            </div>
-            <div className="flex items-center gap-1 text-xs font-bold mt-auto" style={{ color: card.color }}>
-              Select <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><polyline points="9 18 15 12 9 6"/></svg>
-            </div>
-          </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -1237,7 +1344,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           </span>
         </div>
         <h1 className="text-2xl font-black" style={{ color: "var(--text-primary)" }}>
-          {activeTab === "ASSET" ? "New Asset Fractional Lending Deal" : activeTab === "BORROWER" ? "New Borrower Deal" : isEdit ? `Edit ${activeTab === "GOLD" ? "Gold Lot" : "SD Lot"} Deal` : `New ${activeTab === "GOLD" ? "Gold Lot" : "SD Lot"} Deal`}
+          {activeTab === "ASSET" ? "New Asset Fractional Lending Deal" : activeTab === "BORROWER" ? "New Borrower Deal" : isEdit ? `Edit ${activeTab === "GOLD" ? "Gold Lot" : activeTab === "REALGOLD" ? "Real Gold" : "SD Lot"} Deal` : `New ${activeTab === "GOLD" ? "Gold Lot" : activeTab === "REALGOLD" ? "Real Gold" : "SD Lot"} Deal`}
         </h1>
         <p className="text-sm mt-1" style={{ color: "var(--text-muted)" }}>
           {activeTab === "ASSET" ? "Create a fractional lending deal with asset validation reports and media" : activeTab === "BORROWER" ? "Link a new deal to an existing borrower — financial and bank details apply as usual" : isEdit ? "Update the deal details below" : "Create a new investment offering for participants"}
@@ -1869,7 +1976,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
             <Field label="Sub Type" required>
               <select value={form.dealSubType} onChange={e => set("dealSubType", e.target.value)}
                 style={{ ...inp(""), appearance: "none", cursor: "pointer" }}>
-                {(activeTab === "GOLD" ? GOLD_SUB_TYPES : DEAL_SUB_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
+                {(activeTab === "GOLD" || activeTab === "REALGOLD" ? GOLD_SUB_TYPES : DEAL_SUB_TYPES).map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </Field>
           </div>
@@ -1942,7 +2049,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
           <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#6366f1" }}>Financial Details</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Deal Amount (₹)" required error={errors.dealAmount} hint={numVal(form.dealAmount) > 0 ? fmtINR(numVal(form.dealAmount)) : undefined}>
+            <Field label="Deal Amount (₹)" required={form.globalDealType !== "REALGOLD"} error={errors.dealAmount} hint={numVal(form.dealAmount) > 0 ? fmtINR(numVal(form.dealAmount)) : undefined}>
               <input type="text" inputMode="numeric" placeholder="e.g. 100000"
                 value={form.dealAmount} onChange={e => set("dealAmount", toLocale(e.target.value))}
                 style={{ ...inp(errors.dealAmount), fontFamily: "'JetBrains Mono', monospace" }} />
@@ -1953,6 +2060,13 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                 style={inp(errors.duration)} />
             </Field>
           </div>
+          {form.globalDealType === "REALGOLD" && (
+            <Field label="Gold Grams (g)" required error={errors.goldGrams} hint={form.goldGrams ? form.goldGrams + " g" : undefined}>
+              <input type="text" inputMode="decimal" placeholder="e.g. 100"
+                value={form.goldGrams} onChange={e => set("goldGrams", e.target.value.replace(/[^0-9.]/g, ""))}
+                style={{ ...inp(errors.goldGrams), fontFamily: "'JetBrains Mono', monospace" }} />
+            </Field>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
             <Field label="Min Participation (₹)" required error={errors.minimumParticipation} hint={numVal(form.minimumParticipation) > 0 ? fmtINR(numVal(form.minimumParticipation)) : undefined}>
               <input type="text" inputMode="numeric" placeholder="e.g. 500"
@@ -2034,7 +2148,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
           <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>TDS</p>
         <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="TDS Type" error={errors.propertyTds}>
+              <Field label="TDS Type" required={form.globalDealType === "GOLD" || form.globalDealType === "REALGOLD"} error={errors.propertyTds}>
                 <select
                   value={form.propertyTds} onChange={e => set("propertyTds", e.target.value)}
                   style={{ ...inp(errors.propertyTds), appearance: "none", cursor: "pointer" }}>
@@ -2043,7 +2157,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
                   <option value="MANDATORY">MANDATORY</option>
                 </select>
               </Field>
-              <Field label="TDS Percentage (%)" error={errors.tdsPercentage}>
+              <Field label="TDS Percentage (%)" required={form.globalDealType === "GOLD" || form.globalDealType === "REALGOLD"} error={errors.tdsPercentage}>
                 <div className="relative">
                   <input type="text" inputMode="decimal" placeholder="0.0"
                     value={form.tdsPercentage} onChange={e => set("tdsPercentage", e.target.value.replace(/[^0-9.]/g, ""))}
@@ -2059,7 +2173,7 @@ export default function CreateDeal({ editDeal: editDealProp = null }) {
           style={{ background: "var(--surface-card)", border: "1px solid var(--border)" }}>
           {/* <p className="text-xs font-black uppercase tracking-widest" style={{ color: "#f59e0b" }}>Description</p> */}
 
-            <Field label="Description" error={errors.description}>
+            <Field label="Description" required={form.globalDealType === "GOLD" || form.globalDealType === "REALGOLD"} error={errors.description}>
               <textarea rows={3} placeholder="Enter deal description…"
                 value={form.description} onChange={e => set("description", e.target.value)}
                 className="w-full resize-none"

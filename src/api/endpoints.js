@@ -18,6 +18,7 @@ export const EP = {
   FORGOT_PASSWORD:    '/auth-service/auth/forgot-password',
   RESET_PASSWORD:     '/auth-service/auth/reset-password',
   REFRESH_TOKEN:      '/auth-service/auth/refresh-token',
+  UPDATE_EMAIL_MOBILE: '/auth-service/auth/updateEmailAndMobileNumber',
 
   // ── User service ───────────────────────────────────────────────────────────
   PROFILE_GET:        '/user-service/user/profile',

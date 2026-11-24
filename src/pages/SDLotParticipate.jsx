@@ -508,13 +508,13 @@ export default function SDLotParticipate() {
           {/* Min Investment */}
           <div className="rounded-xl p-4" style={{ border: '1px solid var(--border)', background: 'var(--input-bg)' }}>
             <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Min Investment</p>
-            <p className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>{fmtINR(lot.minInvestment)}</p>
+            <p className="text-xl font-black leading-tight break-words" style={{ color: 'var(--text-primary)' }}>{fmtINR(lot.minInvestment)}</p>
           </div>
 
           {/* Max Investment */}
           <div className="rounded-xl p-4" style={{ border: '1px solid var(--border)', background: 'var(--input-bg)' }}>
             <p className="text-sm font-medium mb-2" style={{ color: 'var(--text-muted)' }}>Max Investment</p>
-            <p className="text-2xl font-black" style={{ color: 'var(--text-primary)' }}>{fmtINR(lot.maxInvestment)}</p>
+            <p className="text-xl font-black leading-tight break-words" style={{ color: 'var(--text-primary)' }}>{fmtINR(lot.maxInvestment)}</p>
           </div>
         </div>
 

@@ -723,6 +723,20 @@ export async function adminRegisterUser({ firstName, lastName, email, gender, mo
 }
 
 /**
+ * PATCH /auth-service/auth/updateEmailAndMobileNumber
+ * Update a user's email and/or mobile number.
+ * Body: { email, mobileNumber, testUser }
+ * At least one of email / mobileNumber must be provided.
+ */
+export async function updateEmailAndMobileNumber({ email = '', mobileNumber = '', testUser = false } = {}) {
+  return patch('/auth-service/auth/updateEmailAndMobileNumber', {
+    email,
+    mobileNumber,
+    testUser,
+  });
+}
+
+/**
  * GET /oxybrick-service/listOfMigratedDealsInfo
  * Returns: Array of { dealName: string, roi: number, interestDate: string }
  */

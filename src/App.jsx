@@ -47,6 +47,10 @@ import AssetParticipations from './pages/AssetParticipations.jsx';
 import OxyLoansDeals from './pages/OxyLoansDeals.jsx';
 import GoldDealsParticipated from './pages/GoldDealsParticipated.jsx';
 import GoldDeal from './pages/GoldDeal.jsx';
+import RealGoldDeal from './pages/RealGoldDeal.jsx';
+import RealGoldDealTest from './pages/RealGoldDealTest.jsx';
+import RealGoldLotParticipate from './pages/RealGoldLotParticipate.jsx';
+import RealGoldDealsParticipated from './pages/RealGoldDealsParticipated.jsx';
 import GoldDealContribute from './pages/GoldDealContribute.jsx';
 import GoldParticipationDetails from './pages/GoldParticipationDetails.jsx';
 import GoldLotParticipate from './pages/GoldLotParticipate.jsx';
@@ -73,6 +77,7 @@ import AdminTotalUsers from './pages/admin/AdminTotalUsers.jsx';
 import AdminMigratedUsers from './pages/admin/AdminMigratedUsers.jsx';
 import AdminMigratedDeals from './pages/admin/AdminMigratedDeals.jsx';
 import AdminRegisterUser from './pages/admin/AdminRegisterUser.jsx';
+import AdminUpdateUserContact from './pages/admin/AdminUpdateUserContact.jsx';
 import AdminWalletWithdrawals from './pages/admin/AdminWalletWithdrawals.jsx';
 import AdminDealWithdrawalRequests from './pages/admin/AdminDealWithdrawalRequests.jsx';
 import AdminMigratedTotalData from './pages/admin/AdminMigratedTotalData.jsx';
@@ -201,6 +206,10 @@ function UserLayout() {
             <Route path="/dashboard" element={<UnifiedDashboard addMemberOpen={addMemberOpen} onAddMemberClose={() => setAddMemberOpen(false)} />} />
             <Route path="/sd-lots" element={<SDLots />} />
             <Route path="/gold-deals" element={<GoldDeal />} />
+            <Route path="/real-gold-deals" element={<RealGoldDeal />} />
+            <Route path="/real-gold-test" element={<RealGoldDealTest />} />
+            <Route path="/real-gold-lot/participate/:id" element={<RealGoldLotParticipate />} />
+            <Route path="/real-gold-deals-participation" element={<RealGoldDealsParticipated />} />
             <Route path="/gold-test" element={<GoldDealTest/>} />
             <Route path="/gold-lot/participate/:id" element={<GoldLotParticipate />} />
             <Route path="/gold-deals/contribute/:id" element={<GoldDealContribute />} />
@@ -268,6 +277,7 @@ function AdminLayout() {
               <Route path="interest/generated-files"   element={<RequireAdminPerm routeKey="interest/generated-files"><AdminInterestFiles /></RequireAdminPerm>} />
               <Route path="total-users"           element={<RequireAdminPerm routeKey="total-users"><AdminTotalUsers /></RequireAdminPerm>} />
               <Route path="register-user"         element={<RequireAdminPerm routeKey="register-user"><AdminRegisterUser /></RequireAdminPerm>} />
+              <Route path="update-user-contact"   element={<RequireAdminPerm routeKey="update-user-contact"><AdminUpdateUserContact /></RequireAdminPerm>} />
               <Route path="migrated-users"        element={<RequireAdminPerm routeKey="migrated-users"><AdminMigratedUsers /></RequireAdminPerm>} />
               <Route path="migrated-total-data"   element={<RequireAdminPerm routeKey="migrated-total-data"><AdminMigratedTotalData /></RequireAdminPerm>} />
               <Route path="migrated-deals"         element={<RequireAdminPerm routeKey="migrated-deals"><AdminMigratedDeals /></RequireAdminPerm>} />

@@ -109,16 +109,19 @@ export async function participateInSdLot({ sdLotId, amount }) {
 /**
  * PATCH /oxybrick-service/participationAndUpdate
  * Body: { dealId, lenderReturnsType, participatedAmount, rateofinterest, userId }
+ * For REALGOLD deals: participatedAmount = 0, participatedGoldGrams = grams invested
  */
-export async function participateInDeal({ dealId, lenderReturnsType, participatedAmount, rateofinterest }) {
+export async function participateInDeal({ dealId, lenderReturnsType, participatedAmount, rateofinterest, participatedGoldGrams }) {
   const userId = getUserId();
-  return patch('/oxybrick-service/participationAndUpdate', {
+  const body = {
     dealId,
     lenderReturnsType,
     participatedAmount,
     rateofinterest,
     userId,
-  });
+  };
+  if (participatedGoldGrams !== undefined) body.participatedGoldGrams = participatedGoldGrams;
+  return patch('/oxybrick-service/participationAndUpdate', body);
 }
 
 /**

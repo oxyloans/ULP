@@ -65,7 +65,7 @@ function SDLotCard({ lot, index, participatePath }) {
   const navigate = useNavigate();
   // console.log({lot})
   const raisedPct = lot.totalSize > 0 ? Math.min(Math.round((lot.raised / lot.totalSize) * 100), 100) : 0;
-  const isClosed  = lot.status === 'Closed' || lot.remaining === 0;
+  const isClosed  = lot.status === 'Closed' || (lot.globalDealType === 'SDLOT' && lot.remaining === 0) || lot.dealStatus === 'ACHIEVED';
 
   // Alternate indigo (even) / green (odd) for open deals
   const isGreen      = !isClosed && index % 2 === 1;
@@ -107,13 +107,14 @@ function SDLotCard({ lot, index, participatePath }) {
             style={{ background: glowColor, filter: 'blur(20px)' }} />
 
           <p className="text-xs font-bold uppercase tracking-widest mb-1 relative z-10"
-            style={{ color: subTextColor }}>Total Fund</p>
+            style={{ color: subTextColor }}>{lot.globalDealType === 'REALGOLD' ? 'Total Gold' : 'Total Fund'}</p>
           <p className="text-2xl font-black leading-none relative z-10 text-center"
             style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: textGlow }}>
-            {fmtINR(lot.totalSize)}
+            {lot.globalDealType === 'REALGOLD' ? `${Number(lot.goldGrams ?? 0).toLocaleString()} g` : fmtINR(lot.totalSize)}
           </p>
 
-          {/* Raised / Remaining */}
+          {/* Raised / Remaining (Real Gold size is in grams — no rupee progress bar) */}
+          {lot.globalDealType !== 'REALGOLD' && (
           <div className="w-full mt-4 relative z-10 grid gap-1">
             <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.1)' }}>
               <div className="h-full rounded-full transition-all duration-700"
@@ -124,12 +125,15 @@ function SDLotCard({ lot, index, participatePath }) {
               <span style={{ color: subTextColor, fontSize: 9 }}>{fmtINR(lot.remaining)} left</span>
             </div>
           </div>
+          )}
+          {lot.globalDealType !== 'REALGOLD' && (<>
           <p className="text-xs uppercase tracking-widest mb-1 relative z-10"
             style={{ color: subTextColor }}>Remaining...</p>
           <p className="text-2xl font-black leading-none relative z-10 text-center"
             style={{ color: '#fff', fontFamily: "'JetBrains Mono', monospace", textShadow: textGlow }}>
             {fmtINR(lot.remaining)}
           </p>
+          </>)}
         </div>
 
         {/* ── Right: rest of content ── */}
@@ -143,10 +147,12 @@ function SDLotCard({ lot, index, participatePath }) {
                 style={{ background: `${lot.tagColor}18`, color: lot.tagColor, border: `1px solid ${lot.tagColor}30` }}>
                 {lot.tag}
               </span>
+              {lot.globalDealType !== 'REALGOLD' && (
               <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                 style={{ background: isClosed ? 'rgba(100,116,139,0.1)' : 'rgba(16,185,129,0.1)', color: isClosed ? '#94a3b8' : '#10b981', border: `1px solid ${isClosed ? 'rgba(100,116,139,0.2)' : 'rgba(16,185,129,0.2)'}` }}>
                 {lot.auctionType}
               </span>
+              )}
             </div>
             <h3 className="text-sm font-extrabold leading-snug mb-2"
               style={{ color: 'var(--text-primary)', fontFamily: "'JetBrains Mono', monospace" }}>
@@ -157,7 +163,7 @@ function SDLotCard({ lot, index, participatePath }) {
                 style={{ background: 'rgba(168,85,247,0.1)', color: '#c084fc', border: '1px solid rgba(168,85,247,0.2)' }}>
                 {lot.payoutType}
               </span> */}
-              {lot.feePercentage === 0
+              {lot.globalDealType !== 'REALGOLD' && (lot.feePercentage === 0
                 ? <span className="text-xs px-2 py-0.5 rounded-full font-semibold"
                     style={{ background: 'rgba(16,185,129,0.08)', color: '#10b981', border: '1px solid rgba(16,185,129,0.2)' }}>
                     Zero Fee
@@ -166,7 +172,7 @@ function SDLotCard({ lot, index, participatePath }) {
                     style={{ background: 'rgba(245,158,11,0.08)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}>
                     {lot.feePercentage}% Fee
                   </span>
-              }
+              )}
             </div>
           </div>
 
@@ -199,8 +205,10 @@ function SDLotCard({ lot, index, participatePath }) {
               {/* Tenure / Min / Max cards */}
               {[
                 { label: 'Tenure',         value: lot.tenure,                color: accentColor },
+                ...(lot.globalDealType !== 'REALGOLD' ? [
                 { label: 'Min Investment', value: fmtINR(lot.minInvestment), color: '#f59e0b'   },
                 { label: 'Max Investment', value: fmtINR(lot.maxInvestment), color: '#f59e0b'   },
+                ] : []),
                 { label: 'TDS',            value: lot.propertyTds === 'MANDATORY' ? `${lot.tdsPercentage}% TDS` : 'No TDS', color: '#ef4444'   }
               ].map(f => (
                 <>
@@ -222,6 +230,20 @@ function SDLotCard({ lot, index, participatePath }) {
               ))}
 
             </div>
+
+            {/* Gold Growth (Real Gold deals only) */}
+            {lot.globalDealType === 'REALGOLD' && (lot.goldGrowthOptions ?? []).length > 0 && (
+              <div className="mt-3 flex flex-wrap items-start gap-2">
+                <p className="w-full text-xs font-bold uppercase tracking-widest mb-1" style={{ color: '#f59e0b', fontSize: 10 }}>Gold Growth</p>
+                {lot.goldGrowthOptions.map(opt => (
+                  <div key={opt.type} className="flex flex-col items-center px-3 py-2 rounded-xl"
+                    style={{ background: 'rgba(245,158,11,0.10)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                    <span className="text-base font-black leading-none" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{opt.rate}%</span>
+                    <span className="text-xs mt-1 font-semibold" style={{ color: 'var(--text-muted)' }}>{opt.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           {/* ── Section C: Bank + CTA ── */}
@@ -302,6 +324,13 @@ function mapDeal(raw) {
     raw.endofthedealInterest > 0 && { type: 'ENDOFTHEDEAL', label: 'End of Deal',    rate: raw.endofthedealInterest },
   ].filter(Boolean);
 
+  const goldGrowthOptions = [
+    raw.monthlyGoldGrowth   > 0 && { type: 'MONTHLY',  label: 'Monthly',      rate: raw.monthlyGoldGrowth   },
+    raw.quarterlyGoldGrowth > 0 && { type: 'QUARTELY', label: 'Quarterly',    rate: raw.quarterlyGoldGrowth  },
+    raw.halfGoldGrowth      > 0 && { type: 'HALFLY',   label: 'Half-Yearly',  rate: raw.halfGoldGrowth       },
+    raw.yearlyGoldGrowth    > 0 && { type: 'YEARLY',   label: 'Yearly',       rate: raw.yearlyGoldGrowth     },
+  ].filter(Boolean);
+
   const totalSize      = raw.dealAmount ?? 0;
   const participated   = raw.dealParticipationValue ?? 0;
   const remaining      = raw.remainingDealValue ?? (totalSize - participated);
@@ -329,6 +358,8 @@ function mapDeal(raw) {
     emiEndDate:     raw.emiEndDate ?? '',
     userIds:        raw.userIds ?? '',   // comma-separated allowed user IDs (empty = open to all)
     interestOptions,
+    goldGrams:        raw.goldGrams ?? 0,
+    goldGrowthOptions,
     bankDetails: {
       bankName:      raw.bankName    ?? raw.transferFunds ?? '—',
       accountName:   raw.companyName ?? '—',

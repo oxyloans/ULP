@@ -58,11 +58,13 @@ const UsersIcon2    = () => <svg viewBox="0 0 24 24" fill="none" stroke="current
 const MigrateIcon2  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>;
 const BorrowerIcon2 = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>;
 const UserPlusIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>;
+const EditUserIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
 
 const navItemsBefore = [
   { title: 'Dashboard',       path: '/admin/dashboard',     Icon: HomeIcon,      perm: PERM.DASHBOARD     },
   { title: 'Create Deal',     path: '/admin/create-deal',   Icon: PlusIcon,      perm: PERM.CREATE_DEAL   },
   { title: 'Register User',   path: '/admin/register-user', Icon: UserPlusIcon,  perm: PERM.REGISTER_USER },
+  { title: 'Update User Contact', path: '/admin/update-user-contact', Icon: EditUserIcon, perm: PERM.UPDATE_USER },
   { title: 'Total Users',     path: '/admin/total-users',   Icon: UsersIcon2,    perm: PERM.TOTAL_USERS   },
   { title: 'Borrowers',       path: '/admin/borrowers',     Icon: BorrowerIcon2, perm: PERM.BORROWERS     },
   { title: 'Offline Deals',   path: '/admin/offline',       Icon: PackageIcon,   perm: PERM.OFFLINE       },
