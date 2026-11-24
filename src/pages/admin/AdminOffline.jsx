@@ -44,6 +44,17 @@ const TAB_GROUPS = [
     ],
   },
   {
+    key:   'REALGOLD',
+    label: 'Real Gold',
+    color: '#d97706',
+    globalDealType: 'REALGOLD',
+    subTabs: [
+      { key: 'REALGOLD_NOTACHIEVED', label: 'Not Achieved', statusType: 'NOTACHIEVED', color: '#d97706' },
+      { key: 'REALGOLD_ACHIEVED',    label: 'Achieved',     statusType: 'ACHIEVED',    color: '#6366f1' },
+      { key: 'REALGOLD_CLOSED',      label: 'Closed',       statusType: 'CLOSED',      color: '#ef4444' },
+    ],
+  },
+  {
     key:   'ASSET',
     label: 'Asset Deals',
     color: '#06b6d4',
@@ -615,10 +626,22 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
         {/* Status + Actions */}
         <td className="py-3.5 px-4">
           {isAchieved ? (
+            <div className="flex items-center gap-2 flex-wrap">
             <span className="text-xs px-2.5 py-1 rounded-full font-bold whitespace-nowrap"
               style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
               ✓ Achieved
             </span>
+            <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit(deal);
+                }}
+                className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
+                style={{ background: 'linear-gradient(135deg, #6366f1, #4338ca)', boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }}
+              >
+                <EditIcon /> Edit
+              </button>
+            </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
               {/* Edit button */}
@@ -767,10 +790,13 @@ export default function AdminOffline() {
     if (dealFilter === 'OPEN')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total > 0 && invested >= total) return false; }
 
     if (activeGroup === 'SD') {
-      return d.dealType !== 'TEST' && d.globalDealType !== 'ASSET' && d.globalDealType !== 'GOLD';
+      return d.dealType !== 'TEST' && d.globalDealType !== 'ASSET' && d.globalDealType !== 'GOLD' && d.globalDealType !== 'REALGOLD';
     }
     if (activeGroup === 'GOLD') {
       return d.dealType !== 'TEST' && d.globalDealType === 'GOLD';
+    }
+    if (activeGroup === 'REALGOLD') {
+      return d.dealType !== 'TEST' && d.globalDealType === 'REALGOLD';
     }
     if (activeGroup === 'ASSET') {
       return d.dealType !== 'TEST' && d.globalDealType === 'ASSET';

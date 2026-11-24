@@ -724,14 +724,21 @@ export async function adminRegisterUser({ firstName, lastName, email, gender, mo
 
 /**
  * PATCH /auth-service/auth/updateEmailAndMobileNumber
- * Update a user's email and/or mobile number.
- * Body: { email, mobileNumber, testUser }
- * At least one of email / mobileNumber must be provided.
+ * Identify the user via query params (old values), update via request body (new values).
+ *
+ * Query params: oldEmail, oldMobileNumber  — at least one required
+ * Body:         { email, mobileNumber, testUser } — new values to set
  */
-export async function updateEmailAndMobileNumber({ email = '', mobileNumber = '', testUser = false } = {}) {
-  return patch('/auth-service/auth/updateEmailAndMobileNumber', {
-    email,
-    mobileNumber,
+export async function updateEmailAndMobileNumber({ oldEmail, oldMobileNumber, newEmail, newMobileNumber, testUser = false } = {}) {
+  const params = new URLSearchParams();
+  if (oldEmail)        params.set('email',        oldEmail);
+  if (oldMobileNumber) params.set('mobileNumber', oldMobileNumber);
+
+  const query = params.toString() ? `?${params.toString()}` : '';
+
+  return patch(`/auth-service/auth/updateEmailAndMobileNumber${query}`, {
+    email:        newEmail        || '',
+    mobileNumber: newMobileNumber || '',
     testUser,
   });
 }

@@ -203,10 +203,10 @@ function DealCard({ deal }) {
         {/* Stat pills */}
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
           {[
-            { label: 'Interest',    value: `${fmt(deal.interestEarnedPercentage)}%`, color: BLUE  },
-            { label: 'Gold Growth', value: `${fmt(deal.goldGrowthPercentage)}%`,     color: GOLD  },
-            { label: 'Total',       value: `${fmt(deal.totalUserEarnedPercentage)}%`, color: GREEN },
-            { label: 'Invested',    value: fmtINR(deal.participatedAmount),          color: PURPLE },
+            { label: 'Interest',      value: `${fmt(deal.interestEarnedPercentage)}%`,                              color: BLUE  },
+            { label: 'Gold Growth',   value: `${fmt(deal.goldGrowthPercentage)}%`,                                  color: GOLD  },
+            { label: 'Total',         value: `${fmt(deal.totalUserEarnedPercentage)}%`,                             color: GREEN },
+            { label: 'Gold Invested', value: `${Number(deal.participatedGoldGrams ?? 0).toLocaleString()} g`,       color: PURPLE },
           ].map(s => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px',
               borderRadius: 10, background: `${s.color}0d`, border: `1px solid ${s.color}1e` }}>
@@ -254,12 +254,12 @@ function DealCard({ deal }) {
         <div style={{ padding: '16px 20px', borderTop: `1px solid ${GOLD}10`,
           background: 'var(--input-bg, rgba(255,255,255,0.02))', display: 'grid', gap: 10 }}>
           {[
-            { label: 'Deal ID',          value: deal.dealId },
-            { label: 'Payout Type',      value: payoutLabel(deal.participationType) },
-            { label: 'Amount Invested',  value: fmtINR(deal.participatedAmount) },
-            { label: 'Interest Earned',  value: `${fmt(deal.interestEarnedPercentage)}%` },
-            { label: 'Gold Growth',      value: `${fmt(deal.goldGrowthPercentage)}%` },
-            { label: 'Total Earned',     value: `${fmt(deal.totalUserEarnedPercentage)}%` },
+            { label: 'Deal ID',           value: deal.dealId },
+            { label: 'Payout Type',       value: payoutLabel(deal.participationType) },
+            { label: 'Gold Invested',     value: `${Number(deal.participatedGoldGrams ?? 0).toLocaleString()} g` },
+            { label: 'Interest Earned',   value: `${fmt(deal.interestEarnedPercentage)}%` },
+            { label: 'Gold Growth',       value: `${fmt(deal.goldGrowthPercentage)}%` },
+            { label: 'Total Earned',      value: `${fmt(deal.totalUserEarnedPercentage)}%` },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '8px 12px', borderRadius: 10,
@@ -333,7 +333,7 @@ export default function RealGoldDealsParticipated() {
       });
   }, [deals, payoutFilter, search]);
 
-  const totalInvested  = deals.reduce((s, d) => s + Number(d.participatedAmount ?? 0), 0);
+  const totalGoldGrams = deals.reduce((s, d) => s + Number(d.participatedGoldGrams ?? 0), 0);
   const avgEarned      = deals.length ? deals.reduce((s, d) => s + Number(d.totalUserEarnedPercentage ?? 0), 0) / deals.length : 0;
   const avgGoldGrowth  = deals.length ? deals.reduce((s, d) => s + Number(d.goldGrowthPercentage ?? 0), 0) / deals.length : 0;
 
@@ -387,10 +387,10 @@ export default function RealGoldDealsParticipated() {
       {/* ── KPI strip ── */}
       {!loading && deals.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 16 }}>
-          <KpiCard label="Active Deals"    value={deals.length}         sub="Real gold positions"           color={GOLD}   Icon={GoldBarIcon} />
-          <KpiCard label="Total Invested"  value={fmtINR(totalInvested)} sub="Across all REALGOLD deals"    color={BLUE}   Icon={BarIcon}     />
-          <KpiCard label="Avg. Earned"     value={`${fmt(avgEarned)}%`}  sub="Interest + gold growth"       color={GREEN}  Icon={TrendUp}     />
-          <KpiCard label="Avg. Gold Growth" value={`${fmt(avgGoldGrowth)}%`} sub="Gold appreciation rate"  color={PURPLE} Icon={CoinsIcon}   />
+          <KpiCard label="Active Deals"     value={deals.length}                               sub="Real gold positions"      color={GOLD}   Icon={GoldBarIcon} />
+          <KpiCard label="Total Gold"       value={`${Number(totalGoldGrams.toFixed(2)).toLocaleString()} g`} sub="Across all REALGOLD deals" color={BLUE}   Icon={BarIcon}     />
+          <KpiCard label="Avg. Earned"      value={`${fmt(avgEarned)}%`}                       sub="Interest + gold growth"   color={GREEN}  Icon={TrendUp}     />
+          <KpiCard label="Avg. Gold Growth" value={`${fmt(avgGoldGrowth)}%`}                   sub="Gold appreciation rate"   color={PURPLE} Icon={CoinsIcon}   />
         </div>
       )}
 
