@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRunningClosedDeals, getDealParticipants, getAdminDeals, getDealsByStatusType, returnPrincipal, closeDealManually } from '../../api/afterlogin-admin';
+import { getRunningClosedDeals, getRealGoldParticipations, getAdminDeals, getDealsByStatusType, closeDealManually } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
@@ -110,16 +110,9 @@ const isTextSuccess = (text) => {
 
 // ─── Participants panel (lazy-loaded per deal) ────────────────────────────────
 function ParticipantsPanel({ dealId }) {
-  const [data, setData]       = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError]     = useState('');
-  const [selectedUserIds, setSelectedUserIds] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [actionMessage, setActionMessage] = useState({ type: '', text: '' });
-  
-  // Confirmation state
-  const [confirmModalOpen, setConfirmModalOpen] = useState(false);
-  const [amountsMap, setAmountsMap] = useState({});
+  const [participants, setParticipants] = useState([]);
+  const [loading, setLoading]           = useState(true);
+  const [error, setError]               = useState('');
   const [copiedUserId, setCopiedUserId] = useState(null);
 
   const handleCopyUserId = (uid) => {
@@ -131,8 +124,8 @@ function ParticipantsPanel({ dealId }) {
 
   useEffect(() => {
     setLoading(true); setError('');
-    getDealParticipants(dealId)
-      .then(res => setData(res))
+    getRealGoldParticipations(dealId)
+      .then(res => setParticipants(Array.isArray(res) ? res : []))
       .catch(e => setError(e.message ?? 'Failed to load participants'))
       .finally(() => setLoading(false));
   }, [dealId]);
@@ -148,127 +141,27 @@ function ParticipantsPanel({ dealId }) {
     <div className="py-4 px-6 text-xs font-semibold" style={{ color: '#ef4444' }}>{error}</div>
   );
 
-  const participants = data?.investoresParticipationDetails ?? [];
-  const totalAmt     = data?.totalParticipationByInvestores ?? 0;
-
-  const handleToggleSelect = (userId) => {
-    if (!userId) return;
-    setSelectedUserIds(prev =>
-      prev.includes(userId)
-        ? prev.filter(id => id !== userId)
-        : [...prev, userId]
-    );
-  };
-
-  const handleToggleSelectAll = () => {
-    const allIds = participants.map(p => p.userId).filter(Boolean);
-    if (selectedUserIds.length === allIds.length) {
-      setSelectedUserIds([]);
-    } else {
-      setSelectedUserIds(allIds);
-    }
-  };
-
-  const openConfirmModal = () => {
-    const newMap = {};
-    selectedUserIds.forEach(uid => {
-      const p = participants.find(part => part.userId === uid);
-      const cleanAmt = p ? String(p.participationAmount || 0).replace(/,/g, '') : '0';
-      newMap[uid] = cleanAmt;
-    });
-    setAmountsMap(newMap);
-    setConfirmModalOpen(true);
-  };
-
-  const handlePrincipalReturn = async () => {
-    if (selectedUserIds.length === 0) return;
-    setSubmitting(true);
-    setActionMessage({ type: '', text: '' });
-
-    const userPrincipalRequest = selectedUserIds.map(uid => {
-      const enteredVal = amountsMap[uid];
-      const amt = enteredVal !== undefined && enteredVal !== '' ? Number(enteredVal) : 0;
-      return {
-        userId: uid,
-        principalReturnedAmount: amt
-      };
-    });
-
-    try {
-      const res = await returnPrincipal({
-        dealId,
-        userPrincipalRequest
-      });
-      
-      let successMsg = 'Principal returned successfully!';
-      if (typeof res === 'string' && res.trim()) {
-        successMsg = res;
-      } else if (res) {
-        successMsg = res.message || res.data?.message || res.data || successMsg;
-      }
-      const msgText = typeof successMsg === 'string' ? successMsg : JSON.stringify(successMsg);
-      const isOk = isTextSuccess(msgText);
-      
-      setActionMessage({
-        type: isOk ? 'success' : 'error',
-        text: msgText
-      });
-      
-      if (isOk) {
-        setSelectedUserIds([]);
-      }
-      setConfirmModalOpen(false);
-      
-      // Refresh participants
-      getDealParticipants(dealId)
-        .then(res => setData(res))
-        .catch(() => {});
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || err.response?.data?.error || err.message || 'Failed to return principal';
-      const msgText = typeof errorMsg === 'string' ? errorMsg : JSON.stringify(errorMsg);
-      setActionMessage({
-        type: 'error',
-        text: msgText
-      });
-      setConfirmModalOpen(false);
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const totalGrams    = participants.reduce((s, p) => s + (p.participatedGoldGrams ?? 0), 0);
+  const totalApproved = participants.reduce((s, p) => s + (p.adminApprovedGrams ?? 0), 0);
 
   return (
     <div className="px-5 py-4" style={{ background: 'rgba(217,119,6,0.03)', borderTop: '1px solid var(--border)' }}>
       {/* Summary row */}
-      <div className="flex items-center justify-between flex-wrap gap-4 mb-3">
-        <div className="flex items-center gap-4 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <UsersIcon />
-            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-              {participants.length} Participant{participants.length !== 1 ? 's' : ''}
-            </span>
-          </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Participation:</span>
-            <span className="text-xs font-black" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{fmtINR(totalAmt)}</span>
-          </div>
+      <div className="flex items-center gap-4 flex-wrap mb-3">
+        <div className="flex items-center gap-1.5">
+          <UsersIcon />
+          <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+            {participants.length} Participant{participants.length !== 1 ? 's' : ''}
+          </span>
         </div>
-
-        {participants.length > 0 && (
-          <button
-            onClick={openConfirmModal}
-            disabled={selectedUserIds.length === 0 || submitting}
-            className="px-4 py-1.5 rounded-xl text-xs font-black transition-all hover:scale-105 active:scale-95 flex items-center gap-1.5"
-            style={{
-              background: 'linear-gradient(135deg, #d97706, #b45309)',
-              color: '#fff',
-              boxShadow: selectedUserIds.length > 0 ? '0 4px 14px rgba(217,119,6,0.35)' : 'none',
-              opacity: selectedUserIds.length === 0 || submitting ? 0.6 : 1,
-              cursor: selectedUserIds.length === 0 || submitting ? 'not-allowed' : 'pointer'
-            }}
-          >
-            Principal ({selectedUserIds.length})
-          </button>
-        )}
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Gold:</span>
+          <span className="text-xs font-black tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{totalGrams}g</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Approved:</span>
+          <span className="text-xs font-black tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{totalApproved}g</span>
+        </div>
       </div>
 
       {participants.length === 0 ? (
@@ -278,16 +171,7 @@ function ParticipantsPanel({ dealId }) {
           <table className="w-full text-xs">
             <thead>
               <tr style={{ background: 'var(--input-bg)', borderBottom: '1px solid var(--border)' }}>
-                <th className="py-2.5 px-3 text-left whitespace-nowrap" style={{ width: 40 }}>
-                  <input
-                    type="checkbox"
-                    checked={participants.length > 0 && selectedUserIds.length === participants.filter(p => p.userId).length}
-                    onChange={handleToggleSelectAll}
-                    className="w-3.5 h-3.5 cursor-pointer rounded border-gray-300"
-                    style={{ accentColor: '#d97706' }}
-                  />
-                </th>
-                {['#', 'Investor Name', 'Amount', 'ROI', 'Payout', 'Duration'].map(h => (
+                {['#', 'User ID', 'Participation ID', 'Gold Grams', 'Approved Grams', 'Gold Rate', 'Amount', 'Status', 'Collected Date', 'Comments'].map(h => (
                   <th key={h} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider whitespace-nowrap"
                     style={{ color: 'var(--text-muted)', fontSize: 10 }}>{h}</th>
                 ))}
@@ -295,30 +179,20 @@ function ParticipantsPanel({ dealId }) {
             </thead>
             <tbody>
               {participants.map((p, i) => (
-                <tr key={p.userId ?? i}
+                <tr key={p.participationId ?? i}
                   style={{ borderBottom: i < participants.length - 1 ? '1px solid var(--border)' : 'none' }}
                   onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
                   onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
-                  
-                  <td className="py-2.5 px-3">
-                    {p.userId ? (
-                      <input
-                        type="checkbox"
-                        checked={selectedUserIds.includes(p.userId)}
-                        onChange={() => handleToggleSelect(p.userId)}
-                        className="w-3.5 h-3.5 cursor-pointer rounded border-gray-300"
-                        style={{ accentColor: '#d97706' }}
-                      />
-                    ) : (
-                      <span className="text-xs" style={{ color: 'var(--text-muted)' }}>—</span>
-                    )}
-                  </td>
-                  
+
+                  {/* # */}
                   <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+
+                  {/* User ID */}
                   <td className="py-2.5 px-3">
-                    <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{p.userName ?? '—'}</p>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <p className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>{String(p.userId ?? '').slice(0, 8)}…</p>
+                    <div className="flex items-center gap-1">
+                      <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
+                        {String(p.userId ?? '').slice(0, 8)}…
+                      </span>
                       {p.userId && (
                         <button
                           onClick={() => handleCopyUserId(p.userId)}
@@ -339,119 +213,62 @@ function ParticipantsPanel({ dealId }) {
                       )}
                     </div>
                   </td>
-                  <td className="py-2.5 px-3 font-black tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {fmtINR(p.participationAmount)}
-                  </td>
-                  <td className="py-2.5 px-3 font-bold tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {p.rateofinterest}%
-                  </td>
+
+                  {/* Participation ID */}
                   <td className="py-2.5 px-3">
-                    <span className="px-2 py-0.5 rounded-full font-semibold"
-                      style={{ background: 'rgba(99,102,241,0.1)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.2)', fontSize: 10 }}>
-                      {p.lenderReturnsType ?? '—'}
+                    <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
+                      {String(p.participationId ?? '').slice(0, 8)}…
                     </span>
                   </td>
+
+                  {/* Gold Grams */}
+                  <td className="py-2.5 px-3 font-black tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
+                    {p.participatedGoldGrams ?? '—'}g
+                  </td>
+
+                  {/* Approved Grams */}
+                  <td className="py-2.5 px-3 tabular-nums" style={{ color: p.adminApprovedGrams != null ? '#10b981' : 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                    {p.adminApprovedGrams != null ? `${p.adminApprovedGrams}g` : '—'}
+                  </td>
+
+                  {/* Gold Rate */}
+                  <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                    {p.goldRate != null ? fmtINR(p.goldRate) : '—'}
+                  </td>
+
+                  {/* Amount */}
+                  <td className="py-2.5 px-3 font-bold tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
+                    {fmtINR(p.participatedAmount)}
+                  </td>
+
+                  {/* Status */}
+                  <td className="py-2.5 px-3">
+                    <span className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
+                      style={{
+                        background: p.goldStatus ? 'rgba(99,102,241,0.1)' : 'rgba(107,114,128,0.1)',
+                        color: p.goldStatus ? '#818cf8' : '#9ca3af',
+                        border: `1px solid ${p.goldStatus ? 'rgba(99,102,241,0.2)' : 'rgba(107,114,128,0.2)'}`,
+                        fontSize: 10
+                      }}>
+                      {p.goldStatus ?? 'Pending'}
+                    </span>
+                  </td>
+
+                  {/* Collected Date */}
                   <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                    {p.dealDuration ? `${p.dealDuration} mo` : '—'}
+                    {p.goldCollectedDate ?? '—'}
+                  </td>
+
+                  {/* Comments */}
+                  <td className="py-2.5 px-3" style={{ color: 'var(--text-muted)', maxWidth: 160 }}>
+                    <span className="block truncate" title={p.comments ?? ''}>
+                      {p.comments ?? '—'}
+                    </span>
                   </td>
                 </tr>
               ))}
             </tbody>
           </table>
-        </div>
-      )}
-      
-      {/* Alert / Feedback Modal */}
-      <FeedbackModal message={actionMessage} onClose={() => setActionMessage({ type: '', text: '' })} />
-
-      {/* Confirm Modal */}
-      {confirmModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)' }}
-          onClick={() => setConfirmModalOpen(false)}>
-          <div className="w-full max-w-lg rounded-2xl overflow-hidden animate-fade-in"
-            style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 32px 80px rgba(0,0,0,0.4)' }}
-            onClick={e => e.stopPropagation()}>
-            
-            {/* Header */}
-            <div className="px-6 py-4 flex items-center justify-between"
-              style={{ borderBottom: '1px solid var(--border)', background: 'rgba(217,119,6,0.06)' }}>
-              <div>
-                <h3 className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>
-                  Confirm Principal Return
-                </h3>
-                <p className="text-xs font-semibold mt-0.5" style={{ color: 'var(--text-muted)' }}>
-                  Specify principal return amounts for {selectedUserIds.length} selected investor(s)
-                </p>
-              </div>
-              <button
-                onClick={() => setConfirmModalOpen(false)}
-                className="w-7 h-7 rounded-lg flex items-center justify-center"
-                style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-muted)' }}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
-            {/* Body */}
-            <div className="px-6 py-4 max-h-[50vh] overflow-y-auto grid gap-3">
-              {selectedUserIds.map((uid) => {
-                const p = participants.find(part => part.userId === uid);
-                if (!p) return null;
-                return (
-                  <div key={uid} className="flex items-center justify-between gap-4 p-3 rounded-xl border"
-                    style={{ borderColor: 'var(--border)', background: 'var(--input-bg)' }}>
-                    <div className="grid gap-0.5">
-                      <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-                        {p.userName || '—'}
-                      </span>
-                      <span className="text-[10px] font-mono" style={{ color: 'var(--text-muted)' }}>
-                        ID: {uid.slice(0, 8)}… | Max: {fmtINR(p.participationAmount)}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 font-bold">
-                      <span className="text-xs" style={{ color: 'var(--text-primary)' }}>₹</span>
-                      <input
-                        type="number"
-                        value={amountsMap[uid] ?? ''}
-                        onChange={(e) => setAmountsMap(prev => ({ ...prev, [uid]: e.target.value }))}
-                        className="w-28 px-2.5 py-1.5 text-xs font-bold rounded-lg outline-none"
-                        style={{
-                          background: 'var(--surface-card)',
-                          border: '1.5px solid var(--border)',
-                          color: 'var(--text-primary)'
-                        }}
-                      />
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Footer */}
-            <div className="px-6 py-4 flex gap-3" style={{ borderTop: '1px solid var(--border)' }}>
-              <button
-                onClick={() => setConfirmModalOpen(false)}
-                className="flex-1 py-2 rounded-xl text-xs font-bold"
-                style={{ background: 'var(--input-bg)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handlePrincipalReturn}
-                disabled={submitting}
-                className="flex-1 py-2 rounded-xl text-xs font-black text-white transition-all hover:scale-105 active:scale-95 flex items-center justify-center gap-1.5"
-                style={{
-                  background: 'linear-gradient(135deg, #d97706, #b45309)',
-                  boxShadow: '0 4px 14px rgba(217,119,6,0.35)',
-                  cursor: submitting ? 'not-allowed' : 'pointer'
-                }}
-              >
-                {submitting ? 'Sending...' : 'Confirm & Send'}
-              </button>
-            </div>
-
-          </div>
         </div>
       )}
     </div>

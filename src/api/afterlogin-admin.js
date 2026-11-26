@@ -644,6 +644,14 @@ export async function downloadPrincipalInterestExcel(payload) {
 }
 
 /**
+ * GET /oxybrick-service/getRealGoldParticipations/{dealId}
+ * Returns real gold participations for a deal.
+ */
+export async function getRealGoldParticipations(dealId) {
+  return get(`/oxybrick-service/getRealGoldParticipations/${dealId}`);
+}
+
+/**
  * PATCH /oxybrick-service/dealClosedManually?dealI={dealId}
  * Close / de-activate a deal manually.
  */
