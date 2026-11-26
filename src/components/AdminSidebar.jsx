@@ -19,6 +19,7 @@ const AssetIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentC
 const ChevronDown  = ({ open }) => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5 transition-transform duration-200" style={{ transform: open ? 'rotate(180deg)' : 'rotate(0deg)' }}><polyline points="6 9 12 15 18 9"/></svg>;
 const BarChartIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><line x1="12" y1="20" x2="12" y2="10"/><line x1="18" y1="20" x2="18" y2="4"/><line x1="6" y1="20" x2="6" y2="16"/></svg>;
 const HoldIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/><circle cx="12" cy="16" r="1" fill="currentColor"/></svg>;
+const RealGoldIcon = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-[17px] h-[17px]"><path d="M4 9l1.5-3h13L20 9"/><path d="M3 9h18l-1.6 8.2A2 2 0 0 1 17.44 19H6.56a2 2 0 0 1-1.96-1.8z"/><path d="M3 9h18"/></svg>;
 
 const assetSubItems = [
   { title: 'Load Asset',        path: '/admin/assets/load',      perm: PERM.ASSETS    },
@@ -68,6 +69,7 @@ const navItemsBefore = [
   { title: 'Total Users',     path: '/admin/total-users',   Icon: UsersIcon2,    perm: PERM.TOTAL_USERS   },
   { title: 'Borrowers',       path: '/admin/borrowers',     Icon: BorrowerIcon2, perm: PERM.BORROWERS     },
   { title: 'Offline Deals',   path: '/admin/offline',       Icon: PackageIcon,   perm: PERM.OFFLINE       },
+  { title: 'Real Gold Deals', path: '/admin/real-gold',     Icon: RealGoldIcon,  perm: PERM.REAL_GOLD     },
 ];
 
 const navItemsAfter = [

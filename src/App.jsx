@@ -64,6 +64,7 @@ import AdminApprovals from './pages/admin/AdminApprovals.jsx';
 import AdminProperties from './pages/admin/AdminProperties.jsx';
 import AdminOxyLoans from './pages/admin/AdminOxyLoans.jsx';
 import AdminOffline from './pages/admin/AdminOffline.jsx';
+import AdminRealGold from './pages/admin/AdminRealGold.jsx';
 import AdminSupport from './pages/admin/AdminSupport.jsx';
 import AdminBankAccounts from './pages/admin/AdminBankAccounts.jsx';
 import LoadAsset from './pages/admin/LoadAsset.jsx';
@@ -265,6 +266,7 @@ function AdminLayout() {
               <Route path="properties"            element={<RequireAdminPerm routeKey="properties"><AdminProperties /></RequireAdminPerm>} />
               <Route path="oxyloans"              element={<RequireAdminPerm routeKey="oxyloans"><AdminOxyLoans /></RequireAdminPerm>} />
               <Route path="offline"               element={<RequireAdminPerm routeKey="offline"><AdminOffline /></RequireAdminPerm>} />
+              <Route path="real-gold"            element={<RequireAdminPerm routeKey="real-gold"><AdminRealGold /></RequireAdminPerm>} />
               <Route path="support"               element={<RequireAdminPerm routeKey="support"><AdminSupport /></RequireAdminPerm>} />
               <Route path="bank-accounts"         element={<RequireAdminPerm routeKey="bank-accounts"><AdminBankAccounts /></RequireAdminPerm>} />
               <Route path="assets/load"           element={<RequireAdminPerm routeKey="assets/load"><LoadAsset /></RequireAdminPerm>} />

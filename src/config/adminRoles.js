@@ -34,7 +34,8 @@ export const PERM = {
   BANK_ACCOUNTS:      'bank-accounts',
   SUPPORT:            'support',
   HOLD_AMOUNT:        'hold-amount',       // hold-amount/create + hold-amount/list + hold-amount/deals
-  WITHDRAWAL:         'withdrawal'
+  WITHDRAWAL:         'withdrawal',
+  REAL_GOLD:          'real-gold',
 };
 
 // ─── Role definitions ─────────────────────────────────────────────────────────
@@ -120,6 +121,7 @@ export function getDefaultAdminRoute(roles) {
     { perm: PERM.TOTAL_USERS,     path: '/admin/total-users' },
     { perm: PERM.BORROWERS,       path: '/admin/borrowers' },
     { perm: PERM.OFFLINE,         path: '/admin/offline' },
+    { perm: PERM.REAL_GOLD,       path: '/admin/real-gold' },
     { perm: PERM.MIGRATED,        path: '/admin/migrated-users' },
     { perm: PERM.WALLET,          path: '/admin/wallet-approvals' },
     { perm: PERM.INTEREST,        path: '/admin/interest/sd-lot' },
@@ -151,6 +153,7 @@ export const ROUTE_PERM_MAP = {
   'total-users':         PERM.TOTAL_USERS,
   'borrowers':           PERM.BORROWERS,
   'offline':             PERM.OFFLINE,
+  'real-gold':           PERM.REAL_GOLD,
   'migrated-users':      PERM.MIGRATED,
   'migrated-total-data': PERM.MIGRATED,
   'migrated-deals':      PERM.MIGRATED,
