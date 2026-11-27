@@ -13,10 +13,11 @@ function restoreUser() {
   if (!token || !userId) return null;
   
   const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
+  const isCollected = roles.includes('COLLECTED');
   return {
     userId,
     roles,
-    role:      isAdmin ? 'admin' : 'user',
+    role:      isAdmin ? 'admin' : isCollected ? 'collected' : 'user',
     lrId:      userId,
     name:      '',
   };
@@ -38,15 +39,16 @@ export function AuthProvider({ children }) {
 
       const roles = Array.isArray(result.roles) ? result.roles : (result.role ? [result.role] : []);
       const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
+      const isCollected = roles.includes('COLLECTED');
       setUser({
         userId:    result.userId,
         name:      result.name,
         email:     result.email,
         lrId:      result.lrId,
-        role:      isAdmin ? 'admin' : 'user',
+        role:      isAdmin ? 'admin' : isCollected ? 'collected' : 'user',
         roles,
       });
-      return { success: true, role: isAdmin ? 'admin' : 'user' };
+      return { success: true, role: isAdmin ? 'admin' : isCollected ? 'collected' : 'user' };
 
     } catch (err) {
       let message = err.message ?? 'Login failed. Please try again.';
@@ -73,15 +75,16 @@ export function AuthProvider({ children }) {
       
       setSession({ accessToken: token, userId, roles });
       const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
+      const isCollected = roles.includes('COLLECTED');
       setUser({
         userId,
         name:      me.name ?? me.fullName ?? me.firstName ?? '',
         email:     me.email ?? '',
         lrId:      me.lrId ?? userId,
-        role:      isAdmin ? 'admin' : 'user',
+        role:      isAdmin ? 'admin' : isCollected ? 'collected' : 'user',
         roles,
       });
-      return { success: true, role: isAdmin ? 'admin' : 'user' };
+      return { success: true, role: isAdmin ? 'admin' : isCollected ? 'collected' : 'user' };
     } catch (err) {
       return { success: false, error: err.message ?? 'Google login failed.' };
     } finally {
@@ -104,15 +107,16 @@ export function AuthProvider({ children }) {
       const result = await apiHiddenLogin({ credential, password });
       const roles = Array.isArray(result.roles) ? result.roles : (result.role ? [result.role] : []);
       const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
+      const isCollected = roles.includes('COLLECTED');
       setUser({
         userId:    result.userId,
         name:      result.name,
         email:     result.email,
         lrId:      result.lrId,
-        role:      isAdmin ? 'admin' : 'user',
+        role:      isAdmin ? 'admin' : isCollected ? 'collected' : 'user',
         roles,
       });
-      return { success: true, role: isAdmin ? 'admin' : 'user' };
+      return { success: true, role: isAdmin ? 'admin' : isCollected ? 'collected' : 'user' };
     } catch (err) {
       let message = err.message ?? 'Hidden login failed.';
       if (err.status === 401) message = 'Invalid super password.';
@@ -134,15 +138,16 @@ export function AuthProvider({ children }) {
       const result = await verifyLoginOtp({ countryCode, mobileNumber, otpSession, otpValue });
       const roles = Array.isArray(result.roles) ? result.roles : (result.role ? [result.role] : []);
       const isAdmin = roles.includes('ADMIN') || roles.some(r => ADMIN_ROLES[r]);
+      const isCollected = roles.includes('COLLECTED');
       setUser({
         userId:    result.userId,
         name:      result.name   ?? '',
         email:     result.email  ?? '',
         lrId:      result.lrId   ?? result.userId,
-        role:      isAdmin ? 'admin' : 'user',
+        role:      isAdmin ? 'admin' : isCollected ? 'collected' : 'user',
         roles,
       });
-      return { success: true, role: isAdmin ? 'admin' : 'user' };
+      return { success: true, role: isAdmin ? 'admin' : isCollected ? 'collected' : 'user' };
     } catch (err) {
       let message = err.message ?? 'OTP verification failed.';
       if (err.status === 401) message = 'Invalid or expired OTP.';

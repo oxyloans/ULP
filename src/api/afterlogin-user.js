@@ -544,3 +544,37 @@ export async function getClosedDeals({ pageIndex = 0, pageSize = 10 } = {}) {
     `/oxybrick-service/getClosedDeals/${userId}?pageIndex=${pageIndex}&pageSize=${pageSize}`
   );
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// COLLECTED AGENT
+// ══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /oxybrick-service/getRealGoldParticipations/{collectedId}
+ * Returns participations assigned to this collected agent.
+ */
+export async function getAssignedParticipations(collectedId) {
+  return get(`/oxybrick-service/getRealGoldParticipations/${collectedId}`);
+}
+
+/**
+ * POST /upload-service/uploadRealGoldCollectedImage
+ * Uploads a collected image. Uses multipart/form-data.
+ * Query params: dealId, participationId, userId, collectedId
+ * FormData field: file (the image)
+ */
+export async function uploadRealGoldCollectedImage({ dealId, participationId, userId, collectedId, file }) {
+  const formData = new FormData();
+  formData.append('file', file);
+  return post(
+    `/upload-service/uploadRealGoldCollectedImage?dealId=${dealId}&participationId=${participationId}&userId=${userId}&collectedId=${collectedId}`,
+    formData
+  );
+}
+
+/**
+ * PATCH /oxybrick-service/updateRealGoldStatus
+ */
+export async function updateRealGoldStatus(payload) {
+  return patch('/oxybrick-service/updateRealGoldStatus', payload);
+}

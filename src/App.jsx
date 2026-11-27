@@ -97,6 +97,7 @@ import AdminInterestFiles from './pages/admin/AdminInterestFiles.jsx';
 
 import { hasPermission, ROUTE_PERM_MAP, getDefaultAdminRoute } from './config/adminRoles.js';
 import GoldDealTest from './pages/GoldDealTest.jsx';
+import CollectedDashboard from './pages/collected/CollectedDashboard.jsx';
 
 
 // ─── Floating Support Button ──────────────────────────────────────────────────
@@ -190,6 +191,27 @@ function RequireAdminPerm({ routeKey, children }) {
     return <Navigate replace to={getDefaultAdminRoute(roles)} />;
   }
   return children;
+}
+
+// ─── Collected agent guard ────────────────────────────────────────────────────
+function RequireCollected({ children }) {
+  const { user } = useAuth();
+  const location = useLocation();
+  if (!user) return <Navigate replace to="/login" />;
+  if (user.role !== 'collected') return <Navigate replace to="/dashboard" />;
+  return children;
+}
+
+// ─── Collected Layout ─────────────────────────────────────────────────────────
+function CollectedLayout() {
+  return (
+    <RequireCollected>
+      <Routes>
+        <Route path="dashboard" element={<CollectedDashboard />} />
+        <Route path="*" element={<Navigate replace to="dashboard" />} />
+      </Routes>
+    </RequireCollected>
+  );
 }
 
 // ─── User Layout ──────────────────────────────────────────────────────────────
@@ -311,11 +333,17 @@ function AppRoutes() {
   const hasErrorParam = hasAuthErrorInUrl(location);
 
   const loginElement = (user && !hasErrorParam)
-    ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} />
+    ? <Navigate replace to={
+        user.role === 'admin' ? getDefaultAdminRoute(user.roles)
+        : user.role === 'collected' ? '/collected/dashboard'
+        : '/dashboard'
+      } />
     : <Login />;
 
   const registerElement = (user && !hasErrorParam)
-    ? <Navigate replace to="/dashboard" />
+    ? <Navigate replace to={
+        user.role === 'collected' ? '/collected/dashboard' : '/dashboard'
+      } />
     : <Register />;
 
   return (
@@ -326,10 +354,10 @@ function AppRoutes() {
         <Route path="/login/"                element={loginElement} />
         <Route path="/register"              element={registerElement} />
         <Route path="/register/"             element={registerElement} />
-        <Route path="/login-otp"             element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
-        <Route path="/login-otp/"            element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <LoginOTP />} />
-        <Route path="/hidden-login"          element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
-        <Route path="/hidden-login/"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : '/dashboard'} /> : <HiddenLogin />} />
+        <Route path="/login-otp"             element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : user.role === 'collected' ? '/collected/dashboard' : '/dashboard'} /> : <LoginOTP />} />
+        <Route path="/login-otp/"            element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : user.role === 'collected' ? '/collected/dashboard' : '/dashboard'} /> : <LoginOTP />} />
+        <Route path="/hidden-login"          element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : user.role === 'collected' ? '/collected/dashboard' : '/dashboard'} /> : <HiddenLogin />} />
+        <Route path="/hidden-login/"         element={user ? <Navigate replace to={user.role === 'admin' ? getDefaultAdminRoute(user.roles) : user.role === 'collected' ? '/collected/dashboard' : '/dashboard'} /> : <HiddenLogin />} />
         <Route path="/oauth/callback"        element={<OAuthCallback />} />
         <Route path="/oauth/callback/"       element={<OAuthCallback />} />
         <Route path="/login/oauth/callback"  element={<OAuthCallback />} />
@@ -339,8 +367,9 @@ function AppRoutes() {
         <Route path="/support"               element={<PreLoginContact />} />
 
         {/* Protected routes */}
-        <Route path="/admin/*" element={<AdminLayout />} />
-        <Route path="/*"       element={<UserLayout />} />
+        <Route path="/admin/*"     element={<AdminLayout />} />
+        <Route path="/collected/*" element={<CollectedLayout />} />
+        <Route path="/*"           element={<UserLayout />} />
       </Routes>
     </>
   );
