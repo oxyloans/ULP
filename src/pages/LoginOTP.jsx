@@ -416,7 +416,7 @@ export default function LoginOTP() {
       const result = await otpLogin({ countryCode, mobileNumber: mobile.trim(), otpSession, otpValue: otpStr });
       if (result.success) {
         setStep('success');
-        setTimeout(() => navigate(result.role === 'admin' ? '/admin' : '/dashboard', { replace: true }), 2400);
+        setTimeout(() => navigate(result.role === 'admin' ? '/admin' : result.role === 'collected' ? '/collected/dashboard' : '/dashboard', { replace: true }), 2400);
       } else {
         setOtpShake(true); setTimeout(() => setOtpShake(false), 500);
         setError(result.error ?? 'Invalid OTP.');

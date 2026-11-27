@@ -9,6 +9,7 @@ import {
   closeDealManually,
   getCollectedUsers,
   assignRealGoldPilot,
+  updateRealGoldStatus,
 } from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
@@ -20,6 +21,40 @@ const SpinnerIcon  = () => <div className="w-4 h-4 rounded-full border-2 border-
 const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const SearchIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
 const EditIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
+
+// ─── Image lightbox ───────────────────────────────────────────────────────────
+function ImageLightbox({ url, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(6px)' }}
+      onClick={onClose}>
+      <div style={{ position: 'relative', maxWidth: '90vw', maxHeight: '90vh' }}
+        onClick={e => e.stopPropagation()}>
+        <button
+          onClick={onClose}
+          style={{
+            position: 'absolute', top: -14, right: -14, zIndex: 1,
+            width: 32, height: 32, borderRadius: '50%', border: 'none', cursor: 'pointer',
+            background: 'rgba(255,255,255,0.15)', color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            backdropFilter: 'blur(4px)',
+          }}>
+          <CloseIcon />
+        </button>
+        <img
+          src={url}
+          alt="Collected document"
+          style={{
+            maxWidth: '90vw', maxHeight: '85vh',
+            borderRadius: 12, objectFit: 'contain',
+            boxShadow: '0 24px 64px rgba(0,0,0,0.6)',
+          }}
+        />
+      </div>
+    </div>
+  );
+}
 
 function fmtINR(n) {
   if (!n && n !== 0) return '—';
@@ -250,31 +285,148 @@ function AssignModal({ participation, dealId, adminUser, onClose, onSuccess }) {
   );
 }
 
-// ─── Stub confirmation modal (Collected / Approve) ────────────────────────────
-function StubConfirmModal({ title, message, onConfirm, onClose }) {
+// ─── Status action modal (Approve) ───────────────────────────────────────────
+function StatusActionModal({ type, participation, dealId, adminUser, onClose, onSuccess }) {
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError]           = useState('');
+  const [comments, setComments]     = useState('');
+  const [imgError, setImgError]     = useState(false);
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+
+  const accentColor = '#10b981';
+  const newStatus   = 'APPROVED';
+
+  const handleConfirm = async () => {
+    setSubmitting(true);
+    setError('');
+    try {
+      await updateRealGoldStatus({
+        collectedId:       participation.collectedId ?? '',
+        comments,
+        dealId:            dealId,
+        adminApprovedDate: new Date().toISOString(),
+        goldStatus:        newStatus,
+        participationId:   participation.participationId,
+        userId:            participation.userId,
+      });
+      onSuccess({ text: 'Participation approved successfully.', type: 'success' });
+    } catch (e) {
+      setError(e.message ?? 'Failed to update status. Please try again.');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
       style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)' }}
       onClick={onClose}>
-      <div className="w-full max-w-sm rounded-2xl p-6"
+      <div className="w-full max-w-md rounded-2xl overflow-hidden"
         style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}
         onClick={e => e.stopPropagation()}>
-        <h3 className="text-sm font-black mb-2" style={{ color: 'var(--text-primary)' }}>{title}</h3>
-        <p className="text-xs font-semibold leading-relaxed mb-6" style={{ color: 'var(--text-muted)' }}>{message}</p>
-        <div className="flex items-center justify-end gap-3">
-          <button onClick={onClose}
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(16,185,129,0.06)' }}>
+          <div>
+            <h3 className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Admin Approve</h3>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Review the collected image and approve this participation
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-all hover:bg-black/10"
+            style={{ color: 'var(--text-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>
+            <CloseIcon />
+          </button>
+        </div>
+
+        <div className="px-5 py-4" style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+          {/* User info */}
+          <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+            <p className="text-xs font-bold" style={{ color: 'var(--text-primary)', marginBottom: 2 }}>{participation.userName ?? '—'}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{participation.email ?? ''}</p>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{participation.mobileNumber ?? ''}</p>
+            <p className="text-xs font-black mt-1" style={{ color: '#f59e0b' }}>
+              {participation.participatedGoldGrams ?? '—'} g
+            </p>
+          </div>
+
+          {/* Document image */}
+          {participation.documentUrl && !imgError ? (
+            <div>
+              <p className="text-xs font-semibold mb-2" style={{ color: 'var(--text-muted)' }}>Collected Photo</p>
+              <img
+                src={participation.documentUrl}
+                alt="Collected document"
+                onError={() => setImgError(true)}
+                onClick={() => setLightboxUrl(participation.documentUrl)}
+                style={{
+                  width: '100%', maxHeight: 240, objectFit: 'cover',
+                  borderRadius: 10, border: '1px solid var(--border)',
+                  cursor: 'zoom-in',
+                }}
+              />
+              <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>Click image to enlarge</p>
+            </div>
+          ) : participation.documentUrl && imgError ? (
+            <div style={{ padding: '12px 14px', borderRadius: 10, background: 'rgba(239,68,68,0.06)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              <p className="text-xs font-semibold" style={{ color: '#ef4444' }}>Image could not be loaded.</p>
+            </div>
+          ) : (
+            <div style={{ padding: '12px 14px', borderRadius: 10, background: 'var(--input-bg)', border: '1px solid var(--border)' }}>
+              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>No document image uploaded.</p>
+            </div>
+          )}
+
+          {/* Comments */}
+          <div>
+            <label className="text-xs font-semibold mb-1 block" style={{ color: 'var(--text-muted)' }}>
+              Comments <span style={{ fontWeight: 400 }}>(optional)</span>
+            </label>
+            <textarea
+              value={comments}
+              onChange={e => setComments(e.target.value)}
+              rows={2}
+              placeholder="Add approval notes…"
+              style={{
+                width: '100%', borderRadius: 10, padding: '8px 12px',
+                fontSize: 12, background: 'var(--input-bg)',
+                border: '1px solid var(--border)', color: 'var(--text-primary)',
+                outline: 'none', resize: 'vertical', boxSizing: 'border-box',
+              }}
+            />
+          </div>
+
+          {/* Error */}
+          {error && (
+            <p className="text-xs font-semibold px-3 py-2 rounded-lg"
+              style={{ color: '#ef4444', background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+              {error}
+            </p>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-5 py-4"
+          style={{ borderTop: '1px solid var(--border)' }}>
+          <button onClick={onClose} disabled={submitting}
             className="px-4 py-2 rounded-xl text-xs font-bold"
-            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', cursor: 'pointer' }}>
             Cancel
           </button>
-          <button onClick={onConfirm}
-            className="px-5 py-2 rounded-xl text-xs font-black text-white transition-all hover:scale-105"
-            style={{ background: 'linear-gradient(135deg,#6366f1,#4338ca)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}>
-            Confirm
+          <button onClick={handleConfirm} disabled={submitting}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black text-white transition-all hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:scale-100"
+            style={{ background: 'linear-gradient(135deg,#10b981,#059669)', boxShadow: '0 4px 14px rgba(16,185,129,0.35)', cursor: 'pointer' }}>
+            {submitting
+              ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />Saving…</>
+              : '✓ Approve'}
           </button>
         </div>
       </div>
     </div>
+    {lightboxUrl && <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />}
+    </>
   );
 }
 
@@ -285,23 +437,17 @@ function ParticipantsPanel({ dealId }) {
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState('');
-  const [copiedUserId, setCopiedUserId] = useState(null);
 
-  // Assign modal state
   const [assignTarget, setAssignTarget] = useState(null); // participation object
 
   // Stub action modal state: { type: 'collected'|'approve', participation }
   const [stubTarget, setStubTarget] = useState(null);
 
+  // Lightbox
+  const [lightboxUrl, setLightboxUrl] = useState(null);
+
   // Feedback modal
   const [feedback, setFeedback] = useState(null);
-
-  const handleCopyUserId = (uid) => {
-    navigator.clipboard.writeText(uid).then(() => {
-      setCopiedUserId(uid);
-      setTimeout(() => setCopiedUserId(null), 2000);
-    });
-  };
 
   const loadParticipants = () => {
     setLoading(true); setError('');
@@ -319,9 +465,10 @@ function ParticipantsPanel({ dealId }) {
     loadParticipants();
   };
 
-  const handleStubConfirm = () => {
+  const handleStatusSuccess = (msg) => {
     setStubTarget(null);
-    setFeedback({ text: 'This action is not yet configured. Please contact the developer.', type: 'error' });
+    setFeedback(msg);
+    loadParticipants();
   };
 
   if (loading) return (
@@ -366,7 +513,7 @@ function ParticipantsPanel({ dealId }) {
             <table className="w-full text-xs">
               <thead>
                 <tr style={{ background: 'var(--input-bg)', borderBottom: '1px solid var(--border)' }}>
-                  {['#', 'User ID', 'Participation ID', 'Gold Grams', 'Approved Grams', 'Gold Rate', 'Amount', 'Status', 'Collected Date', 'Comments', 'Actions'].map(h => (
+                  {['#', 'Details', 'Gold Grams', 'Approved Grams', 'Gold Rate', 'Amount', 'Status', 'Collected Date', 'Comments', 'Actions'].map(h => (
                     <th key={h} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider whitespace-nowrap"
                       style={{ color: 'var(--text-muted)', fontSize: 10 }}>{h}</th>
                   ))}
@@ -382,38 +529,17 @@ function ParticipantsPanel({ dealId }) {
                     {/* # */}
                     <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
 
-                    {/* User ID */}
+                    {/* Details */}
                     <td className="py-2.5 px-3">
-                      <div className="flex items-center gap-1">
-                        <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
-                          {String(p.userId ?? '').slice(0, 8)}…
-                        </span>
-                        {p.userId && (
-                          <button
-                            onClick={() => handleCopyUserId(p.userId)}
-                            title={copiedUserId === p.userId ? 'Copied!' : 'Copy User ID'}
-                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: copiedUserId === p.userId ? '#10b981' : 'var(--text-muted)', lineHeight: 1 }}
-                          >
-                            {copiedUserId === p.userId ? (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            ) : (
-                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
-                                <rect x="9" y="9" width="13" height="13" rx="2" />
-                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                              </svg>
-                            )}
-                          </button>
-                        )}
-                      </div>
-                    </td>
-
-                    {/* Participation ID */}
-                    <td className="py-2.5 px-3">
-                      <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
-                        {String(p.participationId ?? '').slice(0, 8)}…
-                      </span>
+                      <p className="font-semibold text-xs" style={{ color: 'var(--text-primary)' }}>
+                        {p.userName ?? '—'}
+                      </p>
+                      <p className="text-xs tabular-nums mt-0.5" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                        {p.mobileNumber ?? '—'}
+                      </p>
+                      <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+                        {p.email ?? '—'}
+                      </p>
                     </td>
 
                     {/* Gold Grams */}
@@ -477,49 +603,59 @@ function ParticipantsPanel({ dealId }) {
 
                     {/* Actions */}
                     <td className="py-2.5 px-3 whitespace-nowrap">
-                      {/* Assign: when goldStatus is null or PENDING */}
+                      {/* Assign: null or PENDING → admin assigns a collector */}
                       {(p.goldStatus == null || p.goldStatus === 'PENDING') && (
                         <button
                           onClick={() => setAssignTarget(p)}
                           className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
-                          style={{
-                            background: 'rgba(245,158,11,0.15)',
-                            color: '#f59e0b',
-                            border: '1px solid rgba(245,158,11,0.3)',
-                          }}>
+                          style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.3)' }}>
                           Assign
                         </button>
                       )}
 
-                      {/* Collected: when goldStatus === ASSIGNED */}
+                      {/* ASSIGNED → collector's job, show read-only badge */}
                       {p.goldStatus === 'ASSIGNED' && (
-                        <button
-                          onClick={() => setStubTarget({ type: 'collected', participation: p })}
-                          className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
-                          style={{
-                            background: 'rgba(99,102,241,0.15)',
-                            color: '#6366f1',
-                            border: '1px solid rgba(99,102,241,0.3)',
-                          }}>
-                          Collected
-                        </button>
+                        <span className="px-2.5 py-1 rounded-lg text-xs font-black"
+                          style={{ background: 'rgba(99,102,241,0.12)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.25)' }}>
+                          Assigned
+                        </span>
                       )}
 
-                      {/* Approve: when goldStatus === COLLECTED */}
+                      {/* COLLECTED → admin can view image and approve */}
                       {p.goldStatus === 'COLLECTED' && (
-                        <button
-                          onClick={() => setStubTarget({ type: 'approve', participation: p })}
-                          className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
-                          style={{
-                            background: 'rgba(16,185,129,0.15)',
-                            color: '#10b981',
-                            border: '1px solid rgba(16,185,129,0.3)',
-                          }}>
-                          Approve
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          {p.documentUrl && (
+                            <button
+                              onClick={() => setLightboxUrl(p.documentUrl)}
+                              className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
+                              style={{ background: 'rgba(99,102,241,0.15)', color: '#818cf8', border: '1px solid rgba(99,102,241,0.3)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ width: 11, height: 11 }}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                              View
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setStubTarget({ type: 'approve', participation: p })}
+                            className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
+                            style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981', border: '1px solid rgba(16,185,129,0.3)' }}>
+                            Approve
+                          </button>
+                        </div>
                       )}
 
-                      {/* APPROVED or any other status: no action button */}
+                      {/* APPROVED → completed */}
+                      {p.goldStatus === 'APPROVED' && (
+                        <div className="flex flex-col items-start gap-1">
+                          <span className="px-2.5 py-1 rounded-lg text-xs font-black"
+                            style={{ background: 'rgba(16,185,129,0.12)', color: '#10b981', border: '1px solid rgba(16,185,129,0.25)' }}>
+                            COMPLETED
+                          </span>
+                          {p.adminApprovedDate && (
+                            <span className="text-[11px] tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                              {p.adminApprovedDate}
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
@@ -540,21 +676,26 @@ function ParticipantsPanel({ dealId }) {
         />
       )}
 
-      {/* Stub confirm modal */}
+      {/* Status action modal */}
       {stubTarget && (
-        <StubConfirmModal
-          title={stubTarget.type === 'collected' ? 'Mark as Collected' : 'Admin Approve'}
-          message={stubTarget.type === 'collected'
-            ? 'Mark this participation as Collected?'
-            : 'Approve this real gold participation?'}
-          onConfirm={handleStubConfirm}
+        <StatusActionModal
+          type={stubTarget.type}
+          participation={stubTarget.participation}
+          dealId={dealId}
+          adminUser={user}
           onClose={() => setStubTarget(null)}
+          onSuccess={handleStatusSuccess}
         />
       )}
 
       {/* Feedback modal */}
       {feedback && (
         <FeedbackModal message={feedback} onClose={() => setFeedback(null)} />
+      )}
+
+      {/* Image lightbox */}
+      {lightboxUrl && (
+        <ImageLightbox url={lightboxUrl} onClose={() => setLightboxUrl(null)} />
       )}
     </>
   );

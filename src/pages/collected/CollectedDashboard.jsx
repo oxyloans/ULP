@@ -77,6 +77,11 @@ function StatusBadge({ status }) {
 function ParticipationCard({ participation: p, collectedId, onDone }) {
   const [file, setFile]           = useState(null);
   const [preview, setPreview]     = useState(null);
+  const [goldType, setGoldType]   = useState(() => {
+    const normalized = p.goldType?.toUpperCase();
+    return normalized === '22K' || normalized === '24K' ? normalized : '';
+  });
+  const [comments, setComments]   = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]         = useState('');
   const fileRef                   = useRef(null);
@@ -93,6 +98,10 @@ function ParticipationCard({ participation: p, collectedId, onDone }) {
 
   async function handleCollect() {
     if (!file) return;
+    if (!goldType) {
+      setError('Please select a gold type.');
+      return;
+    }
     setSubmitting(true);
     setError('');
     try {
@@ -105,12 +114,13 @@ function ParticipationCard({ participation: p, collectedId, onDone }) {
       });
       await updateRealGoldStatus({
         collectedId,
-        comments:          '',
+        comments,
         dealId:            p.dealId,
         goldCollectedDate: new Date().toISOString(),
         goldStatus:        'COLLECTED',
         participationId:   p.participationId,
         userId:            p.userId,
+        goldType,
       });
       onDone(p.participationId);
     } catch (err) {
@@ -138,7 +148,7 @@ function ParticipationCard({ participation: p, collectedId, onDone }) {
           <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--text-primary)', marginBottom: 2 }}>
             {p.userName ?? 'Unknown User'}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.6 }}>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', lineHeight: 1.6 }}>
             {p.email && <div>{p.email}</div>}
             {p.mobileNumber && <div>{p.mobileNumber}</div>}
           </div>
@@ -147,15 +157,69 @@ function ParticipationCard({ participation: p, collectedId, onDone }) {
       </div>
 
       {/* Gold grams + Deal ID */}
-      <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
-        <div style={{ background: '#fef3c7', borderRadius: 10, padding: '6px 14px', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-          <span style={{ fontSize: 11, color: '#92400e', fontWeight: 600 }}>Gold Grams</span>
-          <span style={{ fontSize: 18, fontWeight: 800, color: '#d97706' }}>{p.participatedGoldGrams ?? '—'}</span>
+        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+        <div style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)', borderRadius: 10, padding: '6px 14px', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+          <span style={{ fontSize: 11, color: '#d97706', fontWeight: 600 }}>Gold Grams</span>
+          <span style={{ fontSize: 18, fontWeight: 800, color: '#f59e0b' }}>{p.participatedGoldGrams ?? '—'}</span>
         </div>
-        <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '6px 14px', display: 'inline-flex', flexDirection: 'column' }}>
-          <span style={{ fontSize: 11, color: 'var(--text-secondary)', fontWeight: 600 }}>Deal ID</span>
+        <div style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', borderRadius: 10, padding: '6px 14px', display: 'inline-flex', flexDirection: 'column' }}>
+          <span style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>Deal ID</span>
           <span style={{ fontFamily: 'monospace', fontSize: 13, color: 'var(--text-primary)', fontWeight: 600 }}>{dealShort}</span>
         </div>
+      </div>
+
+      {/* Gold Type */}
+      <div>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+          Gold Type
+        </label>
+        <select
+          value={goldType}
+          onChange={e => { setGoldType(e.target.value); setError(''); }}
+          style={{
+            width:        '100%',
+            borderRadius: 10,
+            padding:      '8px 12px',
+            fontSize:     13,
+            fontWeight:   600,
+            background:   'var(--input-bg)',
+            border:       '1px solid var(--border)',
+            color:        'var(--text-primary)',
+            outline:      'none',
+            boxSizing:    'border-box',
+            cursor:       'pointer',
+          }}
+        >
+          <option value="">Select Gold Type</option>
+          <option value="22K">22K</option>
+          <option value="24K">24K</option>
+        </select>
+      </div>
+
+      {/* Comments */}
+      <div>
+        <label style={{ display: 'block', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 6 }}>
+          Comments <span style={{ fontWeight: 400 }}>(optional)</span>
+        </label>
+        <textarea
+          value={comments}
+          onChange={e => setComments(e.target.value)}
+          rows={2}
+          placeholder="Add collection notes…"
+          style={{
+            width:        '100%',
+            borderRadius: 10,
+            padding:      '8px 12px',
+            fontSize:     13,
+            background:   'var(--input-bg)',
+            border:       '1px solid var(--border)',
+            color:        'var(--text-primary)',
+            outline:      'none',
+            resize:       'vertical',
+            boxSizing:    'border-box',
+            fontFamily:   'inherit',
+          }}
+        />
       </div>
 
       {/* Image upload area */}
@@ -194,7 +258,7 @@ function ParticipationCard({ participation: p, collectedId, onDone }) {
               alt="preview"
               style={{ width: '100%', maxHeight: 200, objectFit: 'cover', borderRadius: 10, border: '1px solid var(--border)' }}
             />
-            <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{file.name}</div>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{file.name}</div>
             <button
               onClick={() => fileRef.current?.click()}
               style={{ background: 'none', border: 'none', color: '#f59e0b', fontWeight: 600, fontSize: 13, cursor: 'pointer', padding: 0, textAlign: 'left' }}
@@ -251,13 +315,13 @@ export default function CollectedDashboard() {
   const [toast, setToast]                   = useState('');
 
   async function load() {
+    if (!user?.userId) return;
     setLoading(true);
     setFetchError('');
     try {
       const data = await getAssignedParticipations(user.userId);
       const list = Array.isArray(data) ? data : (data?.content ?? []);
-      // Show only non-collected items
-      setParticipations(list.filter(p => p.goldStatus !== 'COLLECTED'));
+      setParticipations(list.filter(p => p.goldStatus !== 'COLLECTED' && p.goldStatus !== 'APPROVED'));
     } catch (err) {
       setFetchError(err.message ?? 'Failed to load participations.');
     } finally {
@@ -265,7 +329,7 @@ export default function CollectedDashboard() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.userId]);
 
   function handleCardDone(participationId) {
     setParticipations(prev => prev.filter(p => p.participationId !== participationId));
@@ -303,7 +367,7 @@ export default function CollectedDashboard() {
         {/* Agent name + logout */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
           {user?.name && (
-            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)' }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-muted)' }}>
               {user.name}
             </span>
           )}
@@ -355,7 +419,7 @@ export default function CollectedDashboard() {
           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: 'var(--text-primary)' }}>
             Assigned Participations
           </h2>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-secondary)' }}>
+          <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--text-muted)' }}>
             Upload a photo and mark each participation as collected.
           </p>
         </div>
@@ -392,13 +456,13 @@ export default function CollectedDashboard() {
             borderRadius: 16,
             padding:    '48px 24px',
             textAlign:  'center',
-            color:      'var(--text-secondary)',
+            color:      'var(--text-muted)',
           }}>
             <div style={{ fontSize: 40, marginBottom: 12 }}>✅</div>
             <div style={{ fontWeight: 700, fontSize: 16, color: 'var(--text-primary)', marginBottom: 4 }}>
               All done!
             </div>
-            <div style={{ fontSize: 13 }}>No pending participations assigned to you.</div>
+            <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>No pending participations assigned to you.</div>
           </div>
         )}
 

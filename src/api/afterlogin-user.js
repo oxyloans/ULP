@@ -550,11 +550,11 @@ export async function getClosedDeals({ pageIndex = 0, pageSize = 10 } = {}) {
 // ══════════════════════════════════════════════════════════════════════════════
 
 /**
- * GET /oxybrick-service/getRealGoldParticipations/{collectedId}
+ * GET /oxybrick-service/getCollectedUserGoldStatus/{collectedId}
  * Returns participations assigned to this collected agent.
  */
 export async function getAssignedParticipations(collectedId) {
-  return get(`/oxybrick-service/getRealGoldParticipations/${collectedId}`);
+  return get(`/oxybrick-service/getCollectedUserGoldStatus/${collectedId}`);
 }
 
 /**

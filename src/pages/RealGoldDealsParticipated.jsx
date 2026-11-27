@@ -73,31 +73,35 @@ function fmtINR(n) {
   return formatINR(n);
 }
 function payoutLabel(type) {
-  const map = { monthly: 'Monthly', quarterly: 'Quarterly', halfyearly: 'Half-Yearly', yearly: 'Yearly' };
+  const map = {
+    monthly: 'Monthly',
+    quartely: 'Quarterly',
+    quarterly: 'Quarterly',
+    halfly: 'Half-Yearly',
+    halfyearly: 'Half-Yearly',
+    yearly: 'Yearly',
+    endofthedeal: 'End of Deal',
+  };
   return map[type?.toLowerCase()] ?? type ?? '—';
 }
 function payoutColor(type) {
-  const map = { monthly: GREEN, quarterly: BLUE, halfyearly: GOLD, yearly: PURPLE };
+  const map = {
+    monthly: GREEN,
+    quartely: BLUE,
+    quarterly: BLUE,
+    halfly: GOLD,
+    halfyearly: GOLD,
+    yearly: PURPLE,
+    endofthedeal: '#06b6d4',
+  };
   return map[type?.toLowerCase()] ?? '#818cf8';
 }
-
-// ─── Animated progress bar ────────────────────────────────────────────────────
-function ProgressBar({ pct, color }) {
-  const [w, setW] = useState(0);
-  useEffect(() => {
-    const t = setTimeout(() => setW(Math.min(pct, 100)), 200);
-    return () => clearTimeout(t);
-  }, [pct]);
-  return (
-    <div style={{ height: 6, borderRadius: 999, overflow: 'hidden', background: 'var(--bar-track, rgba(255,255,255,0.08))' }}>
-      <div style={{
-        height: '100%', borderRadius: 999, width: `${w}%`,
-        background: `linear-gradient(90deg, ${color}, ${color}99)`,
-        boxShadow: `0 0 8px ${color}66`,
-        transition: 'width 1s cubic-bezier(0.4,0,0.2,1)',
-      }} />
-    </div>
-  );
+function subTypeLabel(type) {
+  const map = {
+    pledginggold: 'Pledging Gold',
+    investment: 'Investment',
+  };
+  return map[type?.toLowerCase()] ?? type ?? '—';
 }
 
 // ─── KPI card ─────────────────────────────────────────────────────────────────
@@ -139,23 +143,13 @@ function DealCard({ deal }) {
   const [expanded, setExpanded] = useState(false);
   const navigate = useNavigate();
 
-  const pc            = payoutColor(deal.participationType);
-  const interestPct   = Number(deal.interestEarnedPercentage ?? 0);
-  const goldPct       = Number(deal.goldGrowthPercentage ?? 0);
-  const total         = interestPct + goldPct;
-  const interestShare = total > 0 ? Math.round((interestPct / total) * 100) : 0;
-  const goldShare     = total > 0 ? 100 - interestShare : 0;
-
-  function SegBar({ pct, color }) {
-    const [w, setW] = useState(0);
-    useEffect(() => { const t = setTimeout(() => setW(pct), 300); return () => clearTimeout(t); }, [pct]);
-    return (
-      <div style={{ flex: `0 0 ${w}%`, height: '100%', borderRadius: 999,
-        background: `linear-gradient(90deg,${color},${color}99)`,
-        boxShadow: `0 0 6px ${color}55`,
-        transition: 'flex 1s cubic-bezier(0.4,0,0.2,1)' }} />
-    );
-  }
+  const payoutType  = deal.amountTye ?? deal.participationType;
+  const pc          = payoutColor(payoutType);
+  const topups      = Array.isArray(deal.updatedParticipation) ? deal.updatedParticipation : [];
+  const baseAmount  = Number(deal.participatedAmount ?? 0);
+  const totalAmount = baseAmount + topups.reduce((s, u) => s + Number(u.updationParticipation ?? u.participatedAmount ?? 0), 0);
+  const baseGrams   = Number(deal.participationGoldGrams ?? deal.participatedGoldGrams ?? 0);
+  const totalGrams  = baseGrams + topups.reduce((s, u) => s + Number(u.participationGoldGrams ?? u.participatedGoldGrams ?? 0), 0);
 
   return (
     <div style={{
@@ -179,34 +173,40 @@ function DealCard({ deal }) {
               </h3>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 999, flexShrink: 0,
                 background: `${pc}18`, color: pc, border: `1px solid ${pc}28` }}>
-                {payoutLabel(deal.participationType)}
+                {payoutLabel(payoutType)}
               </span>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 999, flexShrink: 0,
                 background: `${GOLD}12`, color: GOLD, border: `1px solid ${GOLD}25` }}>
                 🪙 Real Gold
               </span>
+              {deal.dealSubType && (
+                <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 10px', borderRadius: 999, flexShrink: 0,
+                  background: `${PURPLE}14`, color: PURPLE, border: `1px solid ${PURPLE}28` }}>
+                  {subTypeLabel(deal.dealSubType)}
+                </span>
+              )}
             </div>
             <p style={{ fontSize: 10, fontFamily: "'JetBrains Mono', monospace", color: 'var(--text-muted, #888)' }}>
               {String(deal.dealId).slice(0, 18)}…
             </p>
           </div>
           <div style={{ textAlign: 'right', marginLeft: 'auto' }}>
-            <p style={{ fontSize: 24, fontWeight: 800, color: GREEN, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
-              +{fmt(deal.totalUserEarnedPercentage)}%
+            <p style={{ fontSize: 22, fontWeight: 800, color: GOLD, fontFamily: "'JetBrains Mono', monospace", lineHeight: 1 }}>
+              {Number(totalGrams.toFixed(2)).toLocaleString()} g
             </p>
-            <p style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 3 }}>Total Earned</p>
+            <p style={{ fontSize: 11, color: 'var(--text-muted, #888)', marginTop: 3 }}>Gold Participated</p>
           </div>
         </div>
 
         <div style={{ height: 1, margin: '14px 0', background: 'var(--border, rgba(255,255,255,0.07))' }} />
 
         {/* Stat pills */}
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 14 }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
           {[
-            { label: 'Interest',      value: `${fmt(deal.interestEarnedPercentage)}%`,                              color: BLUE  },
-            { label: 'Gold Growth',   value: `${fmt(deal.goldGrowthPercentage)}%`,                                  color: GOLD  },
-            { label: 'Total',         value: `${fmt(deal.totalUserEarnedPercentage)}%`,                             color: GREEN },
-            { label: 'Gold Invested', value: `${Number(deal.participatedGoldGrams ?? 0).toLocaleString()} g`,       color: PURPLE },
+            { label: 'Amount',    value: fmtINR(totalAmount),                                      color: GREEN  },
+            { label: 'Gold',      value: `${Number(totalGrams.toFixed(2)).toLocaleString()} g`,     color: GOLD   },
+            { label: 'ROI',       value: `${fmt(deal.rateOfInterest)}%`,                           color: BLUE   },
+            { label: 'Date',      value: deal.participatedDate ?? '—',                             color: PURPLE },
           ].map(s => (
             <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '6px 12px',
               borderRadius: 10, background: `${s.color}0d`, border: `1px solid ${s.color}1e` }}>
@@ -217,21 +217,6 @@ function DealCard({ deal }) {
             </div>
           ))}
         </div>
-
-        {/* Segmented progress bar */}
-        {total > 0 && (
-          <div>
-            <div style={{ height: 8, borderRadius: 999, overflow: 'hidden', display: 'flex', gap: 2,
-              background: 'var(--bar-track, rgba(255,255,255,0.06))' }}>
-              <SegBar pct={interestShare} color={BLUE} />
-              {goldPct > 0 && <SegBar pct={goldShare} color={GOLD} />}
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-              <span style={{ fontSize: 10, color: BLUE }}>Interest {fmt(deal.interestEarnedPercentage)}%</span>
-              {goldPct > 0 && <span style={{ fontSize: 10, color: GOLD }}>Gold Growth {fmt(deal.goldGrowthPercentage)}%</span>}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Expand toggle */}
@@ -254,12 +239,16 @@ function DealCard({ deal }) {
         <div style={{ padding: '16px 20px', borderTop: `1px solid ${GOLD}10`,
           background: 'var(--input-bg, rgba(255,255,255,0.02))', display: 'grid', gap: 10 }}>
           {[
-            { label: 'Deal ID',           value: deal.dealId },
-            { label: 'Payout Type',       value: payoutLabel(deal.participationType) },
-            { label: 'Gold Invested',     value: `${Number(deal.participatedGoldGrams ?? 0).toLocaleString()} g` },
-            { label: 'Interest Earned',   value: `${fmt(deal.interestEarnedPercentage)}%` },
-            { label: 'Gold Growth',       value: `${fmt(deal.goldGrowthPercentage)}%` },
-            { label: 'Total Earned',      value: `${fmt(deal.totalUserEarnedPercentage)}%` },
+            { label: 'Deal ID',              value: deal.dealId },
+            { label: 'Deal Type',            value: deal.globalDealType ?? '—' },
+            { label: 'Deal Sub Type',        value: subTypeLabel(deal.dealSubType) },
+            { label: 'Payout Type',          value: payoutLabel(payoutType) },
+            { label: 'Gold Participated',    value: `${Number(totalGrams.toFixed(2)).toLocaleString()} g` },
+            { label: 'Participated Amount',  value: fmtINR(totalAmount) },
+            { label: 'Rate of Interest',     value: `${fmt(deal.rateOfInterest)}%` },
+            { label: 'Participated Date',    value: deal.participatedDate ?? '—' },
+            { label: 'Minimum Participation', value: fmtINR(deal.minimumParticipation) },
+            { label: 'Maximum Participation', value: fmtINR(deal.maxParticipation) },
           ].map(r => (
             <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               padding: '8px 12px', borderRadius: 10,
@@ -271,6 +260,22 @@ function DealCard({ deal }) {
               </span>
             </div>
           ))}
+          {topups.length > 0 && (
+            <div style={{ padding: '10px 12px', borderRadius: 10, background: 'var(--surface-card, #1a1a2e)',
+              border: '1px solid var(--border, rgba(255,255,255,0.07))', display: 'grid', gap: 6 }}>
+              <span style={{ fontSize: 11, color: GOLD, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                Updated Participations ({topups.length})
+              </span>
+              {topups.map((u, idx) => (
+                <div key={idx} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, color: 'var(--text-primary)' }}>
+                  <span style={{ color: 'var(--text-muted)' }}>Top-up #{idx + 1} · {u.updatedDate ?? '—'}</span>
+                  <span style={{ fontFamily: "'JetBrains Mono', monospace", fontWeight: 700 }}>
+                    {fmtINR(u.updationParticipation ?? u.participatedAmount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
           <button
             onClick={() => navigate(`/real-gold-lot/participate/${deal.dealId}`)}
             style={{ marginTop: 4, padding: '9px 0', borderRadius: 12, fontSize: 13, fontWeight: 700,
@@ -307,16 +312,16 @@ export default function RealGoldDealsParticipated() {
   // Filter to REALGOLD only
   const deals = useMemo(() => {
     const info = data?.participationInfo ?? [];
-    // Dedupe by dealId + participationType
     const map = new Map();
     info
       .filter(p => p.globalDealType === 'REALGOLD')
       .forEach(item => {
-        const key = `${item.dealId}-${item.participationType}`;
+        const payout = item.amountTye ?? item.participationType ?? '';
+        const key = `${item.dealId}-${payout}`;
         if (!map.has(key)) map.set(key, item);
         else {
           const prev = map.get(key);
-          if (Number(item.totalUserEarnedPercentage ?? 0) > Number(prev.totalUserEarnedPercentage ?? 0))
+          if (Number(item.participatedAmount ?? 0) > Number(prev.participatedAmount ?? 0))
             map.set(key, item);
         }
       });
@@ -326,19 +331,35 @@ export default function RealGoldDealsParticipated() {
   const filteredDeals = useMemo(() => {
     const q = search.trim().toLowerCase();
     return deals
-      .filter(d => payoutFilter === 'all' || (d.participationType ?? '').toLowerCase() === payoutFilter)
+      .filter(d => payoutFilter === 'all' || (d.amountTye ?? d.participationType ?? '').toLowerCase() === payoutFilter)
       .filter(d => {
         if (!q) return true;
-        return (d.dealName ?? '').toLowerCase().includes(q) || String(d.dealId ?? '').toLowerCase().includes(q);
+        return (
+          (d.dealName ?? '').toLowerCase().includes(q) ||
+          String(d.dealId ?? '').toLowerCase().includes(q) ||
+          (d.dealSubType ?? '').toLowerCase().includes(q)
+        );
       });
   }, [deals, payoutFilter, search]);
 
-  const totalGoldGrams = deals.reduce((s, d) => s + Number(d.participatedGoldGrams ?? 0), 0);
-  const avgEarned      = deals.length ? deals.reduce((s, d) => s + Number(d.totalUserEarnedPercentage ?? 0), 0) / deals.length : 0;
-  const avgGoldGrowth  = deals.length ? deals.reduce((s, d) => s + Number(d.goldGrowthPercentage ?? 0), 0) / deals.length : 0;
+  const totalGoldGrams = deals.reduce((s, d) => {
+    const topups = Array.isArray(d.updatedParticipation) ? d.updatedParticipation : [];
+    const base = Number(d.participationGoldGrams ?? d.participatedGoldGrams ?? 0);
+    const extra = topups.reduce((ts, u) => ts + Number(u.participationGoldGrams ?? u.participatedGoldGrams ?? 0), 0);
+    return s + base + extra;
+  }, 0);
+  const totalParticipatedAmount = deals.reduce((s, d) => {
+    const topups = Array.isArray(d.updatedParticipation) ? d.updatedParticipation : [];
+    const base = Number(d.participatedAmount ?? 0);
+    const extra = topups.reduce((ts, u) => ts + Number(u.updationParticipation ?? u.participatedAmount ?? 0), 0);
+    return s + base + extra;
+  }, 0);
+  const avgRoi = deals.length
+    ? deals.reduce((s, d) => s + Number(d.rateOfInterest ?? 0), 0) / deals.length
+    : 0;
 
   const payoutOptions = useMemo(() => {
-    const types = Array.from(new Set(deals.map(d => (d.participationType ?? '').toLowerCase()).filter(Boolean)));
+    const types = Array.from(new Set(deals.map(d => (d.amountTye ?? d.participationType ?? '').toLowerCase()).filter(Boolean)));
     return ['all', ...types];
   }, [deals]);
 
@@ -373,7 +394,7 @@ export default function RealGoldDealsParticipated() {
               </span>
             </div>
             <p style={{ fontSize: 14, color: 'rgba(255,255,255,0.75)', margin: 0 }}>
-              Track your running real gold deal performance
+              Track your running real gold deal participations
             </p>
           </div>
           <button onClick={load} style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 18px',
@@ -387,10 +408,10 @@ export default function RealGoldDealsParticipated() {
       {/* ── KPI strip ── */}
       {!loading && deals.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(170px,1fr))', gap: 16 }}>
-          <KpiCard label="Active Deals"     value={deals.length}                               sub="Real gold positions"      color={GOLD}   Icon={GoldBarIcon} />
-          <KpiCard label="Total Gold"       value={`${Number(totalGoldGrams.toFixed(2)).toLocaleString()} g`} sub="Across all REALGOLD deals" color={BLUE}   Icon={BarIcon}     />
-          <KpiCard label="Avg. Earned"      value={`${fmt(avgEarned)}%`}                       sub="Interest + gold growth"   color={GREEN}  Icon={TrendUp}     />
-          <KpiCard label="Avg. Gold Growth" value={`${fmt(avgGoldGrowth)}%`}                   sub="Gold appreciation rate"   color={PURPLE} Icon={CoinsIcon}   />
+          <KpiCard label="Active Deals"     value={deals.length}                                               sub="Real gold positions"      color={GOLD}   Icon={GoldBarIcon} />
+          <KpiCard label="Total Gold"       value={`${Number(totalGoldGrams.toFixed(2)).toLocaleString()} g`}  sub="Across all REALGOLD deals" color={BLUE}   Icon={BarIcon}     />
+          <KpiCard label="Total Amount"     value={fmtINR(totalParticipatedAmount)}                            sub="Total participated value"  color={GREEN}  Icon={CoinsIcon}   />
+          <KpiCard label="Avg. Interest"    value={`${fmt(avgRoi)}%`}                                          sub="Rate of interest"          color={PURPLE} Icon={TrendUp}     />
         </div>
       )}
 

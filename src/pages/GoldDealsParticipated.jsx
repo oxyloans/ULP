@@ -683,7 +683,7 @@ function ProcessedDealCard({ deal, onDownloadMou, onRealizationPayout, onOpenDet
             </p>
           </div>
           <div style={{ padding: '8px 10px', borderRadius: 12, background: `${PURPLE}10`, border: `1px solid ${PURPLE}25` }}>
-            <span style={{ fontSize: 10, color: 'var(--text-muted, #888)', fontWeight: 600 }}>Type</span>
+            <span style={{ fontSize: 10, color: 'var(--text-muted, #888)', fontWeight: 600 }}>Participations</span>
             <p style={{ marginTop: 4, fontSize: 14, fontWeight: 900, color: PURPLE }}>
               {auctionLabel}
             </p>

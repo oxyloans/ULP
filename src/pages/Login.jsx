@@ -251,7 +251,7 @@ export default function Login() {
     const result = await login(credential.trim(), password);
     setLoading(false);
     if (!result.success) { setError(result.error); setLoginText(""); return; }
-    navigate(result.role === "admin" ? "/admin" : "/dashboard", { replace: true });
+    navigate(result.role === "admin" ? "/admin" : result.role === "collected" ? "/collected/dashboard" : "/dashboard", { replace: true });
   };
 
   // ── Design tokens ──────────────────────────────────────────────────────────

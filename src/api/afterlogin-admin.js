@@ -669,6 +669,15 @@ export async function assignRealGoldPilot(payload) {
 }
 
 /**
+ * PATCH /oxybrick-service/updateRealGoldStatus
+ * Updates the goldStatus of a real gold participation.
+ * payload: { collectedId, comments, dealId, goldCollectedDate, goldStatus, participationId, userId }
+ */
+export async function updateRealGoldStatus(payload) {
+  return patch('/oxybrick-service/updateRealGoldStatus', payload);
+}
+
+/**
  * PATCH /oxybrick-service/dealClosedManually?dealI={dealId}
  * Close / de-activate a deal manually.
  */
