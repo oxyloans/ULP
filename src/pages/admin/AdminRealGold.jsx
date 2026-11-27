@@ -1,18 +1,25 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRunningClosedDeals, getRealGoldParticipations, getAdminDeals, getDealsByStatusType, closeDealManually } from '../../api/afterlogin-admin';
+import { useAuth } from '../../context/AuthContext';
+import {
+  getRunningClosedDeals,
+  getRealGoldParticipations,
+  getAdminDeals,
+  getDealsByStatusType,
+  closeDealManually,
+  getCollectedUsers,
+  assignRealGoldPilot,
+} from '../../api/afterlogin-admin';
 import { formatINR } from '../../utils/currency';
 
 // ─── Icons ────────────────────────────────────────────────────────────────────
 const RefreshIcon  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>;
 const ChevronDown  = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><polyline points="6 9 12 15 18 9"/></svg>;
 const UsersIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>;
-const BankIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 10v11M12 10v11M16 10v11"/></svg>;
 const SpinnerIcon  = () => <div className="w-4 h-4 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: '#d97706', borderTopColor: 'transparent' }} />;
 const CloseIcon    = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
 const SearchIcon   = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>;
 const EditIcon     = () => <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-3.5 h-3.5"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>;
-
 
 function fmtINR(n) {
   if (!n && n !== 0) return '—';
@@ -43,9 +50,9 @@ function FeedbackModal({ message, onClose }) {
   if (!message || !message.text) return null;
 
   const isSuccess = message.type === 'success';
-  const accentColor = isSuccess ? '#10b981' : '#ef4444';
-  const bgAccent = isSuccess ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
-  const borderAccent = isSuccess ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)';
+  const accentColor   = isSuccess ? '#10b981' : '#ef4444';
+  const bgAccent      = isSuccess ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)';
+  const borderAccent  = isSuccess ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.25)';
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -54,8 +61,7 @@ function FeedbackModal({ message, onClose }) {
       <div className="w-full max-w-sm rounded-2xl overflow-hidden text-center p-6 transition-all"
         style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}
         onClick={e => e.stopPropagation()}>
-        
-        {/* Status Icon */}
+
         <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
           style={{ background: bgAccent, border: `2px solid ${borderAccent}`, color: accentColor }}>
           {isSuccess ? (
@@ -71,17 +77,14 @@ function FeedbackModal({ message, onClose }) {
           )}
         </div>
 
-        {/* Title */}
         <h3 className="text-base font-black mb-2" style={{ color: 'var(--text-primary)' }}>
           {isSuccess ? 'Success' : 'Message'}
         </h3>
 
-        {/* Message */}
         <p className="text-xs font-semibold mb-6 leading-relaxed whitespace-pre-wrap break-words" style={{ color: 'var(--text-muted)' }}>
           {message.text}
         </p>
 
-        {/* Action button */}
         <button
           onClick={onClose}
           className="w-full py-2.5 rounded-xl text-xs font-black transition-all hover:scale-[1.02] active:scale-95"
@@ -98,22 +101,200 @@ function FeedbackModal({ message, onClose }) {
   );
 }
 
-// Helper to check if API text response indicates error
-const isTextSuccess = (text) => {
-  if (!text) return false;
-  const lower = text.toLowerCase();
-  if (lower.includes('greater than') || lower.includes('error') || lower.includes('fail') || lower.includes('invalid') || lower.includes('not found') || lower.includes('exception')) {
-    return false;
+// ─── Assign modal ─────────────────────────────────────────────────────────────
+function AssignModal({ participation, dealId, adminUser, onClose, onSuccess }) {
+  const [collectedUsers, setCollectedUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers]     = useState(true);
+  const [fetchError, setFetchError]         = useState('');
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [submitting, setSubmitting]         = useState(false);
+  const [feedback, setFeedback]             = useState(null);
+
+  useEffect(() => {
+    setLoadingUsers(true);
+    setFetchError('');
+    getCollectedUsers()
+      .then(res => setCollectedUsers(Array.isArray(res) ? res : []))
+      .catch(e => setFetchError(e.message ?? 'Failed to load collected users'))
+      .finally(() => setLoadingUsers(false));
+  }, []);
+
+  const handleAssign = () => {
+    if (!selectedUserId) return;
+    const selectedUser = collectedUsers.find(u => u.userId === selectedUserId);
+    if (!selectedUser) return;
+
+    setSubmitting(true);
+    assignRealGoldPilot({
+      assignedBy:      adminUser?.userName ?? adminUser?.userId ?? '',
+      collectedId:     selectedUser.userId,
+      dealId:          dealId,
+      participationId: participation.participationId,
+      userId:          participation.userId,
+    })
+      .then(() => {
+        onSuccess({ text: 'Participation assigned successfully.', type: 'success' });
+      })
+      .catch(e => {
+        setFeedback({ text: e.message ?? 'Assignment failed. Please try again.', type: 'error' });
+      })
+      .finally(() => setSubmitting(false));
+  };
+
+  if (feedback) {
+    return <FeedbackModal message={feedback} onClose={() => { setFeedback(null); onClose(); }} />;
   }
-  return true;
-};
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)' }}
+      onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl overflow-hidden"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}
+        onClick={e => e.stopPropagation()}>
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4"
+          style={{ borderBottom: '1px solid var(--border)', background: 'rgba(245,158,11,0.06)' }}>
+          <div>
+            <h3 className="text-sm font-black" style={{ color: 'var(--text-primary)' }}>Assign Pilot</h3>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              Select a collected user to assign to this participation
+            </p>
+          </div>
+          <button onClick={onClose} className="p-1.5 rounded-lg transition-all hover:bg-black/10"
+            style={{ color: 'var(--text-muted)' }}>
+            <CloseIcon />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="px-5 py-4" style={{ maxHeight: 360, overflowY: 'auto' }}>
+          {loadingUsers && (
+            <div className="flex items-center gap-2 py-8 justify-center">
+              <SpinnerIcon />
+              <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Loading collected users…</span>
+            </div>
+          )}
+
+          {!loadingUsers && fetchError && (
+            <p className="text-xs font-semibold py-6 text-center" style={{ color: '#ef4444' }}>{fetchError}</p>
+          )}
+
+          {!loadingUsers && !fetchError && collectedUsers.length === 0 && (
+            <p className="text-xs py-6 text-center" style={{ color: 'var(--text-muted)' }}>No collected users found</p>
+          )}
+
+          {!loadingUsers && !fetchError && collectedUsers.map(u => {
+            const selected = selectedUserId === u.userId;
+            return (
+              <div key={u.userId}
+                onClick={() => setSelectedUserId(u.userId)}
+                className="flex items-start gap-3 p-3 rounded-xl mb-2 cursor-pointer transition-all"
+                style={{
+                  background: selected ? 'rgba(245,158,11,0.12)' : 'var(--input-bg)',
+                  border: `1px solid ${selected ? '#f59e0b' : 'var(--border)'}`,
+                  boxShadow: selected ? '0 0 0 2px rgba(245,158,11,0.2)' : 'none',
+                }}>
+                <div className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 font-black text-xs"
+                  style={{ background: selected ? '#f59e0b' : 'var(--border)', color: selected ? '#fff' : 'var(--text-muted)' }}>
+                  {(u.firstName ?? u.userName ?? '?')[0].toUpperCase()}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold truncate" style={{ color: selected ? '#f59e0b' : 'var(--text-primary)' }}>
+                    {u.userName ?? `${u.firstName ?? ''} ${u.lastName ?? ''}`.trim()}
+                  </p>
+                  <p className="text-xs truncate" style={{ color: 'var(--text-muted)' }}>{u.email}</p>
+                  <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{u.mobileNumber}</p>
+                </div>
+                {selected && (
+                  <div className="flex-shrink-0 w-4 h-4 rounded-full flex items-center justify-center"
+                    style={{ background: '#f59e0b', color: '#fff' }}>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                      <polyline points="20 6 9 17 4 12" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-5 py-4"
+          style={{ borderTop: '1px solid var(--border)' }}>
+          <button onClick={onClose} disabled={submitting}
+            className="px-4 py-2 rounded-xl text-xs font-bold transition-all"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            Cancel
+          </button>
+          <button
+            onClick={handleAssign}
+            disabled={!selectedUserId || submitting}
+            className="flex items-center gap-2 px-5 py-2 rounded-xl text-xs font-black transition-all hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:scale-100"
+            style={{
+              background: 'linear-gradient(135deg,#f59e0b,#d97706)',
+              color: '#fff',
+              boxShadow: '0 4px 14px rgba(245,158,11,0.3)',
+            }}>
+            {submitting ? (
+              <>
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                Assigning…
+              </>
+            ) : 'Confirm Assign'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Stub confirmation modal (Collected / Approve) ────────────────────────────
+function StubConfirmModal({ title, message, onConfirm, onClose }) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(5px)' }}
+      onClick={onClose}>
+      <div className="w-full max-w-sm rounded-2xl p-6"
+        style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 24px 64px rgba(0,0,0,0.4)' }}
+        onClick={e => e.stopPropagation()}>
+        <h3 className="text-sm font-black mb-2" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+        <p className="text-xs font-semibold leading-relaxed mb-6" style={{ color: 'var(--text-muted)' }}>{message}</p>
+        <div className="flex items-center justify-end gap-3">
+          <button onClick={onClose}
+            className="px-4 py-2 rounded-xl text-xs font-bold"
+            style={{ background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)' }}>
+            Cancel
+          </button>
+          <button onClick={onConfirm}
+            className="px-5 py-2 rounded-xl text-xs font-black text-white transition-all hover:scale-105"
+            style={{ background: 'linear-gradient(135deg,#6366f1,#4338ca)', boxShadow: '0 4px 14px rgba(99,102,241,0.3)' }}>
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Participants panel (lazy-loaded per deal) ────────────────────────────────
 function ParticipantsPanel({ dealId }) {
+  const { user } = useAuth();
+
   const [participants, setParticipants] = useState([]);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState('');
   const [copiedUserId, setCopiedUserId] = useState(null);
+
+  // Assign modal state
+  const [assignTarget, setAssignTarget] = useState(null); // participation object
+
+  // Stub action modal state: { type: 'collected'|'approve', participation }
+  const [stubTarget, setStubTarget] = useState(null);
+
+  // Feedback modal
+  const [feedback, setFeedback] = useState(null);
 
   const handleCopyUserId = (uid) => {
     navigator.clipboard.writeText(uid).then(() => {
@@ -122,13 +303,26 @@ function ParticipantsPanel({ dealId }) {
     });
   };
 
-  useEffect(() => {
+  const loadParticipants = () => {
     setLoading(true); setError('');
     getRealGoldParticipations(dealId)
       .then(res => setParticipants(Array.isArray(res) ? res : []))
       .catch(e => setError(e.message ?? 'Failed to load participants'))
       .finally(() => setLoading(false));
-  }, [dealId]);
+  };
+
+  useEffect(() => { loadParticipants(); }, [dealId]);
+
+  const handleAssignSuccess = (msg) => {
+    setAssignTarget(null);
+    setFeedback(msg);
+    loadParticipants();
+  };
+
+  const handleStubConfirm = () => {
+    setStubTarget(null);
+    setFeedback({ text: 'This action is not yet configured. Please contact the developer.', type: 'error' });
+  };
 
   if (loading) return (
     <div className="flex items-center gap-2 py-6 px-6">
@@ -145,133 +339,224 @@ function ParticipantsPanel({ dealId }) {
   const totalApproved = participants.reduce((s, p) => s + (p.adminApprovedGrams ?? 0), 0);
 
   return (
-    <div className="px-5 py-4" style={{ background: 'rgba(217,119,6,0.03)', borderTop: '1px solid var(--border)' }}>
-      {/* Summary row */}
-      <div className="flex items-center gap-4 flex-wrap mb-3">
-        <div className="flex items-center gap-1.5">
-          <UsersIcon />
-          <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
-            {participants.length} Participant{participants.length !== 1 ? 's' : ''}
-          </span>
+    <>
+      <div className="px-5 py-4" style={{ background: 'rgba(217,119,6,0.03)', borderTop: '1px solid var(--border)' }}>
+        {/* Summary row */}
+        <div className="flex items-center gap-4 flex-wrap mb-3">
+          <div className="flex items-center gap-1.5">
+            <UsersIcon />
+            <span className="text-xs font-bold" style={{ color: 'var(--text-primary)' }}>
+              {participants.length} Participant{participants.length !== 1 ? 's' : ''}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Gold:</span>
+            <span className="text-xs font-black tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{totalGrams}g</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Approved:</span>
+            <span className="text-xs font-black tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{totalApproved}g</span>
+          </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Total Gold:</span>
-          <span className="text-xs font-black tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>{totalGrams}g</span>
-        </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-semibold" style={{ color: 'var(--text-muted)' }}>Approved:</span>
-          <span className="text-xs font-black tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>{totalApproved}g</span>
-        </div>
-      </div>
 
-      {participants.length === 0 ? (
-        <p className="text-xs py-3 text-center" style={{ color: 'var(--text-muted)' }}>No participants yet</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border)', background: 'var(--surface-card)' }}>
-          <table className="w-full text-xs">
-            <thead>
-              <tr style={{ background: 'var(--input-bg)', borderBottom: '1px solid var(--border)' }}>
-                {['#', 'User ID', 'Participation ID', 'Gold Grams', 'Approved Grams', 'Gold Rate', 'Amount', 'Status', 'Collected Date', 'Comments'].map(h => (
-                  <th key={h} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider whitespace-nowrap"
-                    style={{ color: 'var(--text-muted)', fontSize: 10 }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {participants.map((p, i) => (
-                <tr key={p.participationId ?? i}
-                  style={{ borderBottom: i < participants.length - 1 ? '1px solid var(--border)' : 'none' }}
-                  onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+        {participants.length === 0 ? (
+          <p className="text-xs py-3 text-center" style={{ color: 'var(--text-muted)' }}>No participants yet</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl" style={{ border: '1px solid var(--border)', background: 'var(--surface-card)' }}>
+            <table className="w-full text-xs">
+              <thead>
+                <tr style={{ background: 'var(--input-bg)', borderBottom: '1px solid var(--border)' }}>
+                  {['#', 'User ID', 'Participation ID', 'Gold Grams', 'Approved Grams', 'Gold Rate', 'Amount', 'Status', 'Collected Date', 'Comments', 'Actions'].map(h => (
+                    <th key={h} className="text-left py-2.5 px-3 font-semibold uppercase tracking-wider whitespace-nowrap"
+                      style={{ color: 'var(--text-muted)', fontSize: 10 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {participants.map((p, i) => (
+                  <tr key={p.participationId ?? i}
+                    style={{ borderBottom: i < participants.length - 1 ? '1px solid var(--border)' : 'none' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--row-hover)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
 
-                  {/* # */}
-                  <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
+                    {/* # */}
+                    <td className="py-2.5 px-3 font-bold" style={{ color: 'var(--text-muted)' }}>{i + 1}</td>
 
-                  {/* User ID */}
-                  <td className="py-2.5 px-3">
-                    <div className="flex items-center gap-1">
+                    {/* User ID */}
+                    <td className="py-2.5 px-3">
+                      <div className="flex items-center gap-1">
+                        <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
+                          {String(p.userId ?? '').slice(0, 8)}…
+                        </span>
+                        {p.userId && (
+                          <button
+                            onClick={() => handleCopyUserId(p.userId)}
+                            title={copiedUserId === p.userId ? 'Copied!' : 'Copy User ID'}
+                            style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: copiedUserId === p.userId ? '#10b981' : 'var(--text-muted)', lineHeight: 1 }}
+                          >
+                            {copiedUserId === p.userId ? (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            ) : (
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
+                                <rect x="9" y="9" width="13" height="13" rx="2" />
+                                <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+                              </svg>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    </td>
+
+                    {/* Participation ID */}
+                    <td className="py-2.5 px-3">
                       <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
-                        {String(p.userId ?? '').slice(0, 8)}…
+                        {String(p.participationId ?? '').slice(0, 8)}…
                       </span>
-                      {p.userId && (
+                    </td>
+
+                    {/* Gold Grams */}
+                    <td className="py-2.5 px-3 font-black tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
+                      {p.participatedGoldGrams ?? '—'}g
+                    </td>
+
+                    {/* Approved Grams */}
+                    <td className="py-2.5 px-3 tabular-nums" style={{ color: p.adminApprovedGrams != null ? '#10b981' : 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                      {p.adminApprovedGrams != null ? `${p.adminApprovedGrams}g` : '—'}
+                    </td>
+
+                    {/* Gold Rate */}
+                    <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
+                      {p.goldRate != null ? fmtINR(p.goldRate) : '—'}
+                    </td>
+
+                    {/* Amount */}
+                    <td className="py-2.5 px-3 font-bold tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
+                      {fmtINR(p.participatedAmount)}
+                    </td>
+
+                    {/* Status */}
+                    <td className="py-2.5 px-3">
+                      <span className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
+                        style={{
+                          background: p.goldStatus === 'APPROVED'
+                            ? 'rgba(16,185,129,0.1)'
+                            : p.goldStatus
+                              ? 'rgba(99,102,241,0.1)'
+                              : 'rgba(107,114,128,0.1)',
+                          color: p.goldStatus === 'APPROVED'
+                            ? '#10b981'
+                            : p.goldStatus
+                              ? '#818cf8'
+                              : '#9ca3af',
+                          border: `1px solid ${
+                            p.goldStatus === 'APPROVED'
+                              ? 'rgba(16,185,129,0.2)'
+                              : p.goldStatus
+                                ? 'rgba(99,102,241,0.2)'
+                                : 'rgba(107,114,128,0.2)'
+                          }`,
+                          fontSize: 10
+                        }}>
+                        {p.goldStatus ?? 'Pending'}
+                      </span>
+                    </td>
+
+                    {/* Collected Date */}
+                    <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)' }}>
+                      {p.goldCollectedDate ?? '—'}
+                    </td>
+
+                    {/* Comments */}
+                    <td className="py-2.5 px-3" style={{ color: 'var(--text-muted)', maxWidth: 160 }}>
+                      <span className="block truncate" title={p.comments ?? ''}>
+                        {p.comments ?? '—'}
+                      </span>
+                    </td>
+
+                    {/* Actions */}
+                    <td className="py-2.5 px-3 whitespace-nowrap">
+                      {/* Assign: when goldStatus is null or PENDING */}
+                      {(p.goldStatus == null || p.goldStatus === 'PENDING') && (
                         <button
-                          onClick={() => handleCopyUserId(p.userId)}
-                          title={copiedUserId === p.userId ? 'Copied!' : 'Copy User ID'}
-                          style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: copiedUserId === p.userId ? '#10b981' : 'var(--text-muted)', lineHeight: 1 }}
-                        >
-                          {copiedUserId === p.userId ? (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          ) : (
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="w-2.5 h-2.5">
-                              <rect x="9" y="9" width="13" height="13" rx="2" />
-                              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-                            </svg>
-                          )}
+                          onClick={() => setAssignTarget(p)}
+                          className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            background: 'rgba(245,158,11,0.15)',
+                            color: '#f59e0b',
+                            border: '1px solid rgba(245,158,11,0.3)',
+                          }}>
+                          Assign
                         </button>
                       )}
-                    </div>
-                  </td>
 
-                  {/* Participation ID */}
-                  <td className="py-2.5 px-3">
-                    <span className="font-mono" style={{ color: 'var(--text-muted)', fontSize: 9 }}>
-                      {String(p.participationId ?? '').slice(0, 8)}…
-                    </span>
-                  </td>
+                      {/* Collected: when goldStatus === ASSIGNED */}
+                      {p.goldStatus === 'ASSIGNED' && (
+                        <button
+                          onClick={() => setStubTarget({ type: 'collected', participation: p })}
+                          className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            background: 'rgba(99,102,241,0.15)',
+                            color: '#6366f1',
+                            border: '1px solid rgba(99,102,241,0.3)',
+                          }}>
+                          Collected
+                        </button>
+                      )}
 
-                  {/* Gold Grams */}
-                  <td className="py-2.5 px-3 font-black tabular-nums" style={{ color: '#f59e0b', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {p.participatedGoldGrams ?? '—'}g
-                  </td>
+                      {/* Approve: when goldStatus === COLLECTED */}
+                      {p.goldStatus === 'COLLECTED' && (
+                        <button
+                          onClick={() => setStubTarget({ type: 'approve', participation: p })}
+                          className="px-2.5 py-1 rounded-lg text-xs font-black transition-all hover:scale-105 active:scale-95"
+                          style={{
+                            background: 'rgba(16,185,129,0.15)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16,185,129,0.3)',
+                          }}>
+                          Approve
+                        </button>
+                      )}
 
-                  {/* Approved Grams */}
-                  <td className="py-2.5 px-3 tabular-nums" style={{ color: p.adminApprovedGrams != null ? '#10b981' : 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {p.adminApprovedGrams != null ? `${p.adminApprovedGrams}g` : '—'}
-                  </td>
+                      {/* APPROVED or any other status: no action button */}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
 
-                  {/* Gold Rate */}
-                  <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {p.goldRate != null ? fmtINR(p.goldRate) : '—'}
-                  </td>
-
-                  {/* Amount */}
-                  <td className="py-2.5 px-3 font-bold tabular-nums" style={{ color: '#10b981', fontFamily: "'JetBrains Mono', monospace" }}>
-                    {fmtINR(p.participatedAmount)}
-                  </td>
-
-                  {/* Status */}
-                  <td className="py-2.5 px-3">
-                    <span className="px-2 py-0.5 rounded-full font-semibold whitespace-nowrap"
-                      style={{
-                        background: p.goldStatus ? 'rgba(99,102,241,0.1)' : 'rgba(107,114,128,0.1)',
-                        color: p.goldStatus ? '#818cf8' : '#9ca3af',
-                        border: `1px solid ${p.goldStatus ? 'rgba(99,102,241,0.2)' : 'rgba(107,114,128,0.2)'}`,
-                        fontSize: 10
-                      }}>
-                      {p.goldStatus ?? 'Pending'}
-                    </span>
-                  </td>
-
-                  {/* Collected Date */}
-                  <td className="py-2.5 px-3 tabular-nums" style={{ color: 'var(--text-muted)' }}>
-                    {p.goldCollectedDate ?? '—'}
-                  </td>
-
-                  {/* Comments */}
-                  <td className="py-2.5 px-3" style={{ color: 'var(--text-muted)', maxWidth: 160 }}>
-                    <span className="block truncate" title={p.comments ?? ''}>
-                      {p.comments ?? '—'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {/* Assign modal */}
+      {assignTarget && (
+        <AssignModal
+          participation={assignTarget}
+          dealId={dealId}
+          adminUser={user}
+          onClose={() => setAssignTarget(null)}
+          onSuccess={handleAssignSuccess}
+        />
       )}
-    </div>
+
+      {/* Stub confirm modal */}
+      {stubTarget && (
+        <StubConfirmModal
+          title={stubTarget.type === 'collected' ? 'Mark as Collected' : 'Admin Approve'}
+          message={stubTarget.type === 'collected'
+            ? 'Mark this participation as Collected?'
+            : 'Approve this real gold participation?'}
+          onConfirm={handleStubConfirm}
+          onClose={() => setStubTarget(null)}
+        />
+      )}
+
+      {/* Feedback modal */}
+      {feedback && (
+        <FeedbackModal message={feedback} onClose={() => setFeedback(null)} />
+      )}
+    </>
   );
 }
 
@@ -287,9 +572,9 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
   const isAchieved = deal.dealStatus === 'ACHIEVED';
 
   const fillColor  = fillPct >= 100 ? '#ef4444' : fillPct >= 80 ? '#f59e0b' : '#10b981';
-  
+
   const [copied, setCopied] = useState(false);
-  
+
   const handleCopy = (id) => {
     navigator.clipboard.writeText(id).then(() => {
       setCopied(true);
@@ -409,10 +694,7 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
                 ✓ Achieved
               </span>
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(deal);
-                }}
+                onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
                 style={{ background: 'linear-gradient(135deg, #6366f1, #4338ca)', boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }}
               >
@@ -421,23 +703,15 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
             </div>
           ) : (
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Edit button */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onEdit(deal);
-                }}
+                onClick={(e) => { e.stopPropagation(); onEdit(deal); }}
                 className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
                 style={{ background: 'linear-gradient(135deg, #6366f1, #4338ca)', boxShadow: '0 2px 8px rgba(99,102,241,0.25)' }}
               >
                 <EditIcon /> Edit
               </button>
-              {/* Close Manually button */}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onDeactivate(deal);
-                }}
+                onClick={(e) => { e.stopPropagation(); onDeactivate(deal); }}
                 className="text-xs px-2.5 py-1.5 rounded-full font-bold transition-all hover:scale-105 text-white whitespace-nowrap"
                 style={{ background: 'linear-gradient(135deg, #ef4444, #dc2626)', boxShadow: '0 2px 8px rgba(239,68,68,0.2)' }}
               >
@@ -467,11 +741,10 @@ function DealRow({ deal, idx, tabColor, expandedId, onToggle, showDeactivate, on
         </td>
       </tr>
 
-      {/* Expanded participants — top border matches accent */}
+      {/* Expanded participants */}
       {expanded && (
         <tr style={{ borderBottom: '1px solid var(--border)' }}>
           <td colSpan={9} style={{ padding: 0, boxShadow: `inset 4px 0 0 ${tabColor}` }}>
-            {/* Thin accent top line */}
             <div style={{ height: 2, background: `linear-gradient(90deg, ${tabColor}, ${tabColor}00)` }} />
             <ParticipantsPanel dealId={dealKey} />
           </td>
@@ -504,8 +777,6 @@ export default function AdminRealGold() {
     setLoading(true); setError(''); setDeals([]);
 
     const { group, subTab } = SUB_TAB_MAP[subTabKey] ?? {};
-
-    // All Real Gold tabs: getDealsByStatusType
     const statusType = subTab?.statusType ?? 'NOTACHIEVED';
     getDealsByStatusType(statusType)
       .then(res => {
@@ -520,7 +791,7 @@ export default function AdminRealGold() {
 
   const confirmManualCloseDeal = () => {
     if (!dealToClose) return;
-    const dealId = dealToClose.dealId || dealToClose.id;
+    const dealId   = dealToClose.dealId || dealToClose.id;
     const dealName = dealToClose.dealName || 'this deal';
 
     setClosingDealLoader(true);
@@ -536,9 +807,7 @@ export default function AdminRealGold() {
         setError(err.message || `Failed to close "${dealName}" manually.`);
         setDealToClose(null);
       })
-      .finally(() => {
-        setClosingDealLoader(false);
-      });
+      .finally(() => setClosingDealLoader(false));
   };
 
   const currentGroup  = TAB_GROUPS.find(g => g.key === activeGroup) ?? TAB_GROUPS[0];
@@ -554,7 +823,6 @@ export default function AdminRealGold() {
     if (dealFilter === 'FULL')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total <= 0 || invested < total) return false; }
     if (dealFilter === 'OPEN')     { const invested = d.totalParticipationAmount ?? d.dealParticipationValue ?? 0; const total = d.dealValue ?? d.dealAmount ?? 0; if (total > 0 && invested >= total) return false; }
 
-    // Only show REALGOLD deals
     return d.dealType !== 'TEST' && d.globalDealType === 'REALGOLD';
   });
 
@@ -567,11 +835,11 @@ export default function AdminRealGold() {
     : '—';
 
   const kpis = [
-    { label: 'Total Deals',    value: String(filtered.length),   color: tabColor  },
-    { label: 'Total Deal Size',value: fmtINR(totalDealValue),    color: '#818cf8' },
-    { label: 'Total Invested', value: fmtINR(totalParticipated), color: '#10b981' },
-    { label: 'Remaining',      value: fmtINR(totalRemaining),    color: '#f59e0b' },
-    { label: 'Avg ROI',        value: filtered.length ? `${avgRoi}%` : '—', color: '#f59e0b' },
+    { label: 'Total Deals',     value: String(filtered.length),   color: tabColor  },
+    { label: 'Total Deal Size', value: fmtINR(totalDealValue),    color: '#818cf8' },
+    { label: 'Total Invested',  value: fmtINR(totalParticipated), color: '#10b981' },
+    { label: 'Remaining',       value: fmtINR(totalRemaining),    color: '#f59e0b' },
+    { label: 'Avg ROI',         value: filtered.length ? `${avgRoi}%` : '—', color: '#f59e0b' },
   ];
 
   return (
@@ -605,9 +873,8 @@ export default function AdminRealGold() {
         ))}
       </div>
 
-      {/* Tabs + Search — same row */}
+      {/* Tabs + Search */}
       <div className="grid gap-2">
-        {/* Status sub-tabs */}
         <div className="flex items-center gap-3 flex-wrap">
           <div className="flex gap-1 p-1 rounded-xl flex-shrink-0"
             style={{ background: 'var(--input-bg)', border: `1px solid ${currentGroup.color}25` }}>
@@ -630,7 +897,6 @@ export default function AdminRealGold() {
             className="rounded-xl text-sm outline-none flex-1"
             style={{ padding: '9px 14px', background: 'var(--input-bg)', border: '1px solid var(--border)', color: 'var(--text-primary)', minWidth: 200 }}
           />
-          {/* Deal status filter */}
           <div className="relative flex-shrink-0">
             <select
               value={dealFilter}
@@ -689,7 +955,6 @@ export default function AdminRealGold() {
         <div className="rounded-2xl overflow-hidden"
           style={{ background: 'var(--surface-card)', border: '1px solid var(--border)', boxShadow: '0 4px 24px rgba(0,0,0,0.06)' }}>
 
-          {/* Table header bar */}
           <div className="px-5 py-3.5 flex items-center gap-2"
             style={{ borderBottom: '1px solid var(--border)', background: `${tabColor}08` }}>
             <div className="w-2 h-2 rounded-full" style={{ background: tabColor, boxShadow: `0 0 6px ${tabColor}` }} />
@@ -740,8 +1005,8 @@ export default function AdminRealGold() {
 
       {/* Confirm Manual Deal Closure Modal */}
       {dealToClose && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
-          <div className="w-full max-w-md p-6 rounded-2xl border shadow-2xl animate-scale-up"
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="w-full max-w-md p-6 rounded-2xl border shadow-2xl"
             style={{ background: 'var(--surface-card)', borderColor: 'var(--border)' }}>
             <h3 className="text-lg font-black tracking-tight" style={{ color: 'var(--text-primary)' }}>
               Confirm Deal Closure

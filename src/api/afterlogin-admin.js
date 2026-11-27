@@ -652,6 +652,23 @@ export async function getRealGoldParticipations(dealId) {
 }
 
 /**
+ * GET /auth-service/auth/collectedUsers
+ * Returns list of users with COLLECTED role.
+ */
+export async function getCollectedUsers() {
+  return get('/auth-service/auth/collectedUsers');
+}
+
+/**
+ * POST /oxybrick-service/assignRealGoldPilot
+ * Assigns a collected-role user to a real gold participation.
+ */
+export async function assignRealGoldPilot(payload) {
+  return post('/oxybrick-service/assignRealGoldPilot', payload);
+  // payload: { assignedBy, collectedId, dealId, participationId, userId }
+}
+
+/**
  * PATCH /oxybrick-service/dealClosedManually?dealI={dealId}
  * Close / de-activate a deal manually.
  */
